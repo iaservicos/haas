@@ -10,6 +10,8 @@ export const corsOptions = cors({
     // Produção
     'https://haas-5vgy.vercel.app',
     'https://haas-mu.vercel.app',
+    'https://portalhaas.iaservicos.online',
+
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
