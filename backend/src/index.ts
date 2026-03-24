@@ -11,8 +11,6 @@ import fotosRoutes from './routes/fotos.js';
 import usuarioRoutes from './routes/usuarioroutes.js';
 import gptmakerRoutes from './routes/gptmakerRoutes.js';
 
-
-
 const app = express();
 
 
