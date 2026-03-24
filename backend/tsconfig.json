@@ -14,8 +14,7 @@
     "declaration": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noImplicitReturns": false,
-    "suppressImplicitAnyIndexErrors": true
+    "noImplicitReturns": false
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
