@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const API_BASE_URL = 'https://haas-mu.vercel.app';
+
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -45,7 +47,7 @@ export function ChangePasswordModal({ isOpen, onClose, usuarioId, usuarioEmail }
       setLoading(true);
       
       // Chamar API para alterar senha
-      const response = await fetch('/api/usuario/alterar-senha', {
+      const response = await fetch(`${API_BASE_URL}/api/usuario/alterar-senha`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
