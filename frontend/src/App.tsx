@@ -4,14 +4,15 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Fotos } from './pages/Fotos';
-import { LoginUnificado } from './components/LoginUnificado';
-import { PortalAnalista } from './components/PortalAnalista';
-import { PortalCliente } from './components/PortalCliente';
+import VerConfirmacoes from './pages/VerConfirmacoes';
+import { GerenciarContratos } from './pages/GerenciarContratos';
+import { GerenciarClientes } from './pages/GerenciarClientes';
+import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
+
 
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-
 
   if (loading) {
     return (
@@ -24,10 +25,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 }
-
 
 function AppRoutes() {
   return (
@@ -49,19 +48,42 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/contratos"
+        element={
+          <ProtectedRoute>
+            <GerenciarContratos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/clientes"
+        element={
+          <ProtectedRoute>
+            <GerenciarClientes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/equipamentos"
+        element={
+          <ProtectedRoute>
+            <GerenciarEquipamentos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/confirmacoes"
+        element={
+          <ProtectedRoute>
+            <VerConfirmacoes />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
-
-// Dentro do componente App:
-<Routes>
-  <Route path="/login" element={<LoginUnificado />} />
-  <Route path="/portal-analista" element={<PortalAnalista />} />
-  <Route path="/portal-cliente" element={<PortalCliente />} />
-  {/* outras rotas */}
-</Routes>
-
 
 export function App() {
   return (
