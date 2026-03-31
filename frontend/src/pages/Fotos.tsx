@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../services/supabase";
@@ -174,8 +173,24 @@ export function Fotos() {
         <nav className="flex-1 p-4 space-y-2">
           <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
           
-          <a href="/dashboard" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+          <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Dashboard</span>}
+          </a>
+
+          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Contratos</span>}
+          </a>
+
+          <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Clientes</span>}
+          </a>
+
+          <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Equipamentos</span>}
+          </a>
+
+          <a href="/confirmacoes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Confirmações</span>}
           </a>
 
           <a href="/fotos" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
@@ -301,69 +316,53 @@ export function Fotos() {
                         const paginaAtual = getPaginaGrupo(grupo.chave);
                         const totalFotos = grupo.fotos.length;
                         const totalPaginas = Math.ceil(totalFotos / FOTOS_POR_PAGINA);
-                        const inicioIndex = (paginaAtual - 1) * FOTOS_POR_PAGINA;
-                        const fimIndex = inicioIndex + FOTOS_POR_PAGINA;
-                        const fotosNaPagina = grupo.fotos.slice(inicioIndex, fimIndex);
+                        const inicio = (paginaAtual - 1) * FOTOS_POR_PAGINA;
+                        const fim = inicio + FOTOS_POR_PAGINA;
+                        const fotosPagina = grupo.fotos.slice(inicio, fim);
 
                         return (
-                          <div className="p-6">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                              {fotosNaPagina.map((foto) => (
-                                <div
-                                  key={foto.id}
-                                  className="bg-gray-50 rounded-lg overflow-hidden hover:shadow-lg transition group"
-                                >
-                                  <div className="aspect-square bg-gray-200 overflow-hidden relative">
-                                    <img
-                                      src={foto.url_foto}
-                                      alt={foto.nome_arquivo}
-                                      className="w-full h-full object-cover hover:scale-105 transition"
-                                    />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition flex items-center justify-center">
-                                      <a
-                                        href={foto.url_foto}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="opacity-0 group-hover:opacity-100 transition px-2 py-1 bg-blue-600 text-white text-xs rounded font-semibold"
-                                      >
-                                        Ver
-                                      </a>
-                                    </div>
-                                  </div>
-                                  <div className="p-2">
-                                    <p className="text-xs font-bold text-gray-900 truncate">{foto.nome_arquivo}</p>
-                                    <p className="text-xs text-gray-500 truncate">{formatarData(foto.data_foto)}</p>
+                          <div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">
+                              {fotosPagina.map((foto) => (
+                                <div key={foto.id} className="group relative">
+                                  <img
+                                    src={foto.url_foto}
+                                    alt={foto.nome_arquivo}
+                                    className="w-full h-32 object-cover rounded-lg hover:opacity-75 transition cursor-pointer"
+                                  />
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition rounded-lg flex items-center justify-center">
+                                    <a
+                                      href={foto.url_foto}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-white opacity-0 group-hover:opacity-100 transition text-sm font-semibold"
+                                    >
+                                      Ver
+                                    </a>
                                   </div>
                                 </div>
                               ))}
                             </div>
 
-                            {/* PAGINAÇÃO DENTRO DA PASTA */}
+                            {/* PAGINAÇÃO */}
                             {totalPaginas > 1 && (
-                              <div className="mt-6 flex items-center justify-between pt-6 border-t border-gray-200">
+                              <div className="flex justify-center items-center gap-2 p-4 border-t border-gray-200">
                                 <button
                                   onClick={() => mudarPaginaGrupo(grupo.chave, Math.max(1, paginaAtual - 1))}
                                   disabled={paginaAtual === 1}
-                                  className="px-3 py-1 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                                 >
-                                  ← Anterior
+                                  ←
                                 </button>
-
-                                <div className="text-center text-sm">
-                                  <p className="font-semibold text-gray-900">
-                                    Página <span className="text-blue-600">{paginaAtual}</span> de <span className="text-blue-600">{totalPaginas}</span>
-                                  </p>
-                                  <p className="text-xs text-gray-600 mt-1">
-                                    {inicioIndex + 1} a {Math.min(fimIndex, totalFotos)} de {totalFotos} fotos
-                                  </p>
-                                </div>
-
+                                <span className="text-sm text-gray-600">
+                                  Página {paginaAtual} de {totalPaginas}
+                                </span>
                                 <button
                                   onClick={() => mudarPaginaGrupo(grupo.chave, Math.min(totalPaginas, paginaAtual + 1))}
                                   disabled={paginaAtual === totalPaginas}
-                                  className="px-3 py-1 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
                                 >
-                                  Próxima →
+                                  →
                                 </button>
                               </div>
                             )}
@@ -375,20 +374,7 @@ export function Fotos() {
                 </div>
               )}
             </div>
-
-            {/* RESUMO */}
-            {todasFotos.length > 0 && (
-              <div className="mt-8 text-center text-gray-600">
-                <p className="font-semibold">Total de fotos: {todasFotos.length}</p>
-                <p className="text-sm">Total de pastas: {gruposFotos.length}</p>
-              </div>
-            )}
           </div>
-        </div>
-
-        {/* FOOTER */}
-        <div className="bg-gray-900 text-gray-400 text-xs py-4 px-8 border-t border-gray-800">
-          <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
         </div>
       </div>
     </div>
