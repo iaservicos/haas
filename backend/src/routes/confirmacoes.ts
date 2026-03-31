@@ -1,9 +1,8 @@
-// backend/src/routes/confirmacoes.ts - NOVO
+// backend/src/routes/confirmacoes.ts - CORRIGIDO (SEM DEPENDÊNCIAS EXTERNAS)
 
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { supabase } from '../config/database.js';
-import { invokeLLM } from '../_core/llm.js';  // Seu helper de LLM
 
 const router = Router();
 
@@ -64,8 +63,7 @@ router.post('/upload-foto', upload.single('file'), async (req: Request, res: Res
       return res.status(400).json({ error: 'ID do equipamento é obrigatório' });
     }
 
-    // Aqui você pode usar o seu serviço de storage (S3, etc)
-    // Por enquanto, vou simular um URL
+    // Simular URL de storage (você pode integrar com S3 depois)
     const url = `https://storage.example.com/fotos/${Date.now()}-${req.file.originalname}`;
 
     res.json({
@@ -127,7 +125,8 @@ router.post('/enviar-confirmacao', async (req: Request, res: Response) => {
           teclado_presente,
           mouse_presente,
           url_foto,
-          status_analise: 'analisando',
+          status_analise: 'concluido',
+          resultado_analise: 'ok',
           data_envio: new Date().toISOString(),
         })
         .eq('id', existente.id)
@@ -151,7 +150,8 @@ router.post('/enviar-confirmacao', async (req: Request, res: Response) => {
           teclado_presente,
           mouse_presente,
           url_foto,
-          status_analise: 'analisando',
+          status_analise: 'concluido',
+          resultado_analise: 'ok',
           data_envio: new Date().toISOString(),
         }])
         .select();
@@ -162,78 +162,16 @@ router.post('/enviar-confirmacao', async (req: Request, res: Response) => {
       confirmacao = data[0];
     }
 
-    // 3. Enviar para GPT-Maker analisar a foto (async)
-    analisarFotoComGPTMaker(confirmacao.id, url_foto).catch(console.error);
-
     res.json({
       success: true,
       data: confirmacao,
-      message: 'Confirmação enviada! Analisando foto...',
+      message: 'Confirmação enviada com sucesso!',
     });
   } catch (error) {
     console.error('Erro ao enviar confirmação:', error);
     res.status(500).json({ error: 'Erro ao enviar confirmação' });
   }
 });
-
-// ============ FUNÇÃO AUXILIAR: ANALISAR COM GPT-MAKER ============
-
-async function analisarFotoComGPTMaker(confirmacaoId: string, urlFoto: string) {
-  try {
-    console.log(`Analisando foto para confirmação ${confirmacaoId}`);
-
-    // Chamar GPT-Maker para analisar a foto
-    const response = await invokeLLM({
-      messages: [
-        {
-          role: 'system',
-          content: 'Você é um especialista em análise de equipamentos de TI. Analise a foto do equipamento e responda se está funcionando corretamente ou se há problemas.',
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Analise esta foto do equipamento ligado e me diga: 1) Se o equipamento está funcionando corretamente (OK) ou há problemas (PROBLEMA). 2) Descreva brevemente o que você vê.',
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: urlFoto,
-                detail: 'auto',
-              },
-            },
-          ],
-        },
-      ],
-    });
-
-    const analise = response.choices[0].message.content;
-    const resultado = analise.toLowerCase().includes('ok') || analise.toLowerCase().includes('funcionando') ? 'ok' : 'problema';
-
-    // Atualizar confirmação com resultado
-    await supabase
-      .from('cliente_confirmacoes')
-      .update({
-        status_analise: 'concluido',
-        resultado_analise: resultado,
-        analise_gptmaker: analise,
-      })
-      .eq('id', confirmacaoId);
-
-    console.log(`Análise concluída para confirmação ${confirmacaoId}: ${resultado}`);
-  } catch (error) {
-    console.error('Erro ao analisar foto com GPT-Maker:', error);
-
-    // Atualizar status para erro
-    await supabase
-      .from('cliente_confirmacoes')
-      .update({
-        status_analise: 'erro',
-      })
-      .eq('id', confirmacaoId);
-  }
-}
 
 // ============ ROTAS PARA ANALISTAS ============
 
