@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from "../context/AuthContext";
+import { supabase } from '../services/supabase';
 
 interface Equipamento {
-  id: string;
+  id: number;
+  contrato_id: number;
   numero_serie: string;
   modelo: string;
-  tipo_equipamento: string;
-  contrato_id: string;
-  contrato_nome: string;
-  status: 'ativo' | 'inativo';
+  sku: string | null;
+  data_criacao: string;
 }
 
 interface Contrato {
-  id: string;
-  nome: string;
+  id: number;
+  numero_contrato: string;
 }
 
 export function GerenciarEquipamentos() {
@@ -22,19 +22,21 @@ export function GerenciarEquipamentos() {
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [filtroContrato, setFiltroContrato] = useState('');
-  const [showNovoForm, setShowNovoForm] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-
-  const [novoEquipamento, setNovoEquipamento] = useState({
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedContrato, setSelectedContrato] = useState<string>('');
+  
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  
+  // Form states
+  const [formData, setFormData] = useState({
+    contrato_id: '',
     numero_serie: '',
     modelo: '',
-    tipo_equipamento: 'Notebook',
-    contrato_id: '',
+    sku: '',
   });
-
-  const [editData, setEditData] = useState<Partial<Equipamento>>({});
 
   useEffect(() => {
     carregarDados();
@@ -43,102 +45,148 @@ export function GerenciarEquipamentos() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-
+      
       // Carregar contratos
-      const respContratos = await fetch('/api/contratos/listar', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
-      const dataContratos = await respContratos.json();
-      if (dataContratos.success) {
-        setContratos(dataContratos.data || []);
-      }
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('contratos')
+        .select('id, numero_contrato')
+        .order('numero_contrato', { ascending: true });
+
+      if (contratosError) throw contratosError;
+      setContratos(contratosData || []);
 
       // Carregar equipamentos
-      const respEquipamentos = await fetch('/api/equipamentos/listar', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
-      const dataEquipamentos = await respEquipamentos.json();
-      if (dataEquipamentos.success) {
-        setEquipamentos(dataEquipamentos.data || []);
-      }
+      carregarEquipamentos();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      alert('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditClick = (equipamento: Equipamento) => {
-    setEditandoId(equipamento.id);
-    setEditData({ ...equipamento });
-  };
-
-  const handleSalvarEdicao = async (id: string) => {
+  const carregarEquipamentos = async () => {
     try {
-      setSalvando(true);
-      const response = await fetch(`/api/equipamentos/atualizar/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editData),
-      });
+      let query = supabase
+        .from('contrato_equipamentos')
+        .select('*')
+        .order('data_criacao', { ascending: false });
 
-      const data = await response.json();
-      if (data.success) {
-        alert('Equipamento atualizado com sucesso!');
-        setEditandoId(null);
-        carregarDados();
-      } else {
-        alert('Erro ao atualizar: ' + data.message);
+      if (selectedContrato) {
+        query = query.eq('contrato_id', parseInt(selectedContrato));
       }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setEquipamentos(data || []);
     } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar equipamento');
-    } finally {
-      setSalvando(false);
+      console.error('Erro ao carregar equipamentos:', error);
     }
   };
 
-  const handleInserirNovo = async () => {
-    if (!novoEquipamento.numero_serie || !novoEquipamento.modelo || !novoEquipamento.contrato_id) {
-      alert('Preencha todos os campos');
+  const handleOpenModal = (equipamento?: Equipamento) => {
+    if (equipamento) {
+      setIsEditing(true);
+      setEditingId(equipamento.id);
+      setFormData({
+        contrato_id: equipamento.contrato_id.toString(),
+        numero_serie: equipamento.numero_serie,
+        modelo: equipamento.modelo,
+        sku: equipamento.sku || '',
+      });
+    } else {
+      setIsEditing(false);
+      setEditingId(null);
+      setFormData({
+        contrato_id: '',
+        numero_serie: '',
+        modelo: '',
+        sku: '',
+      });
+    }
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setFormData({
+      contrato_id: '',
+      numero_serie: '',
+      modelo: '',
+      sku: '',
+    });
+  };
+
+  const handleSave = async () => {
+    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo) {
+      alert('Preencha os campos obrigatórios: Contrato, Série e Modelo');
       return;
     }
 
     try {
-      setSalvando(true);
-      const response = await fetch('/api/equipamentos/criar', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(novoEquipamento),
-      });
+      if (isEditing && editingId) {
+        // Atualizar
+        const { error } = await supabase
+          .from('contrato_equipamentos')
+          .update({
+            contrato_id: parseInt(formData.contrato_id),
+            numero_serie: formData.numero_serie,
+            modelo: formData.modelo,
+            sku: formData.sku || null,
+          })
+          .eq('id', editingId);
 
-      const data = await response.json();
-      if (data.success) {
-        alert('Equipamento inserido com sucesso!');
-        setNovoEquipamento({ numero_serie: '', modelo: '', tipo_equipamento: 'Notebook', contrato_id: '' });
-        setShowNovoForm(false);
-        carregarDados();
+        if (error) throw error;
+        alert('Equipamento atualizado com sucesso!');
       } else {
-        alert('Erro ao inserir: ' + data.message);
+        // Inserir novo
+        const { error } = await supabase
+          .from('contrato_equipamentos')
+          .insert([{
+            contrato_id: parseInt(formData.contrato_id),
+            numero_serie: formData.numero_serie,
+            modelo: formData.modelo,
+            sku: formData.sku || null,
+          }]);
+
+        if (error) throw error;
+        alert('Equipamento adicionado com sucesso!');
       }
+
+      handleCloseModal();
+      carregarEquipamentos();
     } catch (error) {
-      console.error('Erro ao inserir:', error);
-      alert('Erro ao inserir equipamento');
-    } finally {
-      setSalvando(false);
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar equipamento');
     }
   };
 
-  const equipamentosFiltrados = equipamentos.filter(eq => {
-    if (filtroContrato && eq.contrato_id !== filtroContrato) return false;
-    return true;
-  });
+  const handleDelete = async (id: number) => {
+    if (!confirm('Tem certeza que deseja deletar este equipamento?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('contrato_equipamentos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      alert('Equipamento deletado com sucesso!');
+      carregarEquipamentos();
+    } catch (error) {
+      console.error('Erro ao deletar:', error);
+      alert('Erro ao deletar equipamento');
+    }
+  };
+
+  const filteredEquipamentos = equipamentos.filter(
+    (equip) =>
+      equip.numero_serie.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      equip.modelo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -212,202 +260,200 @@ export function GerenciarEquipamentos() {
         <div className="flex-1 overflow-auto">
           <div className="p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Equipamentos Cadastrados</h2>
+              <h2 className="text-3xl font-bold text-gray-900">Equipamentos</h2>
               <button
-                onClick={() => setShowNovoForm(!showNovoForm)}
+                onClick={() => handleOpenModal()}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
               >
                 + Novo Equipamento
               </button>
             </div>
 
-            {/* FORMULÁRIO DE NOVO EQUIPAMENTO */}
-            {showNovoForm && (
-              <div className="bg-white rounded-lg shadow p-6 mb-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Inserir Novo Equipamento</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Número de Série *</label>
-                    <input
-                      type="text"
-                      value={novoEquipamento.numero_serie}
-                      onChange={(e) => setNovoEquipamento({ ...novoEquipamento, numero_serie: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: ABC123456"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Modelo *</label>
-                    <input
-                      type="text"
-                      value={novoEquipamento.modelo}
-                      onChange={(e) => setNovoEquipamento({ ...novoEquipamento, modelo: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: Positivo Motion"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                    <select
-                      value={novoEquipamento.tipo_equipamento}
-                      onChange={(e) => setNovoEquipamento({ ...novoEquipamento, tipo_equipamento: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Notebook">Notebook</option>
-                      <option value="Desktop">Desktop</option>
-                      <option value="Monitor">Monitor</option>
-                      <option value="Impressora">Impressora</option>
-                      <option value="Outro">Outro</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Contrato *</label>
-                    <select
-                      value={novoEquipamento.contrato_id}
-                      onChange={(e) => setNovoEquipamento({ ...novoEquipamento, contrato_id: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Selecione um contrato</option>
-                      {contratos.map(contrato => (
-                        <option key={contrato.id} value={contrato.id}>
-                          {contrato.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-4">
-                  <button
-                    onClick={handleInserirNovo}
-                    disabled={salvando}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                  >
-                    {salvando ? 'Salvando...' : 'Salvar'}
-                  </button>
-                  <button
-                    onClick={() => setShowNovoForm(false)}
-                    className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition"
-                  >
-                    Cancelar
-                  </button>
-                </div>
+            {/* FILTROS */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
+                <select
+                  value={selectedContrato}
+                  onChange={(e) => {
+                    setSelectedContrato(e.target.value);
+                    if (e.target.value) {
+                      carregarEquipamentos();
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todos os contratos</option>
+                  {contratos.map((contrato) => (
+                    <option key={contrato.id} value={contrato.id}>
+                      {contrato.numero_contrato}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
 
-            {/* FILTRO */}
-            <div className="bg-white rounded-lg shadow p-4 mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
-              <select
-                value={filtroContrato}
-                onChange={(e) => setFiltroContrato(e.target.value)}
-                className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Todos os contratos</option>
-                {contratos.map(contrato => (
-                  <option key={contrato.id} value={contrato.id}>
-                    {contrato.nome}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
+                <input
+                  type="text"
+                  placeholder="Buscar por série ou modelo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
-            {/* TABELA */}
             {loading ? (
               <p className="text-center text-gray-600">Carregando equipamentos...</p>
-            ) : equipamentosFiltrados.length === 0 ? (
+            ) : filteredEquipamentos.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
-                <p className="text-gray-600">Nenhum equipamento encontrado</p>
+                <p className="text-gray-600 mb-4">Nenhum equipamento encontrado</p>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Série</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Tipo</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ação</th>
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Série</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Data Criação</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredEquipamentos.map((equipamento) => (
+                      <tr key={equipamento.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{equipamento.numero_serie}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.sku || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {contratos.find(c => c.id === equipamento.contrato_id)?.numero_contrato || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {new Date(equipamento.data_criacao).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4 text-sm space-x-2">
+                          <button
+                            onClick={() => handleOpenModal(equipamento)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(equipamento.id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Deletar
+                          </button>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {equipamentosFiltrados.map((eq) => (
-                        <tr key={eq.id} className="hover:bg-gray-50">
-                          {editandoId === eq.id ? (
-                            <>
-                              <td className="px-6 py-4">
-                                <input
-                                  type="text"
-                                  value={editData.numero_serie || ''}
-                                  onChange={(e) => setEditData({ ...editData, numero_serie: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                />
-                              </td>
-                              <td className="px-6 py-4">
-                                <input
-                                  type="text"
-                                  value={editData.modelo || ''}
-                                  onChange={(e) => setEditData({ ...editData, modelo: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                />
-                              </td>
-                              <td className="px-6 py-4">
-                                <select
-                                  value={editData.tipo_equipamento || ''}
-                                  onChange={(e) => setEditData({ ...editData, tipo_equipamento: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                >
-                                  <option value="Notebook">Notebook</option>
-                                  <option value="Desktop">Desktop</option>
-                                  <option value="Monitor">Monitor</option>
-                                  <option value="Impressora">Impressora</option>
-                                  <option value="Outro">Outro</option>
-                                </select>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{eq.contrato_nome}</td>
-                              <td className="px-6 py-4 text-sm space-x-2">
-                                <button
-                                  onClick={() => handleSalvarEdicao(eq.id)}
-                                  disabled={salvando}
-                                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition disabled:opacity-50"
-                                >
-                                  Salvar
-                                </button>
-                                <button
-                                  onClick={() => setEditandoId(null)}
-                                  className="bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400 transition"
-                                >
-                                  Cancelar
-                                </button>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{eq.numero_serie}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{eq.modelo}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{eq.tipo_equipamento}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{eq.contrato_nome}</td>
-                              <td className="px-6 py-4 text-sm">
-                                <button
-                                  onClick={() => handleEditClick(eq)}
-                                  className="text-blue-600 hover:text-blue-900 font-medium"
-                                >
-                                  Editar
-                                </button>
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
+
+            <div className="mt-4 text-sm text-gray-600">
+              Total: {filteredEquipamentos.length} equipamento(s)
+            </div>
           </div>
         </div>
       </div>
+
+      {/* MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
+                </h3>
+                <button
+                  onClick={handleCloseModal}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contrato *
+                  </label>
+                  <select
+                    value={formData.contrato_id}
+                    onChange={(e) => setFormData({ ...formData, contrato_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione um contrato</option>
+                    {contratos.map((contrato) => (
+                      <option key={contrato.id} value={contrato.id}>
+                        {contrato.numero_contrato}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nº de Série *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.numero_serie}
+                    onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Modelo *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.modelo}
+                    onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SKU
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleCloseModal}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  {isEditing ? 'Atualizar' : 'Adicionar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
