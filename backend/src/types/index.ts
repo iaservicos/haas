@@ -1,11 +1,35 @@
+// backend/src/types/index.ts - VERSÃO ATUALIZADA
+
 export interface Usuario {
   id: string;
   email: string;
   nome: string;
   role: 'ADMIN' | 'ANALISTA' | 'VIEWER';
+  user_type: 'analyst' | 'client';  // NOVO: tipo de usuário
+  contrato_id?: string;              // NOVO: contrato do cliente
   ativo: boolean;
   data_criacao: string;
   data_atualizacao: string;
+}
+
+export interface Contrato {
+  id: string;
+  numero_contrato: string;
+  nome_cliente: string;
+  cnpj_cliente?: string;
+  status: 'active' | 'inactive' | 'completed';
+  data_criacao: string;
+  data_atualizacao: string;
+}
+
+export interface ContratoEquipamento {
+  id: string;
+  contrato_id: string;
+  numero_serie: string;
+  modelo: string;
+  material?: string;
+  meses_garantia: number;
+  data_criacao: string;
 }
 
 export interface Vistoria {
@@ -46,6 +70,8 @@ export interface TokenPayload {
   userId: string;
   email: string;
   role: string;
+  user_type: 'analyst' | 'client';  // NOVO
+  contrato_id?: string;              // NOVO
 }
 
 export interface ApiResponse<T> {
@@ -53,4 +79,26 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   timestamp: string;
+}
+
+// Tipos para requisições
+export interface CreateClientRequest {
+  email: string;
+  nome: string;
+  contrato_id: string;
+  senha: string;
+}
+
+export interface CreateContratoRequest {
+  numero_contrato: string;
+  nome_cliente: string;
+  cnpj_cliente?: string;
+}
+
+export interface AddContratoEquipamentoRequest {
+  contrato_id: string;
+  numero_serie: string;
+  modelo: string;
+  material?: string;
+  meses_garantia?: number;
 }

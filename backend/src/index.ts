@@ -10,6 +10,7 @@ import componentesRoutes from './routes/componentes.js';
 import fotosRoutes from './routes/fotos.js';
 import usuarioRoutes from './routes/usuarioroutes.js';
 import gptmakerRoutes from './routes/gptmakerRoutes.js';
+import clientesRoutes from './routes/clientesroutes.js';
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/componentes', componentesRoutes);
 app.use('/api/fotos', fotosRoutes);
 app.use('/api/usuario', usuarioRoutes);
 app.use('/api/gptmaker', gptmakerRoutes);
+app.use('/api/clientes', clientesRoutes);
 
 
 app.get('/health', (req, res) => {

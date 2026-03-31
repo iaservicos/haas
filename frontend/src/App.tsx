@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Fotos } from './pages/Fotos';
+import { LoginUnificado } from './components/LoginUnificado';
+import { PortalAnalista } from './components/PortalAnalista';
+import { PortalCliente } from './components/PortalCliente';
 
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -50,6 +53,14 @@ function AppRoutes() {
     </Routes>
   );
 }
+
+// Dentro do componente App:
+<Routes>
+  <Route path="/login" element={<LoginUnificado />} />
+  <Route path="/portal-analista" element={<PortalAnalista />} />
+  <Route path="/portal-cliente" element={<PortalCliente />} />
+  {/* outras rotas */}
+</Routes>
 
 
 export function App() {
