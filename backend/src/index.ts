@@ -11,6 +11,7 @@ import fotosRoutes from './routes/fotos.js';
 import usuarioRoutes from './routes/usuarioroutes.js';
 import gptmakerRoutes from './routes/gptmakerRoutes.js';
 import clientesRoutes from './routes/clientesroutes.js';
+import confirmacoeRoutes from './routes/confirmacoes.js';
 
 const app = express();
 
@@ -27,7 +28,7 @@ app.use('/api/fotos', fotosRoutes);
 app.use('/api/usuario', usuarioRoutes);
 app.use('/api/gptmaker', gptmakerRoutes);
 app.use('/api/clientes', clientesRoutes);
-
+app.use('/api/confirmacoes', confirmacoeRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
