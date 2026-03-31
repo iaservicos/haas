@@ -9,6 +9,11 @@ interface Equipamento {
   modelo: string;
   sku: string | null;
   data_criacao: string;
+  contratos?: {
+    id: number;
+    numero_contrato: string;
+    nome_cliente: string;
+  };
 }
 
 interface Contrato {
@@ -69,7 +74,19 @@ export function GerenciarEquipamentos() {
     try {
       let query = supabase
         .from('contrato_equipamentos')
-        .select('*')
+        .select(`
+          id,
+          contrato_id,
+          numero_serie,
+          modelo,
+          sku,
+          data_criacao,
+          contratos:contrato_id(
+            id,
+            numero_contrato,
+            nome_cliente
+          )
+        `)
         .order('data_criacao', { ascending: false });
 
       if (selectedContrato) {
@@ -319,6 +336,7 @@ export function GerenciarEquipamentos() {
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Data Criação</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
                     </tr>
@@ -330,7 +348,10 @@ export function GerenciarEquipamentos() {
                         <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{equipamento.sku || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {contratos.find(c => c.id === equipamento.contrato_id)?.numero_contrato || '-'}
+                          {equipamento.contratos?.numero_contrato || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {equipamento.contratos?.nome_cliente || '-'}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {new Date(equipamento.data_criacao).toLocaleDateString('pt-BR')}
