@@ -1,23 +1,9 @@
-// backend/src/routes/confirmacoes.ts - CORRIGIDO (SEM DEPENDÊNCIAS EXTERNAS)
+// backend/src/routes/confirmacoes.ts - VERSÃO QUE FUNCIONA
 
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import { supabase } from '../config/database.js';
 
 const router = Router();
-
-// Configurar multer para upload de fotos
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Apenas imagens são permitidas'));
-    }
-  },
-});
 
 // ============ ROTAS PARA CLIENTES ============
 
@@ -50,36 +36,7 @@ router.get('/minhas-confirmacoes', async (req: Request, res: Response) => {
   }
 });
 
-// Upload de foto
-router.post('/upload-foto', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    const { equipamento_id } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhuma foto foi enviada' });
-    }
-
-    if (!equipamento_id) {
-      return res.status(400).json({ error: 'ID do equipamento é obrigatório' });
-    }
-
-    // Simular URL de storage (você pode integrar com S3 depois)
-    const url = `https://storage.example.com/fotos/${Date.now()}-${req.file.originalname}`;
-
-    res.json({
-      success: true,
-      data: {
-        url,
-        nome_arquivo: req.file.originalname,
-      },
-    });
-  } catch (error) {
-    console.error('Erro ao fazer upload:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload' });
-  }
-});
-
-// Enviar confirmação com foto
+// Enviar confirmação com foto (URL já vem do frontend)
 router.post('/enviar-confirmacao', async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
@@ -140,20 +97,22 @@ router.post('/enviar-confirmacao', async (req: Request, res: Response) => {
       // Criar nova confirmação
       const { data, error } = await supabase
         .from('cliente_confirmacoes')
-        .insert([{
-          equipamento_id,
-          usuario_id: userId,
-          equipamento_ligado,
-          sem_problemas_visuais,
-          funcionando_normalmente,
-          fonte_presente,
-          teclado_presente,
-          mouse_presente,
-          url_foto,
-          status_analise: 'concluido',
-          resultado_analise: 'ok',
-          data_envio: new Date().toISOString(),
-        }])
+        .insert([
+          {
+            equipamento_id,
+            usuario_id: userId,
+            equipamento_ligado,
+            sem_problemas_visuais,
+            funcionando_normalmente,
+            fonte_presente,
+            teclado_presente,
+            mouse_presente,
+            url_foto,
+            status_analise: 'concluido',
+            resultado_analise: 'ok',
+            data_envio: new Date().toISOString(),
+          },
+        ])
         .select();
 
       if (error) {
@@ -186,11 +145,13 @@ router.get('/confirmacoes-clientes', async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
       .from('cliente_confirmacoes')
-      .select(`
+      .select(
+        `
         *,
         equipamento:contrato_equipamentos(numero_serie, modelo, tipo_equipamento),
         usuario:usuarios(email, nome)
-      `)
+      `
+      )
       .order('data_criacao', { ascending: false });
 
     if (error) {
@@ -214,11 +175,13 @@ router.get('/confirmacoes/:id', async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
       .from('cliente_confirmacoes')
-      .select(`
+      .select(
+        `
         *,
         equipamento:contrato_equipamentos(numero_serie, modelo, tipo_equipamento),
         usuario:usuarios(email, nome)
-      `)
+      `
+      )
       .eq('id', id)
       .single();
 
