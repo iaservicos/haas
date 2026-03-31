@@ -1,5 +1,3 @@
-// frontend/src/pages/Dashboard.tsx - VERSÃO ATUALIZADA COM MENU INTEGRADO
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -7,21 +5,12 @@ import { vistoriaService } from '../services/vistoria.service';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 
-// Importar os novos componentes
-import { GerenciarContratos } from './GerenciarContratos';
-import { GerenciarClientes } from './GerenciarClientes';
-import { GerenciarEquipamentos } from './GerenciarEquipamentos';
-import { VerConfirmacoes } from './VerConfirmacoes';
-
-type MenuOption = 'dashboard' | 'fotos' | 'contratos' | 'clientes' | 'equipamentos' | 'confirmacoes';
-
 export function Dashboard() {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeMenu, setActiveMenu] = useState<MenuOption>('dashboard');
   
   // FILTROS
   const [filtroTecnico, setFiltroTecnico] = useState('');
@@ -126,6 +115,7 @@ export function Dashboard() {
   };
 
   const formatarData = (data: string) => {
+    // Extrai apenas a parte da data (YYYY-MM-DD) sem a hora
     const dataParte = data.split('T')[0];
     const [ano, mes, dia] = dataParte.split('-');
     return `${dia}/${mes}/${ano}`;
@@ -151,6 +141,7 @@ export function Dashboard() {
   };
 
   const exportarRelatorio = () => {
+    // Filtrar vistorias conforme os filtros aplicados
     const vistoriasExportacao = vistorias.filter((v: any) => {
       if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
       if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
@@ -166,8 +157,10 @@ export function Dashboard() {
       return;
     }
 
+    // Criar cabeçalho do CSV
     const headers = ['Data', 'Série', 'Equipamento', 'Cliente', 'Técnico', 'Estado', 'Laudo', 'Avaria', 'Teclado', 'Mouse'];
     
+    // Criar linhas do CSV
     const rows = vistoriasExportacao.map((v: any) => [
       formatarData(v.data_vistoria),
       v.numero_serie,
@@ -181,11 +174,13 @@ export function Dashboard() {
       v.mouse_status || '—',
     ]);
 
+    // Montar CSV
     let csvContent = headers.join(',') + '\n';
     rows.forEach((row: any[]) => {
       csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
     });
 
+    // Criar blob e download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -203,167 +198,21 @@ export function Dashboard() {
     navigate('/fotos');
   };
 
-  const renderContent = () => {
-    switch (activeMenu) {
-      case 'contratos':
-        return <GerenciarContratos />;
-      case 'clientes':
-        return <GerenciarClientes />;
-      case 'equipamentos':
-        return <GerenciarEquipamentos />;
-      case 'confirmacoes':
-        return <VerConfirmacoes />;
-      case 'fotos':
-        handleGoToPhotos();
-        return null;
-      case 'dashboard':
-      default:
-        return renderDashboard();
-    }
+  // NOVO: Funções de navegação
+  const handleGoToContratos = () => {
+    navigate('/contratos');
   };
 
-  const renderDashboard = () => {
-    return (
-      <div className="p-8">
-        {/* CARDS DE ESTATÍSTICAS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-blue-100 rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
-            <p className="text-5xl font-bold text-blue-900 mt-3">{stats.total}</p>
-          </div>
+  const handleGoToClientes = () => {
+    navigate('/clientes');
+  };
 
-          <div className="bg-gray-200 rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
-            <p className="text-5xl font-bold text-gray-800 mt-3">{stats.comAvaria}</p>
-          </div>
+  const handleGoToEquipamentos = () => {
+    navigate('/equipamentos');
+  };
 
-          <div className="bg-green-100 rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
-            <p className="text-5xl font-bold text-green-900 mt-3">{stats.semAvaria}</p>
-          </div>
-
-          <div className="bg-blue-50 rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Mouse OK</p>
-            <p className="text-5xl font-bold text-blue-700 mt-3">{stats.mouseOk}</p>
-          </div>
-
-          <div className="bg-red-50 rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Mouse Ausente</p>
-            <p className="text-5xl font-bold text-red-700 mt-3">{stats.mouseAusente}</p>
-          </div>
-
-          <div className="bg-yellow-50 rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Teclado Ausente</p>
-            <p className="text-5xl font-bold text-yellow-700 mt-3">{stats.tecladoAusente}</p>
-          </div>
-        </div>
-
-        {/* FILTROS */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <input
-              type="text"
-              placeholder="Filtrar por Técnico"
-              value={filtroTecnico}
-              onChange={(e) => setFiltroTecnico(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Filtrar por Cliente"
-              value={filtroCliente}
-              onChange={(e) => setFiltroCliente(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Filtrar por Equipamento"
-              value={filtroEquipamento}
-              onChange={(e) => setFiltroEquipamento(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos os Estados</option>
-              <option value="Equipamento OK">Equipamento OK</option>
-              <option value="Equip. com AVARIA">Equip. com AVARIA</option>
-            </select>
-            <select
-              value={filtroMouse}
-              onChange={(e) => setFiltroMouse(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos os Mouse</option>
-              <option value="Mouse, OK">Mouse, OK</option>
-              <option value="Mouse, AUSENTE">Mouse, AUSENTE</option>
-            </select>
-            <select
-              value={filtroTeclado}
-              onChange={(e) => setFiltroTeclado(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos os Teclados</option>
-              <option value="Teclado, OK">Teclado, OK</option>
-              <option value="Teclado, AUSENTE">Teclado, AUSENTE</option>
-            </select>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={limparFiltros}
-              className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-gray-500 transition"
-            >
-              Limpar Filtros
-            </button>
-            <button
-              onClick={exportarRelatorio}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-            >
-              📥 Exportar CSV
-            </button>
-          </div>
-        </div>
-
-        {/* TABELA DE VISTORIAS */}
-        {loading ? (
-          <p className="text-center text-gray-600">Carregando vistorias...</p>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Data</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Série</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Equipamento</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Cliente</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Técnico</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Estado</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Teclado</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Mouse</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {vistorias.map((v: any) => (
-                  <tr key={v.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">{formatarData(v.data_vistoria)}</td>
-                    <td className="px-6 py-4 font-medium">{v.numero_serie}</td>
-                    <td className="px-6 py-4">{v.equipamento}</td>
-                    <td className="px-6 py-4">{v.cliente}</td>
-                    <td className="px-6 py-4">{v.tecnico}</td>
-                    <td className={`px-6 py-4 ${getCorEstado(v.estado)}`}>{v.estado}</td>
-                    <td className={`px-6 py-4 ${getCorComponente(v.teclado_status)}`}>{v.teclado_status}</td>
-                    <td className={`px-6 py-4 ${getCorComponente(v.mouse_status)}`}>{v.mouse_status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
+  const handleGoToConfirmacoes = () => {
+    navigate('/confirmacoes');
   };
 
   return (
@@ -382,76 +231,65 @@ export function Dashboard() {
         <nav className="flex-1 p-4 space-y-2">
           <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
           
+          <a href="#" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
+            {sidebarOpen && <span>Dashboard</span>}
+          </a>
+
+          {/* NOVO: Botão Contratos */}
           <button
-            onClick={() => setActiveMenu('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition ${
-              activeMenu === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'
-            }`}
+            onClick={handleGoToContratos}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            {sidebarOpen && <span>📊 Dashboard</span>}
+            {sidebarOpen && <span>Contratos</span>}
           </button>
 
-          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase mt-4">Gerenciamento</div>
-
+          {/* NOVO: Botão Clientes */}
           <button
-            onClick={() => setActiveMenu('contratos')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition ${
-              activeMenu === 'contratos' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'
-            }`}
+            onClick={handleGoToClientes}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            {sidebarOpen && <span>📋 Contratos</span>}
+            {sidebarOpen && <span>Clientes</span>}
           </button>
 
+          {/* NOVO: Botão Equipamentos */}
           <button
-            onClick={() => setActiveMenu('clientes')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition ${
-              activeMenu === 'clientes' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'
-            }`}
+            onClick={handleGoToEquipamentos}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            {sidebarOpen && <span>👥 Clientes</span>}
+            {sidebarOpen && <span>Equipamentos</span>}
           </button>
 
+          {/* NOVO: Botão Confirmações */}
           <button
-            onClick={() => setActiveMenu('equipamentos')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition ${
-              activeMenu === 'equipamentos' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'
-            }`}
+            onClick={handleGoToConfirmacoes}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            {sidebarOpen && <span>💻 Equipamentos</span>}
+            {sidebarOpen && <span>Confirmações</span>}
           </button>
-
-          <button
-            onClick={() => setActiveMenu('confirmacoes')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded transition ${
-              activeMenu === 'confirmacoes' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'
-            }`}
-          >
-            {sidebarOpen && <span>✅ Confirmações</span>}
-          </button>
-
-          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase mt-4">Outros</div>
-
+          
           <button
             onClick={handleGoToPhotos}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            {sidebarOpen && <span>📸 Fotos</span>}
+            {sidebarOpen && <span>Fotos</span>}
           </button>
 
           <button
             onClick={() => setShowChangePasswordModal(true)}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            {sidebarOpen && <span>🔑 Alterar Senha</span>}
+            {sidebarOpen && <span>Alterar Senha</span>}
           </button>
 
           <button
             onClick={logout}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
           >
-            {sidebarOpen && <span>🚪 Sair</span>}
+            {sidebarOpen && <span>Sair</span>}
           </button>
         </nav>
+
+
       </div>
 
       {/* MAIN CONTENT */}
@@ -475,7 +313,217 @@ export function Dashboard() {
 
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
-          {renderContent()}
+          <div className="p-8">
+            {/* CARDS DE ESTATÍSTICAS - CORPORATIVO */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {/* Card Total */}
+              <div className="bg-blue-100 rounded-lg shadow p-6">
+                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
+                <p className="text-5xl font-bold text-blue-900 mt-3">{stats.total}</p>
+              </div>
+
+              {/* Card Avaria */}
+              <div className="bg-gray-200 rounded-lg shadow p-6">
+                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
+                <p className="text-5xl font-bold text-gray-800 mt-3">{stats.comAvaria}</p>
+              </div>
+
+              {/* Card OK */}
+              <div className="bg-gray-150 rounded-lg shadow p-6">
+                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
+                <p className="text-5xl font-bold text-gray-700 mt-3">{stats.semAvaria}</p>
+              </div>
+            </div>
+
+            {/* FILTROS */}
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-gray-900">Filtros Avançados</h3>
+                <div className="flex gap-3">
+                  <button
+                    onClick={exportarRelatorio}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded hover:bg-green-700 transition"
+                  >
+                    Exportar Relatório
+                  </button>
+                  <button
+                    onClick={limparFiltros}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+                  >
+                    Limpar Filtros
+                  </button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Técnico</label>
+                  <select
+                    value={filtroTecnico}
+                    onChange={(e) => setFiltroTecnico(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Técnicos</option>
+                    {tecnicos.map((tecnico) => (
+                      <option key={tecnico} value={tecnico}>
+                        {tecnico}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Cliente</label>
+                  <select
+                    value={filtroCliente}
+                    onChange={(e) => setFiltroCliente(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Clientes</option>
+                    {clientes.map((cliente) => (
+                      <option key={cliente} value={cliente}>
+                        {cliente}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Equipamento</label>
+                  <select
+                    value={filtroEquipamento}
+                    onChange={(e) => setFiltroEquipamento(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Equipamentos</option>
+                    {equipamentos.map((equipamento) => (
+                      <option key={equipamento} value={equipamento}>
+                        {equipamento}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
+                  <select
+                    value={filtroEstado}
+                    onChange={(e) => setFiltroEstado(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Estados</option>
+                    <option value="Equipamento OK">Equipamento OK</option>
+                    <option value="Equip. com AVARIA">Com Avaria</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mouse</label>
+                  <select
+                    value={filtroMouse}
+                    onChange={(e) => setFiltroMouse(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Mouses</option>
+                    <option value="Mouse, OK">Mouse OK</option>
+                    <option value="Mouse, AUSENTE">Mouse Ausente</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Teclado</label>
+                  <select
+                    value={filtroTeclado}
+                    onChange={(e) => setFiltroTeclado(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Teclados</option>
+                    <option value="Teclado, OK">Teclado OK</option>
+                    <option value="Teclado, AUSENTE">Teclado Ausente</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* TABELA DE VISTORIAS */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h3 className="text-lg font-bold text-gray-900">Vistorias Recentes ({stats.total})</h3>
+              </div>
+
+              {loading ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-gray-600 font-semibold">Carregando dados...</p>
+                </div>
+              ) : stats.total === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="text-gray-600 font-semibold">Nenhuma vistoria encontrada com esses filtros</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Estado</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Laudo</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {vistorias
+                        .filter((v: any) => {
+                          if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
+                          if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+                          if (filtroEquipamento && !v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())) return false;
+                          if (filtroEstado && v.estado !== filtroEstado) return false;
+                          if (filtroMouse && v.mouse_status !== filtroMouse) return false;
+                          if (filtroTeclado && v.teclado_status !== filtroTeclado) return false;
+                          return true;
+                        })
+                        .map((vistoria: any) => (
+                          <tr key={vistoria.id} className="hover:bg-gray-50 transition">
+                            <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
+                            <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`${getCorEstado(vistoria.estado)}`}>
+                                {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.laudo || '—'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.avaria || '—'}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`${getCorComponente(vistoria.teclado_status)}`}>
+                                {vistoria.teclado_status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`${getCorComponente(vistoria.mouse_status)}`}>
+                                {vistoria.mouse_status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="bg-gray-900 text-gray-400 text-xs py-4 px-8 border-t border-gray-800">
+          <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
         </div>
       </div>
 
