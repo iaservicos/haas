@@ -1,6 +1,7 @@
 // frontend/src/pages/VerConfirmacoes.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiClient } from '../services/api';
 
 interface Confirmacao {
   id: string;
@@ -12,12 +13,11 @@ interface Confirmacao {
   fonte_presente?: boolean;
   teclado_presente?: boolean;
   mouse_presente?: boolean;
-  url_foto?: string;
-  status_analise: 'pendente' | 'analisando' | 'concluido' | 'erro';
-  resultado_analise?: 'ok' | 'problema';
-  analise_gptmaker?: string;
+  url_foto: string;
+  status_analise: string;
+  resultado_analise: string;
+  data_envio: string;
   data_criacao: string;
-  data_envio?: string;
   equipamento?: {
     numero_serie: string;
     modelo: string;
@@ -32,26 +32,19 @@ interface Confirmacao {
 export function VerConfirmacoes() {
   const [confirmacoes, setConfirmacoes] = useState<Confirmacao[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtroStatus, setFiltroStatus] = useState('');
-  const [filtroResultado, setFiltroResultado] = useState('');
   const [confirmacaoSelecionada, setConfirmacaoSelecionada] = useState<Confirmacao | null>(null);
+  const [filtro, setFiltro] = useState('todas');
 
   useEffect(() => {
     carregarConfirmacoes();
-    const interval = setInterval(carregarConfirmacoes, 5000); // Atualizar a cada 5 segundos
-    return () => clearInterval(interval);
   }, []);
 
   const carregarConfirmacoes = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/confirmacoes/confirmacoes-clientes', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setConfirmacoes(data.data);
-      }
+      const response = await apiClient.get('/confirmacoes/confirmacoes-clientes');
+      setConfirmacoes(Array.isArray(response.data) ? response.data : []);
+
     } catch (error) {
       console.error('Erro ao carregar confirmações:', error);
     } finally {
@@ -59,263 +52,236 @@ export function VerConfirmacoes() {
     }
   };
 
-  const confirmacoesFiltradas = confirmacoes.filter((conf) => {
-    if (filtroStatus && conf.status_analise !== filtroStatus) return false;
-    if (filtroResultado && conf.resultado_analise !== filtroResultado) return false;
-    return true;
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pendente':
-        return 'bg-gray-100 text-gray-800';
-      case 'analisando':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'concluido':
-        return 'bg-green-100 text-green-800';
-      case 'erro':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const filtrarConfirmacoes = () => {
+    if (filtro === 'todas') return confirmacoes;
+    if (filtro === 'ok') return confirmacoes.filter(c => c.resultado_analise === 'ok');
+    if (filtro === 'problema') return confirmacoes.filter(c => c.resultado_analise === 'problema');
+    return confirmacoes;
   };
 
-  const getResultadoColor = (resultado?: string) => {
-    switch (resultado) {
-      case 'ok':
-        return 'bg-green-100 text-green-800';
-      case 'problema':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const getStatusBadge = (status: string) => {
+    if (status === 'ok') {
+      return <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">✅ OK</span>;
     }
+    if (status === 'problema') {
+      return <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">❌ Problema</span>;
+    }
+    return <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">⏳ Analisando</span>;
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pendente':
-        return '⭕ Pendente';
-      case 'analisando':
-        return '⏳ Analisando';
-      case 'concluido':
-        return '✅ Concluído';
-      case 'erro':
-        return '❌ Erro';
-      default:
-        return status;
-    }
+  const getStatusIcon = (valor: boolean | undefined) => {
+    return valor ? '✅' : '❌';
   };
+
+  const confirmacoesFiltradas = filtrarConfirmacoes();
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <p className="text-center text-gray-600">Carregando confirmações...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-gray-900">Confirmações dos Clientes</h2>
-        <button
-          onClick={carregarConfirmacoes}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-        >
-          🔄 Atualizar
-        </button>
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">Confirmações de Clientes</h2>
+        <p className="text-gray-600">Visualize as confirmações enviadas pelos clientes e os resultados das análises</p>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos</option>
-              <option value="pendente">Pendente</option>
-              <option value="analisando">Analisando</option>
-              <option value="concluido">Concluído</option>
-              <option value="erro">Erro</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Resultado</label>
-            <select
-              value={filtroResultado}
-              onChange={(e) => setFiltroResultado(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos</option>
-              <option value="ok">OK</option>
-              <option value="problema">Problema</option>
-            </select>
-          </div>
+      {/* FILTROS */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h3>
+        <div className="flex gap-4">
+          <button
+            onClick={() => setFiltro('todas')}
+            className={`px-4 py-2 rounded-lg font-semibold transition ${
+              filtro === 'todas'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Todas ({confirmacoes.length})
+          </button>
+          <button
+            onClick={() => setFiltro('ok')}
+            className={`px-4 py-2 rounded-lg font-semibold transition ${
+              filtro === 'ok'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            OK ({confirmacoes.filter(c => c.resultado_analise === 'ok').length})
+          </button>
+          <button
+            onClick={() => setFiltro('problema')}
+            className={`px-4 py-2 rounded-lg font-semibold transition ${
+              filtro === 'problema'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Problema ({confirmacoes.filter(c => c.resultado_analise === 'problema').length})
+          </button>
         </div>
       </div>
 
-      {loading ? (
-        <p className="text-center text-gray-600">Carregando confirmações...</p>
-      ) : confirmacoesFiltradas.length === 0 ? (
-        <p className="text-center text-gray-600">Nenhuma confirmação encontrada</p>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Equipamento</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Resultado</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Data Envio</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {confirmacoesFiltradas.map((conf) => (
-                <tr key={conf.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm">
-                    <div>
-                      <p className="font-medium text-gray-900">{conf.usuario?.nome || '-'}</p>
-                      <p className="text-xs text-gray-600">{conf.usuario?.email || '-'}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* LISTA DE CONFIRMAÇÕES */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <h3 className="font-semibold text-gray-900">Confirmações</h3>
+            </div>
+            <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+              {confirmacoesFiltradas.length === 0 ? (
+                <div className="p-4 text-center text-gray-600">
+                  Nenhuma confirmação encontrada
+                </div>
+              ) : (
+                confirmacoesFiltradas.map(confirmacao => (
+                  <button
+                    key={confirmacao.id}
+                    onClick={() => setConfirmacaoSelecionada(confirmacao)}
+                    className={`w-full text-left p-4 hover:bg-gray-50 transition ${
+                      confirmacaoSelecionada?.id === confirmacao.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold text-gray-900 text-sm">
+                        {confirmacao.usuario?.nome || 'Cliente'}
+                      </p>
+                      {getStatusBadge(confirmacao.resultado_analise)}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <div>
-                      <p className="font-medium text-gray-900">{conf.equipamento?.numero_serie || '-'}</p>
-                      <p className="text-xs text-gray-600">{conf.equipamento?.modelo || '-'}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(conf.status_analise)}`}>
-                      {getStatusLabel(conf.status_analise)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {conf.resultado_analise ? (
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getResultadoColor(conf.resultado_analise)}`}>
-                        {conf.resultado_analise === 'ok' ? '✅ OK' : '⚠️ Problema'}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {conf.data_envio ? new Date(conf.data_envio).toLocaleDateString('pt-BR') : '-'}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <button
-                      onClick={() => setConfirmacaoSelecionada(conf)}
-                      className="text-blue-600 hover:text-blue-900 font-medium"
-                    >
-                      Ver Detalhes
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <p className="text-xs text-gray-600">
+                      Série: {confirmacao.equipamento?.numero_serie || 'N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(confirmacao.data_envio).toLocaleDateString('pt-BR')}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Modal de Detalhes */}
-      {confirmacaoSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-90vh overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-2xl font-bold text-gray-900">Detalhes da Confirmação</h3>
-                <button
-                  onClick={() => setConfirmacaoSelecionada(null)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ✕
-                </button>
+        {/* DETALHES DA CONFIRMAÇÃO */}
+        <div className="lg:col-span-2">
+          {confirmacaoSelecionada ? (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-6 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-semibold text-gray-900">Detalhes da Confirmação</h3>
               </div>
-
-              <div className="space-y-6">
-                {/* Cliente */}
+              <div className="p-6 space-y-6">
+                {/* INFORMAÇÕES DO CLIENTE */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Cliente</h4>
-                  <p className="text-gray-600">{confirmacaoSelecionada.usuario?.nome}</p>
-                  <p className="text-sm text-gray-500">{confirmacaoSelecionada.usuario?.email}</p>
+                  <h4 className="font-semibold text-gray-900 mb-3">Informações do Cliente</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Nome</p>
+                      <p className="font-semibold text-gray-900">{confirmacaoSelecionada.usuario?.nome}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="font-semibold text-gray-900">{confirmacaoSelecionada.usuario?.email}</p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Equipamento */}
+                {/* INFORMAÇÕES DO EQUIPAMENTO */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Equipamento</h4>
-                  <p className="text-gray-600">{confirmacaoSelecionada.equipamento?.numero_serie}</p>
-                  <p className="text-sm text-gray-500">{confirmacaoSelecionada.equipamento?.modelo}</p>
+                  <h4 className="font-semibold text-gray-900 mb-3">Informações do Equipamento</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Número de Série</p>
+                      <p className="font-semibold text-gray-900">{confirmacaoSelecionada.equipamento?.numero_serie}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Modelo</p>
+                      <p className="font-semibold text-gray-900">{confirmacaoSelecionada.equipamento?.modelo}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Tipo</p>
+                      <p className="font-semibold text-gray-900">{confirmacaoSelecionada.equipamento?.tipo_equipamento}</p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Checklist */}
+                {/* CHECKLIST */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">Checklist</h4>
-                  <div className="space-y-1">
-                    <p className="text-sm"><span className={confirmacaoSelecionada.equipamento_ligado ? '✅' : '❌'}</span> Equipamento ligado</p>
-                    <p className="text-sm"><span className={confirmacaoSelecionada.sem_problemas_visuais ? '✅' : '❌'}</span> Sem problemas visuais</p>
-                    <p className="text-sm"><span className={confirmacaoSelecionada.funcionando_normalmente ? '✅' : '❌'}</span> Funcionando normalmente</p>
-                    {confirmacaoSelecionada.fonte_presente !== undefined && (
-                      <p className="text-sm"><span className={confirmacaoSelecionada.fonte_presente ? '✅' : '❌'}</span> Fonte presente</p>
+                  <h4 className="font-semibold text-gray-900 mb-3">Checklist</h4>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-700">
+                      <span className="mr-2">{getStatusIcon(confirmacaoSelecionada.equipamento_ligado)}</span>
+                      Equipamento ligado
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="mr-2">{getStatusIcon(confirmacaoSelecionada.sem_problemas_visuais)}</span>
+                      Sem problemas visuais
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      <span className="mr-2">{getStatusIcon(confirmacaoSelecionada.funcionando_normalmente)}</span>
+                      Funcionando normalmente
+                    </p>
+                    {confirmacaoSelecionada.equipamento?.tipo_equipamento === 'Notebook' && (
+                      <p className="text-sm text-gray-700">
+                        <span className="mr-2">{getStatusIcon(confirmacaoSelecionada.fonte_presente)}</span>
+                        Fonte presente
+                      </p>
                     )}
-                    {confirmacaoSelecionada.teclado_presente !== undefined && (
-                      <p className="text-sm"><span className={confirmacaoSelecionada.teclado_presente ? '✅' : '❌'}</span> Teclado presente</p>
-                    )}
-                    {confirmacaoSelecionada.mouse_presente !== undefined && (
-                      <p className="text-sm"><span className={confirmacaoSelecionada.mouse_presente ? '✅' : '❌'}</span> Mouse presente</p>
+                    {confirmacaoSelecionada.equipamento?.tipo_equipamento === 'Desktop' && (
+                      <>
+                        <p className="text-sm text-gray-700">
+                          <span className="mr-2">{getStatusIcon(confirmacaoSelecionada.teclado_presente)}</span>
+                          Teclado presente
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          <span className="mr-2">{getStatusIcon(confirmacaoSelecionada.mouse_presente)}</span>
+                          Mouse presente
+                        </p>
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* Foto */}
+                {/* FOTO */}
                 {confirmacaoSelecionada.url_foto && (
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Foto do Equipamento</h4>
+                    <h4 className="font-semibold text-gray-900 mb-3">Foto do Equipamento</h4>
                     <img
                       src={confirmacaoSelecionada.url_foto}
                       alt="Equipamento"
-                      className="max-w-full h-auto rounded-lg border border-gray-300"
+                      className="w-full h-64 object-cover rounded-lg border border-gray-200"
                     />
                   </div>
                 )}
 
-                {/* Análise GPT-Maker */}
-                {confirmacaoSelecionada.analise_gptmaker && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Análise GPT-Maker</h4>
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{confirmacaoSelecionada.analise_gptmaker}</p>
+                {/* RESULTADO DA ANÁLISE */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Resultado da Análise</h4>
+                  <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
+                    <div className="flex items-center gap-3 mb-2">
+                      {getStatusBadge(confirmacaoSelecionada.resultado_analise)}
                     </div>
-                  </div>
-                )}
-
-                {/* Status e Resultado */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Status</h4>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(confirmacaoSelecionada.status_analise)}`}>
-                      {getStatusLabel(confirmacaoSelecionada.status_analise)}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Resultado</h4>
-                    {confirmacaoSelecionada.resultado_analise ? (
-                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getResultadoColor(confirmacaoSelecionada.resultado_analise)}`}>
-                        {confirmacaoSelecionada.resultado_analise === 'ok' ? '✅ OK' : '⚠️ Problema'}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                    <p className="text-sm text-gray-700">
+                      Status: <span className="font-semibold">{confirmacaoSelecionada.status_analise}</span>
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      Data de Envio: <span className="font-semibold">{new Date(confirmacaoSelecionada.data_envio).toLocaleString('pt-BR')}</span>
+                    </p>
                   </div>
                 </div>
               </div>
-
-              <button
-                onClick={() => setConfirmacaoSelecionada(null)}
-                className="mt-6 w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-              >
-                Fechar
-              </button>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <p className="text-gray-600">Selecione uma confirmação para ver os detalhes</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
