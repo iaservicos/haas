@@ -4,11 +4,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Fotos } from './pages/Fotos';
-import VerConfirmacoes from './pages/VerConfirmacoes';
 import { GerenciarContratos } from './pages/GerenciarContratos';
 import { GerenciarClientes } from './pages/GerenciarClientes';
 import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
-
+import { VerConfirmacoes } from './pages/VerConfirmacoes';
 
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
