@@ -3,26 +3,29 @@ import { useAuth } from "../context/AuthContext";
 
 interface Contrato {
   id: string;
-  numero_contrato: string;
-  nome_cliente: string;
+  nome: string;
+  cliente: string;
 }
 
 interface Cliente {
   id: string;
-  email: string;
   nome: string;
+  email: string;
   contrato_id: string;
-  ativo: boolean;
+  contrato_nome: string;
+  data_criacao: string;
 }
 
 export function GerenciarClientes() {
   const { usuario, logout } = useAuth();
-  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [credenciais, setCredenciais] = useState<any>(null);
+  const [filtroCliente, setFiltroCliente] = useState('');
+  const [filtroContrato, setFiltroContrato] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
   const [formData, setFormData] = useState({
     email: '',
     nome: '',
@@ -37,20 +40,24 @@ export function GerenciarClientes() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [clientesRes, contratosRes] = await Promise.all([
-        fetch('/api/clientes/clientes', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        }),
-        fetch('/api/clientes/contratos', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        }),
-      ]);
+      
+      // Carregar contratos
+      const respContratos = await fetch('/api/contratos/listar', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      });
+      const dataContratos = await respContratos.json();
+      if (dataContratos.success) {
+        setContratos(dataContratos.data || []);
+      }
 
-      const clientesData = await clientesRes.json();
-      const contratosData = await contratosRes.json();
-
-      if (clientesData.success) setClientes(clientesData.data);
-      if (contratosData.success) setContratos(contratosData.data);
+      // Carregar clientes
+      const respClientes = await fetch('/api/clientes/listar', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      });
+      const dataClientes = await respClientes.json();
+      if (dataClientes.success) {
+        setClientes(dataClientes.data || []);
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -58,45 +65,54 @@ export function GerenciarClientes() {
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.email || !formData.nome || !formData.contrato_id || !formData.senha) {
+      alert('Preencha todos os campos');
+      return;
+    }
+
     try {
-      const response = await fetch('/api/clientes/criar-cliente', {
+      setEnviando(true);
+      const response = await fetch('/api/clientes/criar', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
       });
+
       const data = await response.json();
       if (data.success) {
-        setCredenciais(data.credenciais);
+        alert('Cliente criado com sucesso!');
         setFormData({ email: '', nome: '', contrato_id: '', senha: '' });
-        setShowForm(false);
         carregarDados();
       } else {
-        alert('Erro: ' + data.error);
+        alert('Erro ao criar cliente: ' + data.message);
       }
     } catch (error) {
       console.error('Erro ao criar cliente:', error);
       alert('Erro ao criar cliente');
+    } finally {
+      setEnviando(false);
     }
   };
 
-  const gerarSenhaAleatoria = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let senha = '';
-    for (let i = 0; i < 8; i++) {
-      senha += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setFormData({ ...formData, senha });
-  };
-
-  const getNomeContrato = (contratoId: string) => {
-    const contrato = contratos.find((c) => c.id === contratoId);
-    return contrato ? `${contrato.numero_contrato} - ${contrato.nome_cliente}` : '-';
-  };
+  const clientesFiltrados = clientes.filter(cliente => {
+    if (filtroCliente && !cliente.nome.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+    if (filtroContrato && cliente.contrato_id !== filtroContrato) return false;
+    return true;
+  });
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -169,144 +185,144 @@ export function GerenciarClientes() {
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
           <div className="p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Gerenciar Clientes</h2>
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-              >
-                {showForm ? 'Cancelar' : '+ Novo Cliente'}
-              </button>
-            </div>
-
-            {credenciais && (
-              <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
-                <h3 className="text-lg font-semibold text-green-900 mb-2">✅ Cliente Criado com Sucesso!</h3>
-                <div className="bg-white p-4 rounded border border-green-200 space-y-2">
-                  <p><strong>Email:</strong> <code className="bg-gray-100 px-2 py-1 rounded">{credenciais.email}</code></p>
-                  <p><strong>Senha:</strong> <code className="bg-gray-100 px-2 py-1 rounded">{credenciais.senha}</code></p>
-                  <p className="text-sm text-gray-600">Compartilhe essas credenciais com o cliente.</p>
-                </div>
-                <button
-                  onClick={() => setCredenciais(null)}
-                  className="mt-3 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-                >
-                  Fechar
-                </button>
-              </div>
-            )}
-
-            {showForm && (
-              <div className="bg-white rounded-lg shadow p-6 mb-6">
-                <h3 className="text-xl font-semibold mb-4">Criar Novo Cliente</h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* FORMULÁRIO */}
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Criar Novo Cliente</h2>
+                  
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                       <input
                         type="email"
+                        name="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="email@example.com"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nome *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                       <input
                         type="text"
+                        name="nome"
                         value={formData.nome}
-                        onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Nome do cliente"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Contrato *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contrato *</label>
                       <select
+                        name="contrato_id"
                         value={formData.contrato_id}
-                        onChange={(e) => setFormData({ ...formData, contrato_id: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Selecione um contrato</option>
-                        {contratos.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.numero_contrato} - {c.nome_cliente}
+                        {contratos.map(contrato => (
+                          <option key={contrato.id} value={contrato.id}>
+                            {contrato.nome} - {contrato.cliente}
                           </option>
                         ))}
                       </select>
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Senha *
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={formData.senha}
-                          onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={gerarSenhaAleatoria}
-                          className="bg-gray-300 text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-400 transition"
-                        >
-                          Gerar
-                        </button>
-                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+                      <input
+                        type="password"
+                        name="senha"
+                        value={formData.senha}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Senha de acesso"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={enviando}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                    >
+                      {enviando ? 'Criando...' : 'Criar Cliente'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* LISTA DE CLIENTES */}
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Clientes Cadastrados</h2>
+
+                  {/* FILTROS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Cliente</label>
+                      <input
+                        type="text"
+                        value={filtroCliente}
+                        onChange={(e) => setFiltroCliente(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Nome do cliente"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Contrato</label>
+                      <select
+                        value={filtroContrato}
+                        onChange={(e) => setFiltroContrato(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os contratos</option>
+                        {contratos.map(contrato => (
+                          <option key={contrato.id} value={contrato.id}>
+                            {contrato.nome}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                  <button
-                    type="submit"
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                  >
-                    Criar Cliente
-                  </button>
-                </form>
-              </div>
-            )}
 
-            {loading ? (
-              <p className="text-center text-gray-600">Carregando clientes...</p>
-            ) : clientes.length === 0 ? (
-              <p className="text-center text-gray-600">Nenhum cliente encontrado</p>
-            ) : (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nome</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {clientes.map((cliente) => (
-                      <tr key={cliente.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{cliente.email}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{cliente.nome}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{getNomeContrato(cliente.contrato_id)}</td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${cliente.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {cliente.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  {loading ? (
+                    <p className="text-center text-gray-600">Carregando clientes...</p>
+                  ) : clientesFiltrados.length === 0 ? (
+                    <p className="text-center text-gray-600">Nenhum cliente encontrado</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Nome</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Data Criação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {clientesFiltrados.map((cliente) => (
+                            <tr key={cliente.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{cliente.nome}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{cliente.email}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{cliente.contrato_nome}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {new Date(cliente.data_criacao).toLocaleDateString('pt-BR')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
