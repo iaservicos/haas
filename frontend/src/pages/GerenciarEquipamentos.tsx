@@ -744,22 +744,12 @@ export function GerenciarEquipamentos() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <button
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = '/Template_Importar_Equipamentos.xlsx';
-                      link.download = 'Template_Importar_Equipamentos.xlsx';
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                    className="w-full px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium"
-                  >
-                    📥 Baixar Template
-                  </button>
                   <div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      📥 Baixe o template: <strong>Template_Importar_Equipamentos.xlsx</strong>
+                    </p>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Selecione arquivo Excel
+                      Selecione arquivo Excel preenchido
                     </label>
                     <input
                       type="file"
