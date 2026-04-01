@@ -371,6 +371,22 @@ export function GerenciarEquipamentos() {
               </div>
             </div>
 
+            {/* BOTÃO LIMPAR FILTROS */}
+            {(selectedContrato || selectedCliente || searchTerm) && (
+              <div className="mb-6">
+                <button
+                  onClick={() => {
+                    setSelectedContrato('');
+                    setSelectedCliente('');
+                    setSearchTerm('');
+                  }}
+                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
+                >
+                  🔄 Limpar Filtros
+                </button>
+              </div>
+            )}
+
             {loading ? (
               <p className="text-center text-gray-600">Carregando equipamentos...</p>
             ) : filteredEquipamentos.length === 0 ? (
