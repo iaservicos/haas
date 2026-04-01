@@ -55,19 +55,19 @@ function gerarArquivoExcel() {
     // ========== ABA 1: EQUIPAMENTOS ==========
     const equipamentosData = [
       {
-        'Nº Série': 'SN001',
-        'Modelo': 'Modelo A',
-        'SKU': 'SKU001'
+        'Nº Série': '5A4044G3H',
+        'Modelo': 'POS MASTER C6400 MINIPRO F8256N1XC IOS',
+        'SKU': '1307211'
       },
       {
-        'Nº Série': 'SN002',
-        'Modelo': 'Modelo B',
-        'SKU': 'SKU002'
+        'Nº Série': '4AF91NQ5F',
+        'Modelo': 'POS MASTER N6440 H3-03922 SESI_DF FP',
+        'SKU': '3045107'
       },
       {
-        'Nº Série': 'SN003',
-        'Modelo': 'Modelo C',
-        'SKU': ''
+        'Nº Série': '4AF91NQ4A',
+        'Modelo': 'POS MASTER N6440 H3-03922 SESI_DF FP',
+        'SKU': '3045107'
       }
     ];
 
@@ -111,9 +111,7 @@ function gerarArquivoExcel() {
       ['COLUNAS OBRIGATÓRIAS:'],
       ['• Nº Série: Número de série do equipamento (obrigatório)'],
       ['• Modelo: Modelo do equipamento (obrigatório)'],
-      [''],
-      ['COLUNAS OPCIONAIS:'],
-      ['• SKU: Código SKU do equipamento (opcional)'],
+      ['• SKU: Código SKU do equipamento (obrigatório)'],
       [''],
       ['REGRAS:'],
       ['1. Não deixe campos obrigatórios em branco'],
@@ -122,14 +120,8 @@ function gerarArquivoExcel() {
       ['4. Use apenas a aba "Equipamentos"'],
       ['5. Equipamentos duplicados (mesma série) serão ignorados'],
       [''],
-      ['EXEMPLO:'],
-      ['Nº Série | Modelo | SKU'],
-      ['SN001 | Modelo A | SKU001'],
-      ['SN002 | Modelo B | SKU002'],
-      ['SN003 | Modelo C | (deixar em branco)'],
-      [''],
       ['SUPORTE:'],
-      ['Em caso de dúvidas, entre em contato com o gerente do projeto']
+      ['Em caso de dúvidas, entre em contato com a Equipe da IA Serviços']
     ];
 
     const instrucoesSheet = XLSX.utils.aoa_to_sheet(instrucoesData);
