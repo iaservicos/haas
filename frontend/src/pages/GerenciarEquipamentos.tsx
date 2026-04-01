@@ -384,6 +384,16 @@ export function GerenciarEquipamentos() {
     ? contratos.filter((c) => c.nome_cliente === selectedCliente)
     : contratos;
 
+  // Função para baixar template
+  const handleBaixarTemplate = () => {
+    try {
+      gerarTemplateExcel();
+    } catch (error) {
+      console.error('Erro ao gerar template:', error);
+      alert('Erro ao gerar template');
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-center">Carregando...</div>;
   }
@@ -395,15 +405,13 @@ export function GerenciarEquipamentos() {
         <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-400 hover:text-white"
+            className="text-gray-400 hover:text-white text-2xl"
           >
-            Menu
+            ☰
           </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
-          
           <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Dashboard</span>}
           </a>
@@ -742,7 +750,7 @@ export function GerenciarEquipamentos() {
                       Passo 1: Baixe o template
                     </p>
                     <button
-                      onClick={gerarTemplateExcel}
+                      onClick={handleBaixarTemplate}
                       className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
                     >
                       Baixar Template Excel
