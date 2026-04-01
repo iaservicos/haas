@@ -82,9 +82,9 @@ export function GerenciarClientes() {
     try {
       const offset = (currentPage - 1) * itemsPerPage;
 
-      // Contar total de clientes
+      // Contar total de usuários
       let countQuery = supabase
-        .from('clientes')
+        .from('usuarios')
         .select('id', { count: 'exact', head: true });
 
       if (filtroCliente) {
@@ -94,9 +94,9 @@ export function GerenciarClientes() {
       const { count } = await countQuery;
       setTotalClientes(count || 0);
 
-      // Carregar clientes COM PAGINAÇÃO
+      // Carregar usuários COM PAGINAÇÃO
       let query = supabase
-        .from('clientes')
+        .from('usuarios')
         .select('*')
         .order('data_criacao', { ascending: false })
         .range(offset, offset + itemsPerPage - 1);
@@ -110,7 +110,7 @@ export function GerenciarClientes() {
       if (error) throw error;
       setClientes(data || []);
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
+      console.error('Erro ao carregar usuários:', error);
     }
   };
 
@@ -142,9 +142,9 @@ export function GerenciarClientes() {
       setEnviando(true);
 
       if (editingId) {
-        // Atualizar cliente
+        // Atualizar usuário
         const { error } = await supabase
-          .from('clientes')
+          .from('usuarios')
           .update({
             nome: formData.nome,
             email: formData.email,
@@ -153,12 +153,12 @@ export function GerenciarClientes() {
           .eq('id', editingId);
 
         if (error) throw error;
-        alert('Cliente atualizado com sucesso!');
+        alert('Usuário atualizado com sucesso!');
         setEditingId(null);
       } else {
-        // Criar novo cliente
+        // Criar novo usuário
         const { error } = await supabase
-          .from('clientes')
+          .from('usuarios')
           .insert([{
             nome: formData.nome,
             email: formData.email,
@@ -167,7 +167,7 @@ export function GerenciarClientes() {
           }]);
 
         if (error) throw error;
-        alert('Cliente criado com sucesso!');
+        alert('Usuário criado com sucesso!');
       }
 
       setFormData({ email: '', nome: '', contratos_ids: [], senha: '' });
@@ -199,7 +199,7 @@ export function GerenciarClientes() {
 
     try {
       const { error } = await supabase
-        .from('clientes')
+        .from('usuarios')
         .update({ senha: newPassword })
         .eq('id', resetClienteId);
 
