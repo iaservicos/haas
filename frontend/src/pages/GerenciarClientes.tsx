@@ -88,10 +88,11 @@ export function GerenciarClientes() {
     try {
       const offset = (currentPage - 1) * itemsPerPage;
 
-      // Contar total de usuários
+      // Contar total de usuários (apenas clients)
       let countQuery = supabase
         .from('usuarios')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .eq('user_type', 'client');
 
       if (filtroNome) {
         countQuery = countQuery.ilike('nome', `%${filtroNome}%`);
@@ -100,10 +101,11 @@ export function GerenciarClientes() {
       const { count } = await countQuery;
       setTotalUsuarios(count || 0);
 
-      // Carregar usuários COM PAGINAÇÃO
+      // Carregar usuários COM PAGINAÇÃO (apenas clients)
       let query = supabase
         .from('usuarios')
         .select('*')
+        .eq('user_type', 'client')
         .order('data_criacao', { ascending: false })
         .range(offset, offset + itemsPerPage - 1);
 
@@ -245,13 +247,13 @@ export function GerenciarClientes() {
 
   const handleEditarUsuario = (usr: UsuarioComContratos) => {
     setEditingId(usr.id);
-    setFormData({
-      email: usr.email,
-      nome: usr.nome,
-      contratos_ids: usr.contratos.map(c => c.id),
-      senha_hash: '',
-      role: usr.role,
-    });
+      setFormData({
+            email: usr.email,
+            nome: usr.nome,
+            contratos_ids: usr.contratos.map(c => c.id),
+            senha_hash: '',
+            role: 'VIEWER',
+          });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -413,19 +415,8 @@ export function GerenciarClientes() {
                       <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-                      <select
-                        name="role"
-                        value={formData.role}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="VIEWER">VIEWER</option>
-                        <option value="ANALISTA">ANALISTA</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
-                    </div>
+                    {/* Campo Role oculto - sempre VIEWER para clientes */}
+                    <input type="hidden" name="role" value="VIEWER" />
 
                     {!editingId && (
                       <div>
