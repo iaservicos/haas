@@ -106,15 +106,21 @@ export function GerenciarEquipamentos() {
 
       if (error) throw error;
       
+      // Normalizar dados: converter contratos array em objeto se necessario
+      let normalizedData = (data || []).map((equip: any) => ({
+        ...equip,
+        contratos: Array.isArray(equip.contratos) ? equip.contratos[0] : equip.contratos
+      }));
+      
       // Filtrar por cliente no lado do cliente (JavaScript)
-      let filteredData = data || [];
+      let filteredData = normalizedData;
       if (selectedCliente) {
         filteredData = filteredData.filter(
-          (equip) => equip.contratos?.nome_cliente === selectedCliente
+          (equip) => equip.contratos?.nome_cliente?.trim() === selectedCliente?.trim()
         );
       }
       
-      setEquipamentos(filteredData);
+      setEquipamentos(filteredData as Equipamento[]);
     } catch (error) {
       console.error('Erro ao carregar equipamentos:', error);
     }
@@ -421,6 +427,8 @@ export function GerenciarEquipamentos() {
                         Mostrando {startIndex + 1} a {Math.min(endIndex, filteredEquipamentos.length)} de {filteredEquipamentos.length} equipamentos
                       </div>
                       <div className="flex gap-2 items-center">
+                        {totalPages > 1 && (
+                          <>
                         <button
                           onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage === 1}
@@ -462,6 +470,8 @@ export function GerenciarEquipamentos() {
                         >
                           Próxima →
                         </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
