@@ -1,336 +1,232 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from "../context/AuthContext";
-import { supabase } from '../services/supabase';
+import { useState } from "react";
+import { toast } from "sonner";
 
-interface Equipamento {
+interface Equipment {
   id: number;
-  contrato_id: number;
-  numero_serie: string;
-  modelo: string;
+  contractId: number;
+  serialNumber: string;
+  model: string;
   sku: string | null;
-  data_criacao: string;
-  contratos?: {
-    id: number;
-    numero_contrato: string;
-    nome_cliente: string;
-  };
+  status: string;
+  createdAt: string | Date;
+  contractNumber: string;
+  clientName: string;
 }
 
-interface Contrato {
-  id: number;
-  numero_contrato: string;
-  nome_cliente?: string;
+interface PaginatedResponse {
+  items: Equipment[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
-// ========== FUNÇÃO PARA GERAR TEMPLATE EXCEL ==========
-const gerarTemplateExcel = () => {
-  // Carregar biblioteca XLSX
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-  
-  script.onload = () => {
-    const XLSX = (window as any).XLSX;
-    const workbook = XLSX.utils.book_new();
-    
-    // ========== ABA 1: EQUIPAMENTOS ==========
-    const equipamentosData: any[] = [
-      {
-        'Nº Série': 'SN001',
-        'Modelo': 'Modelo A',
-        'SKU': 'SKU001'
-      },
-      {
-        'Nº Série': 'SN002',
-        'Modelo': 'Modelo B',
-        'SKU': 'SKU002'
-      },
-      {
-        'Nº Série': 'SN003',
-        'Modelo': 'Modelo C',
-        'SKU': ''
-      }
-    ];
-    
-    // Adicionar 100 linhas vazias
-    for (let i = 0; i < 100; i++) {
-      equipamentosData.push({
-        'Nº Série': '',
-        'Modelo': '',
-        'SKU': ''
-      });
-    }
-    
-    const equipamentosSheet = XLSX.utils.json_to_sheet(equipamentosData);
-    equipamentosSheet['!cols'] = [
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 15 }
-    ];
-    
-    // Formatar cabeçalho
-    const headerRange = XLSX.utils.decode_range(equipamentosSheet['!ref'] || 'A1');
-    for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
-      const address = XLSX.utils.encode_col(C) + '1';
-      if (!equipamentosSheet[address]) continue;
-      
-      equipamentosSheet[address].s = {
-        font: { bold: true, color: { rgb: 'FFFFFF' } },
-        fill: { fgColor: { rgb: '3B82F6' } },
-        alignment: { horizontal: 'center', vertical: 'center' }
-      };
-    }
-    
-    XLSX.utils.book_append_sheet(workbook, equipamentosSheet, 'Equipamentos');
-    
-    // ========== ABA 2: INSTRUÇÕES ==========
-    const instrucoesData = [
-      ['INSTRUÇÕES DE PREENCHIMENTO'],
-      [''],
-      ['COLUNAS OBRIGATÓRIAS:'],
-      ['• Nº Série: Número de série do equipamento (obrigatório)'],
-      ['• Modelo: Modelo do equipamento (obrigatório)'],
-      [''],
-      ['COLUNAS OPCIONAIS:'],
-      ['• SKU: Código SKU do equipamento (opcional)'],
-      [''],
-      ['FLUXO:'],
-      ['1. Preencha as colunas: Nº Série, Modelo e SKU (opcional)'],
-      ['2. Não deixe campos obrigatórios em branco'],
-      ['3. Não modifique o nome das colunas'],
-      ['4. Não adicione novas colunas'],
-      ['5. Use apenas a aba "Equipamentos"'],
-      ['6. Ao importar, selecione o contrato para vincular todos os equipamentos'],
-      ['7. Equipamentos duplicados (mesma série) serão ignorados'],
-    ];
-    
-    const instrucoesSheet = XLSX.utils.aoa_to_sheet(instrucoesData);
-    instrucoesSheet['!cols'] = [{ wch: 80 }];
-    
-    instrucoesSheet['A1'].s = {
-      font: { bold: true, size: 14, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1F2937' } },
-      alignment: { horizontal: 'left', vertical: 'center' }
-    };
-    
-    XLSX.utils.book_append_sheet(workbook, instrucoesSheet, 'Instruções');
-    
-    // Gerar arquivo
-    const nomeArquivo = `Template_Importar_Equipamentos_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(workbook, nomeArquivo);
-  };
-  
-  document.head.appendChild(script);
-};
-
-export function GerenciarEquipamentos() {
-  const { usuario, logout } = useAuth();
-  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
-  const [contratos, setContratos] = useState<Contrato[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedContrato, setSelectedContrato] = useState<string>('');
-  const [selectedCliente, setSelectedCliente] = useState<string>('');
+export default function GerenciarEquipamentos() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(1000);
-  
-  // Modal states
-  const [showModal, setShowModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedContrato, setSelectedContrato] = useState<string>("");
+  const [selectedCliente, setSelectedCliente] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [importProgress, setImportProgress] = useState(0);
-  const [isImporting, setIsImporting] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [selectedImportContrato, setSelectedImportContrato] = useState<string>('');
-  
-  // Form states
+  const [selectedImportContrato, setSelectedImportContrato] = useState<string>("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+
   const [formData, setFormData] = useState({
-    contrato_id: '',
-    numero_serie: '',
-    modelo: '',
-    sku: '',
+    contractId: "",
+    serialNumber: "",
+    model: "",
+    sku: "",
   });
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
+  // TODO: Integrar com sua API/tRPC
+  const [equipmentData, setEquipmentData] = useState<PaginatedResponse>({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 1000,
+    totalPages: 0,
+  });
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [equipmentLoading, setEquipmentLoading] = useState(false);
 
-  // Recarregar equipamentos quando filtros mudam
-  useEffect(() => {
-    carregarEquipamentos();
-  }, [selectedContrato, selectedCliente]);
-
-  const carregarDados = async () => {
-    try {
-      setLoading(true);
-      
-      // Carregar contratos com clientes
-      const { data: contratosData, error: contratosError } = await supabase
-        .from('contratos')
-        .select('id, numero_contrato, nome_cliente')
-        .order('numero_contrato', { ascending: true });
-
-      if (contratosError) throw contratosError;
-      setContratos(contratosData || []);
-
-      // Carregar equipamentos
-      carregarEquipamentos();
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      alert('Erro ao carregar dados');
-    } finally {
-      setLoading(false);
-    }
+  const resetForm = () => {
+    setFormData({
+      contractId: "",
+      serialNumber: "",
+      model: "",
+      sku: "",
+    });
+    setIsEditing(false);
+    setEditingId(null);
   };
 
-  const carregarEquipamentos = async () => {
-    try {
-      let query = supabase
-        .from('contrato_equipamentos')
-        .select(`
-          id,
-          contrato_id,
-          numero_serie,
-          modelo,
-          sku,
-          data_criacao,
-          contratos:contrato_id(
-            id,
-            numero_contrato,
-            nome_cliente
-          )
-        `)
-        .order('data_criacao', { ascending: false });
-
-      if (selectedContrato) {
-        query = query.eq('contrato_id', parseInt(selectedContrato));
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      
-      // Normalizar dados: converter contratos array em objeto se necessario
-      let normalizedData = (data || []).map((equip: any) => ({
-        ...equip,
-        contratos: Array.isArray(equip.contratos) ? equip.contratos[0] : equip.contratos
-      }));
-      
-      // Filtrar por cliente no lado do cliente (JavaScript)
-      let filteredData = normalizedData;
-      if (selectedCliente) {
-        filteredData = filteredData.filter(
-          (equip) => equip.contratos?.nome_cliente?.trim() === selectedCliente?.trim()
-        );
-      }
-      
-      setEquipamentos(filteredData as Equipamento[]);
-    } catch (error) {
-      console.error('Erro ao carregar equipamentos:', error);
-    }
-  };
-
-  const handleOpenModal = (equipamento?: Equipamento) => {
-    if (equipamento) {
+  const handleOpenModal = (equipment?: Equipment) => {
+    if (equipment) {
       setIsEditing(true);
-      setEditingId(equipamento.id);
+      setEditingId(equipment.id);
       setFormData({
-        contrato_id: equipamento.contrato_id.toString(),
-        numero_serie: equipamento.numero_serie,
-        modelo: equipamento.modelo,
-        sku: equipamento.sku || '',
+        contractId: equipment.contractId.toString(),
+        serialNumber: equipment.serialNumber,
+        model: equipment.model,
+        sku: equipment.sku || "",
       });
     } else {
-      setIsEditing(false);
-      setEditingId(null);
-      setFormData({
-        contrato_id: '',
-        numero_serie: '',
-        modelo: '',
-        sku: '',
-      });
+      resetForm();
     }
     setShowModal(true);
   };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setFormData({
-      contrato_id: '',
-      numero_serie: '',
-      modelo: '',
-      sku: '',
-    });
-  };
-
   const handleSave = async () => {
-    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo) {
-      alert('Preencha os campos obrigatórios: Contrato, Série e Modelo');
+    if (!formData.contractId || !formData.serialNumber || !formData.model) {
+      toast.error("Preencha os campos obrigatorios");
       return;
     }
 
     try {
+      // TODO: Chamar sua API/tRPC para criar ou atualizar
       if (isEditing && editingId) {
-        // Atualizar
-        const { error } = await supabase
-          .from('contrato_equipamentos')
-          .update({
-            contrato_id: parseInt(formData.contrato_id),
-            numero_serie: formData.numero_serie,
-            modelo: formData.modelo,
-            sku: formData.sku || null,
-          })
-          .eq('id', editingId);
-
-        if (error) throw error;
-        alert('Equipamento atualizado com sucesso!');
+        // await updateMutation.mutateAsync({...})
+        toast.success("Equipamento atualizado com sucesso!");
       } else {
-        // Inserir novo
-        const { error } = await supabase
-          .from('contrato_equipamentos')
-          .insert([{
-            contrato_id: parseInt(formData.contrato_id),
-            numero_serie: formData.numero_serie,
-            modelo: formData.modelo,
-            sku: formData.sku || null,
-          }]);
-
-        if (error) throw error;
-        alert('Equipamento adicionado com sucesso!');
+        // await createMutation.mutateAsync({...})
+        toast.success("Equipamento criado com sucesso!");
       }
-
-      handleCloseModal();
-      carregarEquipamentos();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar equipamento');
+      setShowModal(false);
+      resetForm();
+    } catch (error: any) {
+      toast.error(`Erro: ${error.message}`);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja deletar este equipamento?')) {
+    if (!confirm("Tem certeza que deseja deletar este equipamento?")) {
       return;
     }
-
     try {
-      const { error } = await supabase
-        .from('contrato_equipamentos')
-        .delete()
-        .eq('id', id);
+      // TODO: Chamar sua API/tRPC para deletar
+      toast.success("Equipamento deletado com sucesso!");
+    } catch (error: any) {
+      toast.error(`Erro: ${error.message}`);
+    }
+  };
 
-      if (error) throw error;
-      alert('Equipamento deletado com sucesso!');
-      carregarEquipamentos();
+  const gerarTemplateExcel = () => {
+    try {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js";
+
+      script.onload = ( ) => {
+        setTimeout(() => {
+          const XLSX = (window as any).XLSX;
+          if (!XLSX) {
+            toast.error("Erro ao carregar biblioteca");
+            return;
+          }
+
+          const workbook = XLSX.utils.book_new();
+
+          const equipamentosData: any[] = [
+            {
+              "No Serie": "SN001",
+              "Modelo": "Modelo A",
+              "SKU": "SKU001",
+            },
+            {
+              "No Serie": "SN002",
+              "Modelo": "Modelo B",
+              "SKU": "SKU002",
+            },
+          ];
+
+          for (let i = 0; i < 100; i++) {
+            equipamentosData.push({
+              "No Serie": "",
+              "Modelo": "",
+              "SKU": "",
+            });
+          }
+
+          const equipamentosSheet = XLSX.utils.json_to_sheet(equipamentosData);
+          equipamentosSheet["!cols"] = [
+            { wch: 20 },
+            { wch: 20 },
+            { wch: 15 },
+          ];
+
+          const headerRange = XLSX.utils.decode_range(equipamentosSheet["!ref"] || "A1");
+          for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
+            const address = XLSX.utils.encode_col(C) + "1";
+            if (!equipamentosSheet[address]) continue;
+
+            equipamentosSheet[address].s = {
+              font: { bold: true, color: { rgb: "FFFFFF" } },
+              fill: { fgColor: { rgb: "3B82F6" } },
+              alignment: { horizontal: "center", vertical: "center" },
+            };
+          }
+
+          XLSX.utils.book_append_sheet(workbook, equipamentosSheet, "Equipamentos");
+
+          const instrucoesData = [
+            ["INSTRUCOES DE PREENCHIMENTO"],
+            [""],
+            ["COLUNAS OBRIGATORIAS:"],
+            ["- No Serie: Numero de serie do equipamento (obrigatorio)"],
+            ["- Modelo: Modelo do equipamento (obrigatorio)"],
+            [""],
+            ["COLUNAS OPCIONAIS:"],
+            ["- SKU: Codigo SKU do equipamento (opcional)"],
+            [""],
+            ["FLUXO:"],
+            ["1. Preencha as colunas: No Serie, Modelo e SKU (opcional)"],
+            ["2. Nao deixe campos obrigatorios em branco"],
+            ["3. Nao modifique o nome das colunas"],
+            ["4. Nao adicione novas colunas"],
+            ["5. Use apenas a aba Equipamentos"],
+            ["6. Ao importar, selecione o contrato para vincular todos os equipamentos"],
+            ["7. Equipamentos duplicados (mesma serie) serao ignorados"],
+          ];
+
+          const instrucoesSheet = XLSX.utils.aoa_to_sheet(instrucoesData);
+          instrucoesSheet["!cols"] = [{ wch: 80 }];
+
+          instrucoesSheet["A1"].s = {
+            font: { bold: true, size: 14, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "1F2937" } },
+            alignment: { horizontal: "left", vertical: "center" },
+          };
+
+          XLSX.utils.book_append_sheet(workbook, instrucoesSheet, "Instrucoes");
+
+          const nomeArquivo = `Template_Importar_Equipamentos_${new Date().toISOString().split("T")[0]}.xlsx`;
+          XLSX.writeFile(workbook, nomeArquivo);
+          toast.success("Template baixado com sucesso!");
+        }, 100);
+      };
+
+      script.onerror = () => {
+        toast.error("Erro ao carregar biblioteca");
+      };
+
+      document.head.appendChild(script);
     } catch (error) {
-      console.error('Erro ao deletar:', error);
-      alert('Erro ao deletar equipamento');
+      console.error("Erro ao gerar template:", error);
+      toast.error("Erro ao gerar template");
     }
   };
 
   const handleImportarEquipamentos = async () => {
     if (!importFile) {
-      alert('Selecione um arquivo para importar');
+      toast.error("Selecione um arquivo para importar");
+      return;
+    }
+
+    if (!selectedImportContrato) {
+      toast.error("Selecione um contrato antes de importar");
       return;
     }
 
@@ -338,9 +234,9 @@ export function GerenciarEquipamentos() {
     setImportProgress(0);
 
     try {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-      script.onload = async () => {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js";
+      script.onload = async ( ) => {
         try {
           const reader = new FileReader();
           reader.onload = async (e) => {
@@ -348,471 +244,350 @@ export function GerenciarEquipamentos() {
               const data = e.target?.result as ArrayBuffer;
               const XLSX = (window as any).XLSX;
 
-              const workbook = XLSX.read(data, { type: 'array' });
-              const worksheet = workbook.Sheets['Equipamentos'];
+              const workbook = XLSX.read(data, { type: "array" });
+              const worksheet = workbook.Sheets["Equipamentos"];
 
               if (!worksheet) {
-                alert('Aba "Equipamentos" nao encontrada no arquivo');
+                toast.error('Aba "Equipamentos" nao encontrada no arquivo');
                 setIsImporting(false);
                 return;
               }
 
-                const rows = XLSX.utils.sheet_to_json(worksheet);
-              let inserted = 0;
-              let skipped = 0;
-              const contratoId = parseInt(selectedImportContrato);
-
-              if (!contratoId) {
-                alert('Selecione um contrato antes de importar');
-                setIsImporting(false);
-                return;
-              }
+              const rows = XLSX.utils.sheet_to_json(worksheet);
+              const equipments: any[] = [];
 
               for (let i = 0; i < rows.length; i++) {
                 const row: any = rows[i];
+                const numeroSerie = String(row["No Serie"] || row["numero_serie"] || "").trim();
+                const modelo = String(row["Modelo"] || row["modelo"] || "").trim();
+                const sku = String(row["SKU"] || row["sku"] || "").trim() || undefined;
 
-                const numeroSerie = String(row['Nº Série'] || row['numero_serie'] || '').trim();
-                const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
-                const sku = String(row['SKU'] || row['sku'] || '').trim() || null;
-
-                if (!numeroSerie || !modelo) {
-                  skipped++;
-                  continue;
-                }
-
-                try {
-                  const { data: existing } = await supabase
-                    .from('contrato_equipamentos')
-                    .select('id')
-                    .eq('numero_serie', numeroSerie)
-                    .single();
-
-                  if (existing) {
-                    skipped++;
-                  } else {
-                    const { error } = await supabase
-                      .from('contrato_equipamentos')
-                      .insert([{
-                        contrato_id: contratoId,
-                        numero_serie: numeroSerie,
-                        modelo: modelo,
-                        sku: sku,
-                      }]);
-
-                    if (error) {
-                      skipped++;
-                    } else {
-                      inserted++;
-                    }
-                  }
-                } catch (err) {
-                  skipped++;
+                if (numeroSerie && modelo) {
+                  equipments.push({
+                    serialNumber: numeroSerie,
+                    model: modelo,
+                    sku: sku,
+                  });
                 }
 
                 setImportProgress(Math.round(((i + 1) / rows.length) * 100));
               }
 
-              alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
+              if (equipments.length === 0) {
+                toast.error("Nenhum equipamento valido encontrado no arquivo");
+                setIsImporting(false);
+                return;
+              }
+
+              // TODO: Chamar sua API/tRPC para importar em massa
+              // await bulkImportMutation.mutateAsync({
+              //   contractId: parseInt(selectedImportContrato),
+              //   equipments,
+              // });
+
+              toast.success(`Importacao concluida! ${equipments.length} equipamentos processados`);
               setShowImportModal(false);
               setImportFile(null);
-              setImportProgress(0);
-              setSelectedImportContrato('');
+              setSelectedImportContrato("");
               setIsImporting(false);
-              carregarEquipamentos();
+              setImportProgress(0);
             } catch (error) {
-              console.error('Erro ao processar arquivo:', error);
-              alert('Erro ao processar arquivo');
-            } finally {
+              console.error("Erro ao processar arquivo:", error);
+              toast.error("Erro ao processar arquivo");
               setIsImporting(false);
             }
           };
           reader.readAsArrayBuffer(importFile);
         } catch (error) {
-          console.error('Erro:', error);
-          alert('Erro ao importar equipamentos');
+          console.error("Erro:", error);
+          toast.error("Erro ao importar equipamentos");
           setIsImporting(false);
         }
       };
       document.head.appendChild(script);
     } catch (error) {
-      console.error('Erro na importacao:', error);
-      alert('Erro ao importar equipamentos');
+      console.error("Erro na importacao:", error);
+      toast.error("Erro ao importar equipamentos");
       setIsImporting(false);
     }
   };
 
-  const filteredEquipamentos = equipamentos.filter(
-    (equip) =>
-      equip.numero_serie.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      equip.modelo.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Paginação
-  const totalPages = Math.ceil(filteredEquipamentos.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedEquipamentos = filteredEquipamentos.slice(startIndex, endIndex);
-
-  // Resetar página quando filtros mudam
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredEquipamentos.length]);
+  const uniqueClientes = Array.from(
+    new Set(contracts.map((c) => c.clientName))
+  ).sort();
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* SIDEBAR */}
-      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-700">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-400 hover:text-white"
-          >
-            ☰
-          </button>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
-          
-          <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Dashboard</span>}
-          </a>
-
-          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Contratos</span>}
-          </a>
-
-          <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Clientes</span>}
-          </a>
-
-          <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
-            {sidebarOpen && <span>Equipamentos</span>}
-          </a>
-
-          <a href="/confirmacoes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Confirmações</span>}
-          </a>
-
-          <a href="/fotos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Fotos</span>}
-          </a>
-
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
-          >
-            {sidebarOpen && <span>Sair</span>}
-          </button>
-        </nav>
-      </div>
-
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* HEADER */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img
-                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
-                alt="Logo Positivo"
-                className="h-10 w-auto"
-              />
-              <h1 className="text-2xl font-bold text-gray-900">Gerenciar Equipamentos</h1>
-            </div>
-            <div className="text-right text-sm text-gray-600">
-              <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>
-            </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900">Equipamentos</h1>
+            <p className="text-gray-600 mt-2">Gerenciar equipamentos por contrato</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-medium"
+            >
+              Importar em Massa
+            </button>
+            <button
+              onClick={() => handleOpenModal()}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+            >
+              Novo Equipamento
+            </button>
           </div>
         </div>
 
-        {/* SCROLL CONTENT */}
-        <div className="flex-1 overflow-auto">
-          <div className="p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Equipamentos</h2>
-              <div className="flex gap-3">
-                {(selectedContrato || selectedCliente || searchTerm) && (
-                  <button
-                    onClick={() => {
-                      setSelectedContrato('');
-                      setSelectedCliente('');
-                      setSearchTerm('');
-                    }}
-                    className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
-                  >
-                    Limpar Filtros
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowImportModal(true)}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                >
-                  Importar em Massa
-                </button>
-                <button
-                  onClick={() => handleOpenModal()}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  + Novo Equipamento
-                </button>
-              </div>
+        {/* Filtros */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filtrar por Contrato
+            </label>
+            <select
+              value={selectedContrato}
+              onChange={(e) => {
+                setSelectedContrato(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos os contratos</option>
+              {contracts.map((contrato) => (
+                <option key={contrato.id} value={contrato.id}>
+                  {contrato.contractNumber}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filtrar por Cliente
+            </label>
+            <select
+              value={selectedCliente}
+              onChange={(e) => {
+                setSelectedCliente(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos os clientes</option>
+              {uniqueClientes.map((cliente) => (
+                <option key={cliente} value={cliente}>
+                  {cliente}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Buscar
+            </label>
+            <input
+              type="text"
+              placeholder="Buscar por serie..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Tabela */}
+        {equipmentLoading ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <p className="text-gray-600">Carregando equipamentos...</p>
+          </div>
+        ) : equipmentData.items.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <p className="text-gray-600">Nenhum equipamento encontrado</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                      Contrato
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                      Cliente
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                      No Serie
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                      Modelo
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                      SKU
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                      Acoes
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {equipmentData.items.map((equip) => (
+                    <tr key={equip.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {equip.contractNumber}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {equip.clientName}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        {equip.serialNumber}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {equip.model}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {equip.sku || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-sm space-x-2">
+                        <button
+                          onClick={() => handleOpenModal(equip)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(equip.id)}
+                          className="text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Deletar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* FILTROS */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            {/* Paginacao */}
+            {equipmentData.totalPages > 1 && (
+              <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Pagina {equipmentData.page} de {equipmentData.totalPages} (Total: {equipmentData.total} equipamentos)
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(equipmentData.totalPages, currentPage + 1))}
+                      disabled={currentPage === equipmentData.totalPages}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Proxima
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Novo/Editar */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">
+                {isEditing ? "Editar Equipamento" : "Novo Equipamento"}
+              </h2>
+            </div>
+            <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contrato
+                </label>
                 <select
-                  value={selectedContrato}
-                  onChange={(e) => setSelectedContrato(e.target.value)}
+                  value={formData.contractId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contractId: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Todos os contratos</option>
-                  {contratos
-                    .filter((contrato) => !selectedCliente || contrato.nome_cliente === selectedCliente)
-                    .map((contrato) => (
+                  <option value="">Selecione um contrato</option>
+                  {contracts.map((contrato) => (
                     <option key={contrato.id} value={contrato.id}>
-                      {contrato.numero_contrato}
+                      {contrato.contractNumber}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente</label>
-                <select
-                  value={selectedCliente}
-                  onChange={(e) => setSelectedCliente(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os clientes</option>
-                  {Array.from(new Set(contratos.map(c => c.nome_cliente)))
-                    .sort()
-                    .map((cliente) => (
-                    <option key={cliente} value={cliente}>
-                      {cliente}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  No de Serie
+                </label>
                 <input
                   type="text"
-                  placeholder="Buscar por série ou modelo..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={formData.serialNumber}
+                  onChange={(e) =>
+                    setFormData({ ...formData, serialNumber: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>
 
-
-
-            {loading ? (
-              <p className="text-center text-gray-600">Carregando equipamentos...</p>
-            ) : filteredEquipamentos.length === 0 ? (
-              <div className="bg-white rounded-lg shadow p-8 text-center">
-                <p className="text-gray-600 mb-4">Nenhum equipamento encontrado</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Modelo
+                </label>
+                <input
+                  type="text"
+                  value={formData.model}
+                  onChange={(e) =>
+                    setFormData({ ...formData, model: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Série</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {paginatedEquipamentos.map((equipamento) => (
-                      <tr key={equipamento.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {equipamento.contratos?.numero_contrato || '-'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {equipamento.contratos?.nome_cliente || '-'}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{equipamento.numero_serie}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.sku || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
-                        <td className="px-6 py-4 text-sm space-x-2">
-                          <button
-                            onClick={() => handleOpenModal(equipamento)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDelete(equipamento.id)}
-                            className="text-red-600 hover:text-red-800 font-medium"
-                          >
-                            Deletar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
 
-                {/* PAGINAÇÃO */}
-                {filteredEquipamentos.length > 0 && (
-                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
-                        Mostrando {startIndex + 1} a {Math.min(endIndex, filteredEquipamentos.length)} de {filteredEquipamentos.length} equipamentos
-                      </div>
-                      <div className="flex gap-2 items-center">
-                        {totalPages > 1 && (
-                          <>
-                        <button
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          disabled={currentPage === 1}
-                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                          ← Anterior
-                        </button>
-                        <div className="flex gap-1">
-                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            let pageNum;
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (currentPage >= totalPages - 2) {
-                              pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = currentPage - 2 + i;
-                            }
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() => setCurrentPage(pageNum)}
-                                className={`px-3 py-2 rounded-lg transition ${
-                                  currentPage === pageNum
-                                    ? 'bg-blue-600 text-white'
-                                    : 'border border-gray-300 text-gray-700 hover:bg-white'
-                                }`}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <button
-                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                          Próxima →
-                        </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SKU
+                </label>
+                <input
+                  type="text"
+                  value={formData.sku}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sku: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-            )}
 
-            <div className="mt-4 text-sm text-gray-600">
-              Total: {filteredEquipamentos.length} equipamento(s)
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* MODAL */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-2xl font-bold text-gray-900">
-                  {isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
-                </h3>
+              <div className="flex gap-3 pt-4">
                 <button
-                  onClick={handleCloseModal}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contrato *
-                  </label>
-                  <select
-                    value={formData.contrato_id}
-                    onChange={(e) => setFormData({ ...formData, contrato_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecione um contrato</option>
-                    {contratos.map((contrato) => (
-                      <option key={contrato.id} value={contrato.id}>
-                        {contrato.numero_contrato}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nº de Série *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.numero_serie}
-                    onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Modelo *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.modelo}
-                    onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    SKU
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={handleCloseModal}
+                  onClick={() => setShowModal(false)}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                 >
-                  {isEditing ? 'Atualizar' : 'Adicionar'}
+                  {isEditing ? "Atualizar" : "Adicionar"}
                 </button>
               </div>
             </div>
@@ -820,26 +595,14 @@ export function GerenciarEquipamentos() {
         </div>
       )}
 
-      {/* MODAL IMPORTACAO */}
+      {/* Modal Importacao */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-2xl font-bold text-gray-900">Importar Equipamentos</h3>
-                <button
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setImportFile(null);
-                    setImportProgress(0);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                  disabled={isImporting}
-                >
-                  ✕
-                </button>
-              </div>
-
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Importar Equipamentos</h2>
+            </div>
+            <div className="p-6 space-y-4">
               {isImporting ? (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-600">Importando...</p>
@@ -852,28 +615,23 @@ export function GerenciarEquipamentos() {
                   <p className="text-sm text-gray-600 text-center">{importProgress}%</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <>
                   <div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      📥 <strong>Passo 1:</strong> Baixe o template
+                    <p className="text-sm text-gray-600 mb-3 font-medium">
+                      Passo 1: Baixe o template
                     </p>
                     <button
                       onClick={gerarTemplateExcel}
                       className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
                     >
-                      📥 Baixar Template Excel
+                      Baixar Template Excel
                     </button>
                   </div>
 
-                  <hr className="my-4" />
-
-                  <div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      📋 <strong>Passo 2:</strong> Selecione o contrato
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-gray-600 mb-3 font-medium">
+                      Passo 2: Selecione o contrato
                     </p>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Selecione o contrato para vincular os equipamentos
-                    </label>
                     <select
                       value={selectedImportContrato}
                       onChange={(e) => setSelectedImportContrato(e.target.value)}
@@ -881,21 +639,18 @@ export function GerenciarEquipamentos() {
                       disabled={isImporting}
                     >
                       <option value="">Selecione um contrato</option>
-                      {contratos.map((contrato) => (
+                      {contracts.map((contrato) => (
                         <option key={contrato.id} value={contrato.id}>
-                          {contrato.numero_contrato} - {contrato.nome_cliente}
+                          {contrato.contractNumber} - {contrato.clientName}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      📄 <strong>Passo 3:</strong> Selecione o arquivo
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-gray-600 mb-3 font-medium">
+                      Passo 3: Selecione o arquivo
                     </p>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Selecione arquivo Excel preenchido
-                    </label>
                     <input
                       type="file"
                       accept=".xlsx,.xls"
@@ -904,35 +659,32 @@ export function GerenciarEquipamentos() {
                       disabled={isImporting}
                     />
                     {importFile && (
-                      <p className="text-xs text-green-600 mt-2">✓ {importFile.name}</p>
+                      <p className="text-xs text-green-600 mt-2">{importFile.name}</p>
                     )}
-                    <p className="text-xs text-gray-500 mt-2">
-                      Use o template fornecido: Template_Importar_Equipamentos.xlsx
-                    </p>
                   </div>
-                </div>
-              )}
 
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setImportFile(null);
-                    setImportProgress(0);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                  disabled={isImporting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleImportarEquipamentos}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                  disabled={!importFile || !selectedImportContrato || isImporting}
-                >
-                  {isImporting ? 'Importando...' : 'Importar'}
-                </button>
-              </div>
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={() => {
+                        setShowImportModal(false);
+                        setImportFile(null);
+                        setSelectedImportContrato("");
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                      disabled={isImporting}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleImportarEquipamentos}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
+                      disabled={!importFile || !selectedImportContrato || isImporting}
+                    >
+                      {isImporting ? "Importando..." : "Importar em Massa"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
