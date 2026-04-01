@@ -1,16 +1,48 @@
 /**
  * Função para gerar template Excel dinamicamente no navegador
- * Não precisa de arquivo externo - tudo é criado em memória
+ * Versão corrigida com melhor tratamento de erros
  */
 
-export const gerarTemplateExcel = () => {
-  // Carregar biblioteca XLSX dinamicamente
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-  
-  script.onload = () => {
+export const gerarTemplateExcel = async () => {
+  try {
+    // Verificar se XLSX já está carregado
+    if ((window as any).XLSX) {
+      gerarArquivo();
+      return;
+    }
+
+    // Carregar biblioteca XLSX dinamicamente
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+    script.async = true;
+    
+    script.onload = () => {
+      setTimeout(() => {
+        gerarArquivo();
+      }, 100);
+    };
+    
+    script.onerror = () => {
+      alert('Erro ao carregar biblioteca. Tente novamente.');
+      console.error('Erro ao carregar XLSX');
+    };
+    
+    document.head.appendChild(script);
+  } catch (error) {
+    console.error('Erro ao gerar template:', error);
+    alert('Erro ao gerar template');
+  }
+};
+
+function gerarArquivo() {
+  try {
     const XLSX = (window as any).XLSX;
     
+    if (!XLSX) {
+      alert('Biblioteca não carregada. Tente novamente.');
+      return;
+    }
+
     // Criar um novo workbook
     const workbook = XLSX.utils.book_new();
     
@@ -109,7 +141,8 @@ export const gerarTemplateExcel = () => {
     // ========== GERAR ARQUIVO ==========
     const nomeArquivo = `Template_Importar_Equipamentos_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, nomeArquivo);
-  };
-  
-  document.head.appendChild(script);
-};
+  } catch (error) {
+    console.error('Erro ao gerar arquivo:', error);
+    alert('Erro ao gerar arquivo Excel');
+  }
+}
