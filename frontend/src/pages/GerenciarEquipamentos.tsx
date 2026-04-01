@@ -379,6 +379,11 @@ export function GerenciarEquipamentos() {
     new Set(contratos.map((c) => c.nome_cliente).filter(Boolean))
   ).sort();
 
+  // Filtrar contratos baseado no cliente selecionado
+  const contratosDoCliente = selectedCliente
+    ? contratos.filter((c) => c.nome_cliente === selectedCliente)
+    : contratos;
+
   if (loading) {
     return <div className="p-8 text-center">Carregando...</div>;
   }
@@ -492,9 +497,10 @@ export function GerenciarEquipamentos() {
                   value={selectedContrato}
                   onChange={(e) => setSelectedContrato(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={selectedCliente ? false : false}
                 >
                   <option value="">Todos os contratos</option>
-                  {contratos.map((contrato) => (
+                  {contratosDoCliente.map((contrato) => (
                     <option key={contrato.id} value={contrato.id}>
                       {contrato.numero_contrato}
                     </option>
@@ -643,7 +649,7 @@ export function GerenciarEquipamentos() {
                   <option value="">Selecione um contrato</option>
                   {contratos.map((contrato) => (
                     <option key={contrato.id} value={contrato.id}>
-                      {contrato.numero_contrato}
+                      {contrato.numero_contrato} - {contrato.nome_cliente}
                     </option>
                   ))}
                 </select>
@@ -754,11 +760,19 @@ export function GerenciarEquipamentos() {
                       disabled={isImporting}
                     >
                       <option value="">Selecione um contrato</option>
-                      {contratos.map((contrato) => (
-                        <option key={contrato.id} value={contrato.id}>
-                          {contrato.numero_contrato} - {contrato.nome_cliente}
-                        </option>
-                      ))}
+                      {contratosDoCliente.length > 0 ? (
+                        contratosDoCliente.map((contrato) => (
+                          <option key={contrato.id} value={contrato.id}>
+                            {contrato.numero_contrato} - {contrato.nome_cliente}
+                          </option>
+                        ))
+                      ) : (
+                        contratos.map((contrato) => (
+                          <option key={contrato.id} value={contrato.id}>
+                            {contrato.numero_contrato} - {contrato.nome_cliente}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 
