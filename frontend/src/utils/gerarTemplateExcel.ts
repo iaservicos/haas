@@ -17,25 +17,16 @@ export const gerarTemplateExcel = () => {
     // ========== ABA 1: EQUIPAMENTOS ==========
     const equipamentosData: any[] = [
       {
-        'Contrato ID': 1,
-        'Número Contrato': '2000264954',
-        'Cliente': 'CLARO SA',
         'Nº Série': 'SN001',
         'Modelo': 'Modelo A',
         'SKU': 'SKU001'
       },
       {
-        'Contrato ID': 1,
-        'Número Contrato': '2000264954',
-        'Cliente': 'CLARO SA',
         'Nº Série': 'SN002',
         'Modelo': 'Modelo B',
         'SKU': 'SKU002'
       },
       {
-        'Contrato ID': 2,
-        'Número Contrato': '2000420465',
-        'Cliente': 'TECCHAPECO SISTEMAS LTDA',
         'Nº Série': 'SN003',
         'Modelo': 'Modelo C',
         'SKU': ''
@@ -45,9 +36,6 @@ export const gerarTemplateExcel = () => {
     // Adicionar 100 linhas vazias como exemplo
     for (let i = 0; i < 100; i++) {
       equipamentosData.push({
-        'Contrato ID': '',
-        'Número Contrato': '',
-        'Cliente': '',
         'Nº Série': '',
         'Modelo': '',
         'SKU': ''
@@ -58,9 +46,6 @@ export const gerarTemplateExcel = () => {
     
     // Configurar largura das colunas
     equipamentosSheet['!cols'] = [
-      { wch: 12 },  // Contrato ID
-      { wch: 18 },  // Número Contrato
-      { wch: 25 },  // Cliente
       { wch: 20 },  // Nº Série
       { wch: 20 },  // Modelo
       { wch: 15 }   // SKU
@@ -86,13 +71,10 @@ export const gerarTemplateExcel = () => {
       ['INSTRUÇÕES DE PREENCHIMENTO'],
       [''],
       ['COLUNAS OBRIGATÓRIAS:'],
-      ['• Contrato ID: ID numérico do contrato (obrigatório)'],
       ['• Nº Série: Número de série do equipamento (obrigatório)'],
       ['• Modelo: Modelo do equipamento (obrigatório)'],
       [''],
       ['COLUNAS OPCIONAIS:'],
-      ['• Número Contrato: Número do contrato (informativo)'],
-      ['• Cliente: Nome do cliente (informativo)'],
       ['• SKU: Código SKU do equipamento (opcional)'],
       [''],
       ['REGRAS:'],
@@ -103,10 +85,10 @@ export const gerarTemplateExcel = () => {
       ['5. Equipamentos duplicados (mesma série) serão ignorados'],
       [''],
       ['EXEMPLO:'],
-      ['Contrato ID | Nº Série | Modelo | SKU'],
-      ['1 | SN001 | Modelo A | SKU001'],
-      ['1 | SN002 | Modelo B | SKU002'],
-      ['2 | SN003 | Modelo C | (deixar em branco)'],
+      ['Nº Série | Modelo | SKU'],
+      ['SN001 | Modelo A | SKU001'],
+      ['SN002 | Modelo B | SKU002'],
+      ['SN003 | Modelo C | (deixar em branco)'],
       [''],
       ['SUPORTE:'],
       ['Em caso de dúvidas, entre em contato com o gerente do projeto']
