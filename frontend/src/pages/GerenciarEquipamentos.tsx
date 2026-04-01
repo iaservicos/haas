@@ -116,12 +116,6 @@ const gerarTemplateExcel = () => {
       ['3. Não adicione novas colunas'],
       ['4. Use apenas a aba "Equipamentos"'],
       ['5. Equipamentos duplicados (mesma série) serão ignorados'],
-      [''],
-      ['EXEMPLO:'],
-      ['Contrato ID | Nº Série | Modelo | SKU'],
-      ['1 | SN001 | Modelo A | SKU001'],
-      ['1 | SN002 | Modelo B | SKU002'],
-      ['2 | SN003 | Modelo C | (deixar em branco)'],
     ];
     
     const instrucoesSheet = XLSX.utils.aoa_to_sheet(instrucoesData);
@@ -176,6 +170,7 @@ export function GerenciarEquipamentos() {
     carregarDados();
   }, []);
 
+  // Recarregar equipamentos quando filtros mudam
   useEffect(() => {
     carregarEquipamentos();
   }, [selectedContrato, selectedCliente]);
@@ -184,6 +179,7 @@ export function GerenciarEquipamentos() {
     try {
       setLoading(true);
       
+      // Carregar contratos com clientes
       const { data: contratosData, error: contratosError } = await supabase
         .from('contratos')
         .select('id, numero_contrato, nome_cliente')
@@ -192,6 +188,7 @@ export function GerenciarEquipamentos() {
       if (contratosError) throw contratosError;
       setContratos(contratosData || []);
 
+      // Carregar equipamentos
       carregarEquipamentos();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -228,11 +225,13 @@ export function GerenciarEquipamentos() {
 
       if (error) throw error;
       
+      // Normalizar dados: converter contratos array em objeto se necessario
       let normalizedData = (data || []).map((equip: any) => ({
         ...equip,
         contratos: Array.isArray(equip.contratos) ? equip.contratos[0] : equip.contratos
       }));
       
+      // Filtrar por cliente no lado do cliente (JavaScript)
       let filteredData = normalizedData;
       if (selectedCliente) {
         filteredData = filteredData.filter(
@@ -241,7 +240,6 @@ export function GerenciarEquipamentos() {
       }
       
       setEquipamentos(filteredData as Equipamento[]);
-      setCurrentPage(1);
     } catch (error) {
       console.error('Erro ao carregar equipamentos:', error);
     }
@@ -288,6 +286,7 @@ export function GerenciarEquipamentos() {
 
     try {
       if (isEditing && editingId) {
+        // Atualizar
         const { error } = await supabase
           .from('contrato_equipamentos')
           .update({
@@ -301,6 +300,7 @@ export function GerenciarEquipamentos() {
         if (error) throw error;
         alert('Equipamento atualizado com sucesso!');
       } else {
+        // Inserir novo
         const { error } = await supabase
           .from('contrato_equipamentos')
           .insert([{
@@ -366,7 +366,7 @@ export function GerenciarEquipamentos() {
               const worksheet = workbook.Sheets['Equipamentos'];
 
               if (!worksheet) {
-                alert('Aba "Equipamentos" não encontrada no arquivo');
+                alert('Aba "Equipamentos" nao encontrada no arquivo');
                 setIsImporting(false);
                 return;
               }
@@ -420,7 +420,7 @@ export function GerenciarEquipamentos() {
                 setImportProgress(Math.round(((i + 1) / rows.length) * 100));
               }
 
-              alert(`Importação concluída!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
+              alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
               setShowImportModal(false);
               setImportFile(null);
               setImportProgress(0);
@@ -441,334 +441,482 @@ export function GerenciarEquipamentos() {
       };
       document.head.appendChild(script);
     } catch (error) {
-      console.error('Erro na importação:', error);
+      console.error('Erro na importacao:', error);
       alert('Erro ao importar equipamentos');
       setIsImporting(false);
     }
   };
 
-  // Calcular paginação
-  const filteredEquipamentos = equipamentos;
+  const filteredEquipamentos = equipamentos.filter(
+    (equip) =>
+      equip.numero_serie.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      equip.modelo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Paginação
   const totalPages = Math.ceil(filteredEquipamentos.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedEquipamentos = filteredEquipamentos.slice(startIndex, startIndex + itemsPerPage);
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedEquipamentos = filteredEquipamentos.slice(startIndex, endIndex);
 
-  // Obter clientes únicos
-  const clientesUnicos = Array.from(
-    new Set(equipamentos.map((e) => e.contratos?.nome_cliente).filter(Boolean))
-  ).sort() as string[];
+  // Resetar página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredEquipamentos.length]);
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-blue-600 text-white transition-all duration-300`}>
-        <div className="p-4">
-          <h1 className={`font-bold ${sidebarOpen ? 'text-xl' : 'text-xs'}`}>HaaS Portal</h1>
+      {/* SIDEBAR */}
+      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
+        <div className="p-4 border-b border-gray-700">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-gray-400 hover:text-white"
+          >
+            ☰
+          </button>
         </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
+          
+          <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Dashboard</span>}
+          </a>
+
+          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Contratos</span>}
+          </a>
+
+          <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Clientes</span>}
+          </a>
+
+          <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
+            {sidebarOpen && <span>Equipamentos</span>}
+          </a>
+
+          <a href="/confirmacoes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Confirmações</span>}
+          </a>
+
+          <a href="/fotos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Fotos</span>}
+          </a>
+
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
+          >
+            {sidebarOpen && <span>Sair</span>}
+          </button>
+        </nav>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white shadow p-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Equipamentos</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            >
-              Importar
-            </button>
-            <button
-              onClick={() => handleOpenModal()}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              + Novo Equipamento
-            </button>
-            {(selectedContrato || selectedCliente || searchTerm) && (
-              <button
-                onClick={() => {
-                  setSelectedContrato('');
-                  setSelectedCliente('');
-                  setSearchTerm('');
-                  setCurrentPage(1);
-                }}
-                className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded"
-              >
-                Limpar Filtros
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white shadow p-4 grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Filtrar por Contrato</label>
-            <select
-              value={selectedContrato}
-              onChange={(e) => {
-                setSelectedContrato(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="">Todos os contratos</option>
-              {contratos.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.numero_contrato}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Filtrar por Cliente</label>
-            <select
-              value={selectedCliente}
-              onChange={(e) => {
-                setSelectedCliente(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="">Todos os clientes</option>
-              {clientesUnicos.map((cliente) => (
-                <option key={cliente} value={cliente}>
-                  {cliente}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Buscar</label>
-            <input
-              type="text"
-              placeholder="Buscar por série ou modelo..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-4">
-          <table className="w-full bg-white shadow rounded">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-left">Contrato</th>
-                <th className="px-4 py-2 text-left">Cliente</th>
-                <th className="px-4 py-2 text-left">Nº Série</th>
-                <th className="px-4 py-2 text-left">SKU</th>
-                <th className="px-4 py-2 text-left">Modelo</th>
-                <th className="px-4 py-2 text-left">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedEquipamentos.map((equip) => (
-                <tr key={equip.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-2">{equip.contratos?.numero_contrato}</td>
-                  <td className="px-4 py-2">{equip.contratos?.nome_cliente}</td>
-                  <td className="px-4 py-2">{equip.numero_serie}</td>
-                  <td className="px-4 py-2">{equip.sku || '-'}</td>
-                  <td className="px-4 py-2">{equip.modelo}</td>
-                  <td className="px-4 py-2 flex gap-2">
-                    <button
-                      onClick={() => handleOpenModal(equip)}
-                      className="text-blue-500 hover:text-blue-700"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(equip.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      Deletar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {filteredEquipamentos.length > 0 && (
-          <div className="bg-white shadow p-4 flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-              Mostrando {startIndex + 1} a {Math.min(startIndex + itemsPerPage, filteredEquipamentos.length)} de {filteredEquipamentos.length} equipamentos
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* HEADER */}
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <img
+                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
+                alt="Logo Positivo"
+                className="h-10 w-auto"
+              />
+              <h1 className="text-2xl font-bold text-gray-900">Gerenciar Equipamentos</h1>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((page) => Math.abs(page - currentPage) <= 2 || page === 1 || page === totalPages)
-                .map((page, idx, arr) => (
-                  <React.Fragment key={page}>
-                    {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-2">...</span>}
-                    <button
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 border rounded ${
-                        currentPage === page ? 'bg-blue-500 text-white' : ''
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  </React.Fragment>
-                ))}
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Próxima
-              </button>
+            <div className="text-right text-sm text-gray-600">
+              <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Modal - Novo/Editar */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-xl font-bold mb-4">
-              {isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Contrato *</label>
-                <select
-                  value={formData.contrato_id}
-                  onChange={(e) => setFormData({ ...formData, contrato_id: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
+        {/* SCROLL CONTENT */}
+        <div className="flex-1 overflow-auto">
+          <div className="p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-900">Equipamentos</h2>
+              <div className="flex gap-3">
+                {(selectedContrato || selectedCliente || searchTerm) && (
+                  <button
+                    onClick={() => {
+                      setSelectedContrato('');
+                      setSelectedCliente('');
+                      setSearchTerm('');
+                    }}
+                    className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
+                  >
+                    Limpar Filtros
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
                 >
-                  <option value="">Selecione um contrato</option>
-                  {contratos.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.numero_contrato} - {c.nome_cliente}
+                  Importar
+                </button>
+                <button
+                  onClick={() => handleOpenModal()}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                >
+                  + Novo Equipamento
+                </button>
+              </div>
+            </div>
+
+            {/* FILTROS */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
+                <select
+                  value={selectedContrato}
+                  onChange={(e) => setSelectedContrato(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todos os contratos</option>
+                  {contratos
+                    .filter((contrato) => !selectedCliente || contrato.nome_cliente === selectedCliente)
+                    .map((contrato) => (
+                    <option key={contrato.id} value={contrato.id}>
+                      {contrato.numero_contrato}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Nº de Série *</label>
-                <input
-                  type="text"
-                  value={formData.numero_serie}
-                  onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente</label>
+                <select
+                  value={selectedCliente}
+                  onChange={(e) => setSelectedCliente(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todos os clientes</option>
+                  {Array.from(new Set(contratos.map(c => c.nome_cliente)))
+                    .sort()
+                    .map((cliente) => (
+                    <option key={cliente} value={cliente}>
+                      {cliente}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Modelo *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
                 <input
                   type="text"
-                  value={formData.modelo}
-                  onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">SKU</label>
-                <input
-                  type="text"
-                  value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
+                  placeholder="Buscar por série ou modelo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={handleCloseModal}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-              >
-                Salvar
-              </button>
+
+
+            {loading ? (
+              <p className="text-center text-gray-600">Carregando equipamentos...</p>
+            ) : filteredEquipamentos.length === 0 ? (
+              <div className="bg-white rounded-lg shadow p-8 text-center">
+                <p className="text-gray-600 mb-4">Nenhum equipamento encontrado</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Série</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {paginatedEquipamentos.map((equipamento) => (
+                      <tr key={equipamento.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {equipamento.contratos?.numero_contrato || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {equipamento.contratos?.nome_cliente || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{equipamento.numero_serie}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.sku || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
+                        <td className="px-6 py-4 text-sm space-x-2">
+                          <button
+                            onClick={() => handleOpenModal(equipamento)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(equipamento.id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Deletar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* PAGINAÇÃO */}
+                {filteredEquipamentos.length > 0 && (
+                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Mostrando {startIndex + 1} a {Math.min(endIndex, filteredEquipamentos.length)} de {filteredEquipamentos.length} equipamentos
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        {totalPages > 1 && (
+                          <>
+                        <button
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                          ← Anterior
+                        </button>
+                        <div className="flex gap-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-3 py-2 rounded-lg transition ${
+                                  currentPage === pageNum
+                                    ? 'bg-blue-600 text-white'
+                                    : 'border border-gray-300 text-gray-700 hover:bg-white'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                          Próxima →
+                        </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-4 text-sm text-gray-600">
+              Total: {filteredEquipamentos.length} equipamento(s)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
+                </h3>
+                <button
+                  onClick={handleCloseModal}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contrato *
+                  </label>
+                  <select
+                    value={formData.contrato_id}
+                    onChange={(e) => setFormData({ ...formData, contrato_id: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione um contrato</option>
+                    {contratos.map((contrato) => (
+                      <option key={contrato.id} value={contrato.id}>
+                        {contrato.numero_contrato}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nº de Série *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.numero_serie}
+                    onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Modelo *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.modelo}
+                    onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SKU
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleCloseModal}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  {isEditing ? 'Atualizar' : 'Adicionar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal - Importar */}
+      {/* MODAL IMPORTACAO */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-xl font-bold mb-4">Importar Equipamentos</h3>
-
-            {/* NOVO: Seção para baixar template */}
-            <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
-              <p className="text-sm font-medium mb-3">📥 <strong>Passo 1:</strong> Baixe o template</p>
-              <button
-                onClick={gerarTemplateExcel}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-medium"
-              >
-                📥 Baixar Template Excel
-              </button>
-            </div>
-
-            <hr className="my-4" />
-
-            {/* Seção de arquivo */}
-            <div className="mb-4">
-              <p className="text-sm font-medium mb-3">📋 <strong>Passo 2:</strong> Preencha e selecione o arquivo</p>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                className="w-full border rounded px-3 py-2"
-              />
-              {importFile && <p className="text-sm text-green-600 mt-2">✓ {importFile.name}</p>}
-            </div>
-
-            {/* Barra de progresso */}
-            {isImporting && (
-              <div className="mb-4">
-                <p className="text-sm font-medium mb-2">Importando... {importProgress}%</p>
-                <div className="w-full bg-gray-200 rounded h-2 overflow-hidden">
-                  <div
-                    className="bg-green-500 h-full transition-all"
-                    style={{ width: `${importProgress}%` }}
-                  ></div>
-                </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-2xl font-bold text-gray-900">Importar Equipamentos</h3>
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportProgress(0);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  disabled={isImporting}
+                >
+                  ✕
+                </button>
               </div>
-            )}
 
-            {/* Botões */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowImportModal(false)}
-                disabled={isImporting}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleImportarEquipamentos}
-                disabled={isImporting || !importFile}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
-              >
-                {isImporting ? 'Importando...' : 'Importar'}
-              </button>
+              {isImporting ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">Importando...</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-green-600 h-2 rounded-full transition-all"
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-600 text-center">{importProgress}%</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      📥 <strong>Passo 1:</strong> Baixe o template
+                    </p>
+                    <button
+                      onClick={gerarTemplateExcel}
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                    >
+                      📥 Baixar Template Excel
+                    </button>
+                  </div>
+
+                  <hr className="my-4" />
+
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      📋 <strong>Passo 2:</strong> Preencha e selecione o arquivo
+                    </p>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Selecione arquivo Excel preenchido
+                    </label>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={isImporting}
+                    />
+                    {importFile && (
+                      <p className="text-xs text-green-600 mt-2">✓ {importFile.name}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">
+                      Use o template fornecido: Template_Importar_Equipamentos.xlsx
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportProgress(0);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  disabled={isImporting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleImportarEquipamentos}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  disabled={!importFile || isImporting}
+                >
+                  {isImporting ? 'Importando...' : 'Importar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
