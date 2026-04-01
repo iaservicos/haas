@@ -36,8 +36,12 @@ export function GerenciarEquipamentos() {
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [importProgress, setImportProgress] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -223,6 +227,97 @@ export function GerenciarEquipamentos() {
     }
   };
 
+  const handleImportarEquipamentos = async () => {
+    if (!importFile) {
+      alert('Selecione um arquivo para importar');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split('\n').filter(line => line.trim());
+          
+          const dataLines = lines.slice(1);
+          let inserted = 0;
+          let skipped = 0;
+
+          for (let i = 0; i < dataLines.length; i++) {
+            const line = dataLines[i];
+            const columns = line.split(',').map(col => col.trim());
+
+            if (columns.length < 3) {
+              skipped++;
+              continue;
+            }
+
+            const contratoId = parseInt(columns[0]);
+            const numeroSerie = columns[1];
+            const modelo = columns[2];
+            const sku = columns[3] || null;
+
+            if (!contratoId || !numeroSerie || !modelo) {
+              skipped++;
+              continue;
+            }
+
+            try {
+              const { data: existing } = await supabase
+                .from('contrato_equipamentos')
+                .select('id')
+                .eq('numero_serie', numeroSerie)
+                .single();
+
+              if (existing) {
+                skipped++;
+              } else {
+                const { error } = await supabase
+                  .from('contrato_equipamentos')
+                  .insert([{
+                    contrato_id: contratoId,
+                    numero_serie: numeroSerie,
+                    modelo: modelo,
+                    sku: sku,
+                  }]);
+
+                if (error) {
+                  skipped++;
+                } else {
+                  inserted++;
+                }
+              }
+            } catch (err) {
+              skipped++;
+            }
+
+            setImportProgress(Math.round(((i + 1) / dataLines.length) * 100));
+          }
+
+          alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
+          setShowImportModal(false);
+          setImportFile(null);
+          setImportProgress(0);
+          carregarEquipamentos();
+        } catch (error) {
+          console.error('Erro ao processar arquivo:', error);
+          alert('Erro ao processar arquivo');
+        } finally {
+          setIsImporting(false);
+        }
+      };
+      reader.readAsText(importFile);
+    } catch (error) {
+      console.error('Erro na importacao:', error);
+      alert('Erro ao importar equipamentos');
+      setIsImporting(false);
+    }
+  };
+
   const filteredEquipamentos = equipamentos.filter(
     (equip) =>
       equip.numero_serie.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -260,14 +355,14 @@ export function GerenciarEquipamentos() {
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
-           <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Clientes</span>}
-          </a>
-
           <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Contratos</span>}
           </a>
-      
+
+          <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Clientes</span>}
+          </a>
+
           <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
             {sidebarOpen && <span>Equipamentos</span>}
           </a>
@@ -326,6 +421,12 @@ export function GerenciarEquipamentos() {
                     Limpar Filtros
                   </button>
                 )}
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+                >
+                  Importar
+                </button>
                 <button
                   onClick={() => handleOpenModal()}
                   className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
@@ -589,6 +690,82 @@ export function GerenciarEquipamentos() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
                   {isEditing ? 'Atualizar' : 'Adicionar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL IMPORTACAO */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-2xl font-bold text-gray-900">Importar Equipamentos</h3>
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportProgress(0);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  disabled={isImporting}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {isImporting ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">Importando...</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-green-600 h-2 rounded-full transition-all"
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-600 text-center">{importProgress}%</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Selecione arquivo CSV
+                    </label>
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={isImporting}
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Formato esperado: contrato_id, numero_serie, modelo, sku (opcional)
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportProgress(0);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  disabled={isImporting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleImportarEquipamentos}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  disabled={!importFile || isImporting}
+                >
+                  {isImporting ? 'Importando...' : 'Importar'}
                 </button>
               </div>
             </div>
