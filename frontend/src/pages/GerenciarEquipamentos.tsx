@@ -51,6 +51,11 @@ export function GerenciarEquipamentos() {
     carregarDados();
   }, []);
 
+  // Recarregar equipamentos quando filtros mudam
+  useEffect(() => {
+    carregarEquipamentos();
+  }, [selectedContrato, selectedCliente]);
+
   const carregarDados = async () => {
     try {
       setLoading(true);
@@ -227,7 +232,7 @@ export function GerenciarEquipamentos() {
   // Resetar página quando filtros mudam
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedContrato, selectedCliente, searchTerm]);
+  }, [filteredEquipamentos.length]);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -316,10 +321,7 @@ export function GerenciarEquipamentos() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
                 <select
                   value={selectedContrato}
-                  onChange={(e) => {
-                    setSelectedContrato(e.target.value);
-                    carregarEquipamentos();
-                  }}
+                  onChange={(e) => setSelectedContrato(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os contratos</option>
@@ -335,10 +337,7 @@ export function GerenciarEquipamentos() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente</label>
                 <select
                   value={selectedCliente}
-                  onChange={(e) => {
-                    setSelectedCliente(e.target.value);
-                    carregarEquipamentos();
-                  }}
+                  onChange={(e) => setSelectedCliente(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os clientes</option>
@@ -415,7 +414,7 @@ export function GerenciarEquipamentos() {
                 </table>
 
                 {/* PAGINAÇÃO */}
-                {totalPages > 1 && (
+                {filteredEquipamentos.length > 0 && (
                   <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-600">
