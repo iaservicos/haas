@@ -18,6 +18,9 @@ export function GerenciarContratos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModalCadastro, setShowModalCadastro] = useState(false);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(1000);
+  const [totalContratos, setTotalContratos] = useState(0);
   const [formData, setFormData] = useState({
     numero_contrato: '',
     nome_cliente: '',
@@ -29,13 +32,50 @@ export function GerenciarContratos() {
     carregarContratos();
   }, []);
 
+  // Recarregar contratos quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+    carregarContratos();
+  }, [searchTerm]);
+
+  // Recarregar quando página muda
+  useEffect(() => {
+    carregarContratos();
+  }, [currentPage]);
+
   const carregarContratos = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const offset = (currentPage - 1) * itemsPerPage;
+
+      // Contar total de contratos
+      let countQuery = supabase
+        .from('contratos')
+        .select('id', { count: 'exact', head: true });
+
+      if (searchTerm) {
+        countQuery = countQuery.or(
+          `numero_contrato.ilike.%${searchTerm}%,nome_cliente.ilike.%${searchTerm}%`
+        );
+      }
+
+      const { count } = await countQuery;
+      setTotalContratos(count || 0);
+
+      // Carregar contratos COM PAGINAÇÃO
+      let query = supabase
         .from('contratos')
         .select('*')
-        .order('numero_contrato', { ascending: true });
+        .order('numero_contrato', { ascending: true })
+        .range(offset, offset + itemsPerPage - 1);
+
+      if (searchTerm) {
+        query = query.or(
+          `numero_contrato.ilike.%${searchTerm}%,nome_cliente.ilike.%${searchTerm}%`
+        );
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setContratos(data || []);
@@ -106,11 +146,7 @@ export function GerenciarContratos() {
     }
   };
 
-  const filteredContratos = contratos.filter(
-    (contrato) =>
-      contrato.numero_contrato.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contrato.nome_cliente?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const totalPages = Math.ceil(totalContratos / itemsPerPage);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -214,36 +250,56 @@ export function GerenciarContratos() {
 
             {loading ? (
               <p className="text-center text-gray-600">Carregando contratos...</p>
-            ) : filteredContratos.length === 0 ? (
+            ) : contratos.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <p className="text-gray-600 mb-4">Nenhum contrato encontrado</p>
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Contrato</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Código Cliente</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredContratos.map((contrato) => (
-                      <tr key={contrato.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{contrato.numero_contrato}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{contrato.nome_cliente || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{contrato.cliente || '-'}</td>
+              <>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Contrato</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Código Cliente</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {contratos.map((contrato) => (
+                        <tr key={contrato.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{contrato.numero_contrato}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{contrato.nome_cliente || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{contrato.cliente || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-            <div className="mt-4 text-sm text-gray-600">
-              Total: {filteredContratos.length} contrato(s)
-            </div>
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Página {currentPage} de {totalPages} (Total: {totalContratos} contrato(s))
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -286,13 +342,13 @@ export function GerenciarContratos() {
                     value={formData.nome_cliente}
                     onChange={(e) => setFormData({ ...formData, nome_cliente: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Ex: Empresa XYZ"
+                    placeholder="Ex: Empresa ABC"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Código do Cliente
+                    Código Cliente
                   </label>
                   <input
                     type="text"
@@ -313,9 +369,9 @@ export function GerenciarContratos() {
                 </button>
                 <button
                   onClick={handleCadastroContrato}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
                 >
-                  Cadastrar
+                  Salvar
                 </button>
               </div>
             </div>
@@ -341,15 +397,13 @@ export function GerenciarContratos() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Selecione o arquivo Excel
+                    Selecionar arquivo
                   </label>
                   <input
                     type="file"
-                    accept=".xlsx,.xls,.csv"
                     onChange={(e) => setArquivoImportacao(e.target.files?.[0] || null)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <p className="text-xs text-gray-500 mt-2">Formatos aceitos: Excel (.xlsx, .xls) ou CSV</p>
                 </div>
               </div>
 
@@ -362,7 +416,7 @@ export function GerenciarContratos() {
                 </button>
                 <button
                   onClick={handleImportacao}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
                 >
                   Importar
                 </button>
