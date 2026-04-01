@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from '../services/supabase';
 
 interface Contrato {
-  id: string;
+  id: number;
   numero_contrato: string;
   nome_cliente: string;
 }
@@ -41,7 +41,7 @@ export function GerenciarClientes() {
   const [formData, setFormData] = useState({
     email: '',
     nome: '',
-    contratos_ids: [] as string[],
+    contratos_ids: [] as number[],
     senha_hash: '',
     role: 'VIEWER',
   });
@@ -148,7 +148,7 @@ export function GerenciarClientes() {
   };
 
   const handleContratoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value));
     setFormData(prev => ({
       ...prev,
       contratos_ids: selectedOptions,
@@ -399,7 +399,7 @@ export function GerenciarClientes() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
                       <select
                         multiple
-                        value={formData.contratos_ids}
+                        value={formData.contratos_ids.map(String)}
                         onChange={handleContratoChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         size={5}
