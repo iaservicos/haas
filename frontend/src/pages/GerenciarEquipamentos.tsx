@@ -237,80 +237,94 @@ export function GerenciarEquipamentos() {
     setImportProgress(0);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
+      script.onload = async () => {
         try {
-          const text = e.target?.result as string;
-          const lines = text.split('\n').filter(line => line.trim());
-          
-          const dataLines = lines.slice(1);
-          let inserted = 0;
-          let skipped = 0;
-
-          for (let i = 0; i < dataLines.length; i++) {
-            const line = dataLines[i];
-            const columns = line.split(',').map(col => col.trim());
-
-            if (columns.length < 3) {
-              skipped++;
-              continue;
-            }
-
-            const contratoId = parseInt(columns[0]);
-            const numeroSerie = columns[1];
-            const modelo = columns[2];
-            const sku = columns[3] || null;
-
-            if (!contratoId || !numeroSerie || !modelo) {
-              skipped++;
-              continue;
-            }
-
+          const reader = new FileReader();
+          reader.onload = async (e) => {
             try {
-              const { data: existing } = await supabase
-                .from('contrato_equipamentos')
-                .select('id')
-                .eq('numero_serie', numeroSerie)
-                .single();
+              const data = e.target?.result as ArrayBuffer;
+              const XLSX = (window as any).XLSX;
 
-              if (existing) {
-                skipped++;
-              } else {
-                const { error } = await supabase
-                  .from('contrato_equipamentos')
-                  .insert([{
-                    contrato_id: contratoId,
-                    numero_serie: numeroSerie,
-                    modelo: modelo,
-                    sku: sku,
-                  }]);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const worksheet = workbook.Sheets['Equipamentos'];
 
-                if (error) {
-                  skipped++;
-                } else {
-                  inserted++;
-                }
+              if (!worksheet) {
+                alert('Aba "Equipamentos" nao encontrada no arquivo');
+                setIsImporting(false);
+                return;
               }
-            } catch (err) {
-              skipped++;
+
+              const rows = XLSX.utils.sheet_to_json(worksheet);
+              let inserted = 0;
+              let skipped = 0;
+
+              for (let i = 0; i < rows.length; i++) {
+                const row: any = rows[i];
+
+                const contratoId = parseInt(row['Contrato ID'] || row['contrato_id'] || 0);
+                const numeroSerie = String(row['Nº Série'] || row['numero_serie'] || '').trim();
+                const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
+                const sku = String(row['SKU'] || row['sku'] || '').trim() || null;
+
+                if (!contratoId || !numeroSerie || !modelo) {
+                  skipped++;
+                  continue;
+                }
+
+                try {
+                  const { data: existing } = await supabase
+                    .from('contrato_equipamentos')
+                    .select('id')
+                    .eq('numero_serie', numeroSerie)
+                    .single();
+
+                  if (existing) {
+                    skipped++;
+                  } else {
+                    const { error } = await supabase
+                      .from('contrato_equipamentos')
+                      .insert([{
+                        contrato_id: contratoId,
+                        numero_serie: numeroSerie,
+                        modelo: modelo,
+                        sku: sku,
+                      }]);
+
+                    if (error) {
+                      skipped++;
+                    } else {
+                      inserted++;
+                    }
+                  }
+                } catch (err) {
+                  skipped++;
+                }
+
+                setImportProgress(Math.round(((i + 1) / rows.length) * 100));
+              }
+
+              alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
+              setShowImportModal(false);
+              setImportFile(null);
+              setImportProgress(0);
+              carregarEquipamentos();
+            } catch (error) {
+              console.error('Erro ao processar arquivo:', error);
+              alert('Erro ao processar arquivo');
+            } finally {
+              setIsImporting(false);
             }
-
-            setImportProgress(Math.round(((i + 1) / dataLines.length) * 100));
-          }
-
-          alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
-          setShowImportModal(false);
-          setImportFile(null);
-          setImportProgress(0);
-          carregarEquipamentos();
+          };
+          reader.readAsArrayBuffer(importFile);
         } catch (error) {
-          console.error('Erro ao processar arquivo:', error);
-          alert('Erro ao processar arquivo');
-        } finally {
+          console.error('Erro:', error);
+          alert('Erro ao importar equipamentos');
           setIsImporting(false);
         }
       };
-      reader.readAsText(importFile);
+      document.head.appendChild(script);
     } catch (error) {
       console.error('Erro na importacao:', error);
       alert('Erro ao importar equipamentos');
@@ -730,19 +744,32 @@ export function GerenciarEquipamentos() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = '/Template_Importar_Equipamentos.xlsx';
+                      link.download = 'Template_Importar_Equipamentos.xlsx';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="w-full px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium"
+                  >
+                    📥 Baixar Template
+                  </button>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Selecione arquivo CSV
+                      Selecione arquivo Excel
                     </label>
                     <input
                       type="file"
-                      accept=".csv,.xlsx,.xls"
+                      accept=".xlsx,.xls"
                       onChange={(e) => setImportFile(e.target.files?.[0] || null)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       disabled={isImporting}
                     />
                     <p className="text-xs text-gray-500 mt-2">
-                      Formato esperado: contrato_id, numero_serie, modelo, sku (opcional)
+                      Use o template fornecido: Template_Importar_Equipamentos.xlsx
                     </p>
                   </div>
                 </div>
