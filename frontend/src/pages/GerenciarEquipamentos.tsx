@@ -331,7 +331,9 @@ export function GerenciarEquipamentos() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Todos os contratos</option>
-                  {contratos.map((contrato) => (
+                  {contratos
+                    .filter((contrato) => !selectedCliente || contrato.nome_cliente === selectedCliente)
+                    .map((contrato) => (
                     <option key={contrato.id} value={contrato.id}>
                       {contrato.numero_contrato}
                     </option>
