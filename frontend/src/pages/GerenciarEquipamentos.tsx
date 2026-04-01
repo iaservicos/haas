@@ -198,8 +198,8 @@ export function GerenciarEquipamentos() {
   };
 
   const handleSave = async () => {
-    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo) {
-      alert('Preencha os campos obrigatorios: Contrato, Serie e Modelo');
+    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo || !formData.sku) {
+      alert('Preencha todos os campos obrigatórios: Contrato, Série, Modelo e SKU');
       return;
     }
 
@@ -212,7 +212,7 @@ export function GerenciarEquipamentos() {
             contrato_id: parseInt(formData.contrato_id),
             numero_serie: formData.numero_serie,
             modelo: formData.modelo,
-            sku: formData.sku || null,
+            sku: formData.sku,
           })
           .eq('id', editingId);
 
@@ -226,7 +226,7 @@ export function GerenciarEquipamentos() {
             contrato_id: parseInt(formData.contrato_id),
             numero_serie: formData.numero_serie,
             modelo: formData.modelo,
-            sku: formData.sku || null,
+            sku: formData.sku,
           }]);
 
         if (error) throw error;
