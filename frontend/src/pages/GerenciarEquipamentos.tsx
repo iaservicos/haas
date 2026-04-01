@@ -19,6 +19,7 @@ interface Equipamento {
 interface Contrato {
   id: number;
   numero_contrato: string;
+  nome_cliente?: string;
 }
 
 export function GerenciarEquipamentos() {
@@ -29,6 +30,7 @@ export function GerenciarEquipamentos() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContrato, setSelectedContrato] = useState<string>('');
+  const [selectedCliente, setSelectedCliente] = useState<string>('');
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -51,10 +53,10 @@ export function GerenciarEquipamentos() {
     try {
       setLoading(true);
       
-      // Carregar contratos
+      // Carregar contratos com clientes
       const { data: contratosData, error: contratosError } = await supabase
         .from('contratos')
-        .select('id, numero_contrato')
+        .select('id, numero_contrato, nome_cliente')
         .order('numero_contrato', { ascending: true });
 
       if (contratosError) throw contratosError;
@@ -91,6 +93,10 @@ export function GerenciarEquipamentos() {
 
       if (selectedContrato) {
         query = query.eq('contrato_id', parseInt(selectedContrato));
+      }
+
+      if (selectedCliente) {
+        query = query.eq('contratos.nome_cliente', selectedCliente);
       }
 
       const { data, error } = await query;
@@ -287,16 +293,14 @@ export function GerenciarEquipamentos() {
             </div>
 
             {/* FILTROS */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
                 <select
                   value={selectedContrato}
                   onChange={(e) => {
                     setSelectedContrato(e.target.value);
-                    if (e.target.value) {
-                      carregarEquipamentos();
-                    }
+                    carregarEquipamentos();
                   }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -304,6 +308,25 @@ export function GerenciarEquipamentos() {
                   {contratos.map((contrato) => (
                     <option key={contrato.id} value={contrato.id}>
                       {contrato.numero_contrato}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente</label>
+                <select
+                  value={selectedCliente}
+                  onChange={(e) => {
+                    setSelectedCliente(e.target.value);
+                    carregarEquipamentos();
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todos os clientes</option>
+                  {Array.from(new Set(contratos.map(c => c.nome_cliente))).map((cliente) => (
+                    <option key={cliente} value={cliente}>
+                      {cliente}
                     </option>
                   ))}
                 </select>
