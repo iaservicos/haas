@@ -261,6 +261,36 @@ export function GerenciarEquipamentos() {
     }
   };
 
+  const loadXLSXLibrary = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).XLSX) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+
+      script.onload = () => {
+        setTimeout(() => {
+          if ((window as any).XLSX) {
+            resolve();
+          } else {
+            reject(new Error('XLSX não carregou'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        reject(new Error('Erro ao carregar XLSX do CDN'));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
   const handleImportarEquipamentos = async () => {
     if (!importFile) {
       alert('Selecione um arquivo para importar');
@@ -276,21 +306,19 @@ export function GerenciarEquipamentos() {
     setImportProgress(0);
 
     try {
-      // Carregar XLSX do CDN
       await loadXLSXLibrary();
+
+      const XLSX = (window as any).XLSX;
+      if (!XLSX) {
+        alert('Biblioteca XLSX não carregou. Tente novamente.');
+        setIsImporting(false);
+        return;
+      }
 
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const data = e.target?.result as ArrayBuffer;
-          const XLSX = (window as any).XLSX;
-
-          if (!XLSX) {
-            alert('Biblioteca XLSX não carregou. Tente novamente.');
-            setIsImporting(false);
-            return;
-          }
-
           const workbook = XLSX.read(data, { type: 'array' });
           const worksheet = workbook.Sheets['Equipamentos'];
 
@@ -308,7 +336,6 @@ export function GerenciarEquipamentos() {
           for (let i = 0; i < rows.length; i++) {
             const row: any = rows[i];
 
-            // Tentar diferentes nomes de coluna
             const numeroSerie = String(
               row['Nº Série'] || 
               row['No Serie'] || 
@@ -316,27 +343,15 @@ export function GerenciarEquipamentos() {
               row['N° Série'] ||
               ''
             ).trim();
-            
-            const modelo = String(
-              row['Modelo'] || 
-              row['modelo'] || 
-              ''
-            ).trim();
-            
-            const sku = String(
-              row['SKU'] || 
-              row['sku'] || 
-              ''
-            ).trim();
+            const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
+            const sku = String(row['SKU'] || row['sku'] || '').trim();
 
-            // Validar campos obrigatórios
             if (!numeroSerie || !modelo || !sku) {
               skipped++;
               continue;
             }
 
             try {
-              // Verificar se já existe
               const { data: existing, error: checkError } = await supabase
                 .from('contrato_equipamentos')
                 .select('id')
@@ -346,11 +361,9 @@ export function GerenciarEquipamentos() {
               if (existing) {
                 skipped++;
               } else if (checkError && checkError.code !== 'PGRST116') {
-                // PGRST116 = no rows found (esperado)
                 skipped++;
               } else {
-                // Inserir novo equipamento
-                const { error: insertError } = await supabase
+                const { error } = await supabase
                   .from('contrato_equipamentos')
                   .insert([{
                     contrato_id: contratoId,
@@ -359,8 +372,8 @@ export function GerenciarEquipamentos() {
                     sku: sku,
                   }]);
 
-                if (insertError) {
-                  console.error('Erro ao inserir:', insertError);
+                if (error) {
+                  console.error('Erro ao inserir:', error);
                   skipped++;
                 } else {
                   inserted++;
@@ -371,7 +384,6 @@ export function GerenciarEquipamentos() {
               skipped++;
             }
 
-            // Atualizar progresso
             setImportProgress(Math.round(((i + 1) / rows.length) * 100));
           }
 
@@ -399,38 +411,6 @@ export function GerenciarEquipamentos() {
       alert('Erro ao importar equipamentos');
       setIsImporting(false);
     }
-  };
-
-  // Função auxiliar para carregar XLSX
-  const loadXLSXLibrary = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      // Se já está carregado, resolver imediatamente
-      if ((window as any).XLSX) {
-        resolve();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-
-      script.onload = () => {
-        setTimeout(() => {
-          if ((window as any).XLSX) {
-            resolve();
-          } else {
-            reject(new Error('XLSX não carregou'));
-          }
-        }, 100);
-      };
-
-      script.onerror = () => {
-        reject(new Error('Erro ao carregar XLSX do CDN'));
-      };
-
-      document.head.appendChild(script);
-    });
   };
 
   // Obter clientes únicos
