@@ -34,9 +34,7 @@ export function GerenciarClientes() {
   const [itemsPerPage] = useState(1000);
   const [totalUsuarios, setTotalUsuarios] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetUsuarioId, setResetUsuarioId] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [showEditPanel, setShowEditPanel] = useState(false);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -44,6 +42,13 @@ export function GerenciarClientes() {
     contratos_ids: [] as number[],
     senha_hash: '',
     role: 'VIEWER',
+  });
+
+  const [editFormData, setEditFormData] = useState({
+    email: '',
+    nome: '',
+    contratos_ids: [] as number[],
+    nova_senha: '',
   });
 
   useEffect(() => {
@@ -142,9 +147,25 @@ export function GerenciarClientes() {
     }));
   };
 
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleContratoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value));
     setFormData(prev => ({
+      ...prev,
+      contratos_ids: selectedOptions,
+    }));
+  };
+
+  const handleEditContratoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value));
+    setEditFormData(prev => ({
       ...prev,
       contratos_ids: selectedOptions,
     }));
@@ -161,69 +182,36 @@ export function GerenciarClientes() {
     try {
       setEnviando(true);
 
-      if (editingId) {
-        const { error: updateError } = await supabase
-          .from('usuarios')
-          .update({
-            nome: formData.nome,
-            email: formData.email,
-            role: formData.role,
-          })
-          .eq('id', editingId);
+      const { data: novoUsuario, error: createError } = await supabase
+        .from('usuarios')
+        .insert([{
+          nome: formData.nome,
+          email: formData.email,
+          senha_hash: formData.senha_hash,
+          role: formData.role,
+          user_type: 'client',
+        }])
+        .select();
 
-        if (updateError) throw updateError;
+      if (createError) throw createError;
 
-        await supabase
-          .from('usuario_contratos')
-          .delete()
-          .eq('usuario_id', editingId);
+      if (novoUsuario && novoUsuario.length > 0) {
+        const usuarioId = novoUsuario[0].id;
 
-        const novasVinculacoes = formData.contratos_ids.map(contratoId => ({
-          usuario_id: editingId,
+        const vinculacoes = formData.contratos_ids.map(contratoId => ({
+          usuario_id: usuarioId,
           contrato_id: contratoId,
         }));
 
-        const { error: insertError } = await supabase
+        const { error: vinculError } = await supabase
           .from('usuario_contratos')
-          .insert(novasVinculacoes);
+          .insert(vinculacoes);
 
-        if (insertError) throw insertError;
-
-        alert('Usuário atualizado com sucesso!');
-      } else {
-        const { data: novoUsuario, error: createError } = await supabase
-          .from('usuarios')
-          .insert([{
-            nome: formData.nome,
-            email: formData.email,
-            senha_hash: formData.senha_hash,
-            role: formData.role,
-            user_type: 'client',
-          }])
-          .select();
-
-        if (createError) throw createError;
-
-        if (novoUsuario && novoUsuario.length > 0) {
-          const usuarioId = novoUsuario[0].id;
-
-          const vinculacoes = formData.contratos_ids.map(contratoId => ({
-            usuario_id: usuarioId,
-            contrato_id: contratoId,
-          }));
-
-          const { error: vinculError } = await supabase
-            .from('usuario_contratos')
-            .insert(vinculacoes);
-
-          if (vinculError) throw vinculError;
-        }
-
-        alert('Usuário criado com sucesso!');
+        if (vinculError) throw vinculError;
       }
 
+      alert('Usuário criado com sucesso!');
       setFormData({ email: '', nome: '', contratos_ids: [], senha_hash: '', role: 'VIEWER' });
-      setEditingId(null);
       carregarDados();
     } catch (error) {
       console.error('Erro ao salvar usuário:', error);
@@ -235,43 +223,71 @@ export function GerenciarClientes() {
 
   const handleEditarUsuario = (usr: UsuarioComContratos) => {
     setEditingId(usr.id);
-    setFormData({
+    setEditFormData({
       email: usr.email,
       nome: usr.nome,
       contratos_ids: usr.contratos.map(c => c.id),
-      senha_hash: '',
-      role: 'VIEWER',
+      nova_senha: '',
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowEditPanel(true);
   };
 
-  const handleResetSenha = async () => {
-    if (!newPassword || !resetUsuarioId) {
-      alert('Preencha a nova senha');
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editFormData.email || !editFormData.nome || editFormData.contratos_ids.length === 0) {
+      alert('Preencha todos os campos e selecione pelo menos um contrato');
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('usuarios')
-        .update({ senha_hash: newPassword })
-        .eq('id', resetUsuarioId);
+      setEnviando(true);
 
-      if (error) throw error;
-      alert('Senha resetada com sucesso!');
-      setShowResetModal(false);
-      setNewPassword('');
-      setResetUsuarioId(null);
-      carregarUsuarios();
+      // Atualizar dados do usuário
+      const { error: updateError } = await supabase
+        .from('usuarios')
+        .update({
+          nome: editFormData.nome,
+          email: editFormData.email,
+          ...(editFormData.nova_senha && { senha_hash: editFormData.nova_senha }),
+        })
+        .eq('id', editingId);
+
+      if (updateError) throw updateError;
+
+      // Atualizar contratos
+      await supabase
+        .from('usuario_contratos')
+        .delete()
+        .eq('usuario_id', editingId);
+
+      const novasVinculacoes = editFormData.contratos_ids.map(contratoId => ({
+        usuario_id: editingId,
+        contrato_id: contratoId,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('usuario_contratos')
+        .insert(novasVinculacoes);
+
+      if (insertError) throw insertError;
+
+      alert('Usuário atualizado com sucesso!');
+      setShowEditPanel(false);
+      setEditingId(null);
+      carregarDados();
     } catch (error) {
-      console.error('Erro ao resetar senha:', error);
-      alert('Erro ao resetar senha');
+      console.error('Erro ao atualizar usuário:', error);
+      alert('Erro ao atualizar usuário');
+    } finally {
+      setEnviando(false);
     }
   };
 
-  const handleCancelar = () => {
-    setFormData({ email: '', nome: '', contratos_ids: [], senha_hash: '', role: 'VIEWER' });
+  const handleCancelarEdit = () => {
+    setShowEditPanel(false);
     setEditingId(null);
+    setEditFormData({ email: '', nome: '', contratos_ids: [], nova_senha: '' });
   };
 
   const getNomesContratos = (contratosDoUsuario: Contrato[]) => {
@@ -352,13 +368,11 @@ export function GerenciarClientes() {
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
           <div className="p-8">
-            <div className="grid grid-cols-3 gap-8">
-              {/* COLUNA ESQUERDA - FORMULÁRIO */}
+            <div className="grid grid-cols-3 gap-8 mb-8">
+              {/* COLUNA ESQUERDA - FORMULÁRIO NOVO */}
               <div className="col-span-1">
                 <div className="bg-white rounded-lg shadow p-6 sticky top-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-6">
-                    {editingId ? 'Editar Cliente' : 'Criar Novo Cliente'}
-                  </h2>
+                  <h2 className="text-xl font-bold text-gray-900 mb-6">Criar Novo Cliente</h2>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -403,38 +417,25 @@ export function GerenciarClientes() {
                       <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
                     </div>
 
-                    {!editingId && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                        <input
-                          type="password"
-                          name="senha_hash"
-                          value={formData.senha_hash}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Senha de acesso"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-4">
-                      <button
-                        type="submit"
-                        disabled={enviando}
-                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
-                      >
-                        {enviando ? 'Salvando...' : editingId ? 'Atualizar' : 'Criar Cliente'}
-                      </button>
-                      {editingId && (
-                        <button
-                          type="button"
-                          onClick={handleCancelar}
-                          className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition font-medium"
-                        >
-                          Cancelar
-                        </button>
-                      )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+                      <input
+                        type="password"
+                        name="senha_hash"
+                        value={formData.senha_hash}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Senha de acesso"
+                      />
                     </div>
+
+                    <button
+                      type="submit"
+                      disabled={enviando}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
+                    >
+                      {enviando ? 'Salvando...' : 'Criar Cliente'}
+                    </button>
                   </form>
                 </div>
               </div>
@@ -478,23 +479,12 @@ export function GerenciarClientes() {
                                 <td className="px-4 py-3 text-gray-600">{usr.email}</td>
                                 <td className="px-4 py-3 text-gray-600">{getNomesContratos(usr.contratos)}</td>
                                 <td className="px-4 py-3">
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => handleEditarUsuario(usr)}
-                                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-medium"
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setResetUsuarioId(usr.id);
-                                        setShowResetModal(true);
-                                      }}
-                                      className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-xs font-medium"
-                                    >
-                                      Reset Senha
-                                    </button>
-                                  </div>
+                                  <button
+                                    onClick={() => handleEditarUsuario(usr)}
+                                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-medium"
+                                  >
+                                    Editar
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -528,52 +518,99 @@ export function GerenciarClientes() {
                 </div>
               </div>
             </div>
+
+            {/* PAINEL DE EDIÇÃO - EMBAIXO */}
+            {showEditPanel && (
+              <div className="bg-white rounded-lg shadow p-6 border-t-4 border-blue-500">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Editar Cliente</h2>
+                  <button
+                    onClick={handleCancelarEdit}
+                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitEdit}>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={editFormData.email}
+                        onChange={handleEditInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                      <input
+                        type="text"
+                        name="nome"
+                        value={editFormData.nome}
+                        onChange={handleEditInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Nome do cliente"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
+                      <select
+                        multiple
+                        value={editFormData.contratos_ids.map(String)}
+                        onChange={handleEditContratoChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        size={5}
+                      >
+                        {contratos.map(contrato => (
+                          <option key={contrato.id} value={contrato.id}>
+                            {contrato.numero_contrato} - {contrato.nome_cliente}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha (deixe em branco para não alterar)</label>
+                      <input
+                        type="password"
+                        name="nova_senha"
+                        value={editFormData.nova_senha}
+                        onChange={handleEditInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Digite a nova senha (opcional)"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      type="submit"
+                      disabled={enviando}
+                      className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
+                    >
+                      {enviando ? 'Salvando...' : 'Atualizar Cliente'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelarEdit}
+                      className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition font-medium"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* MODAL RESET SENHA */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-            <div className="p-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Resetar Senha</h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nova Senha</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Digite a nova senha"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowResetModal(false);
-                    setNewPassword('');
-                    setResetUsuarioId(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleResetSenha}
-                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium"
-                >
-                  Resetar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
