@@ -24,6 +24,7 @@ interface Contrato {
 
 // ========== FUNÇÃO PARA GERAR TEMPLATE EXCEL ==========
 const gerarTemplateExcel = () => {
+  // Carregar biblioteca XLSX
   const script = document.createElement('script');
   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
   
@@ -34,25 +35,16 @@ const gerarTemplateExcel = () => {
     // ========== ABA 1: EQUIPAMENTOS ==========
     const equipamentosData: any[] = [
       {
-        'Contrato ID': 1,
-        'Número Contrato': '2000264954',
-        'Cliente': 'CLARO SA',
         'Nº Série': 'SN001',
         'Modelo': 'Modelo A',
         'SKU': 'SKU001'
       },
       {
-        'Contrato ID': 1,
-        'Número Contrato': '2000264954',
-        'Cliente': 'CLARO SA',
         'Nº Série': 'SN002',
         'Modelo': 'Modelo B',
         'SKU': 'SKU002'
       },
       {
-        'Contrato ID': 2,
-        'Número Contrato': '2000420465',
-        'Cliente': 'TECCHAPECO SISTEMAS LTDA',
         'Nº Série': 'SN003',
         'Modelo': 'Modelo C',
         'SKU': ''
@@ -62,9 +54,6 @@ const gerarTemplateExcel = () => {
     // Adicionar 100 linhas vazias
     for (let i = 0; i < 100; i++) {
       equipamentosData.push({
-        'Contrato ID': '',
-        'Número Contrato': '',
-        'Cliente': '',
         'Nº Série': '',
         'Modelo': '',
         'SKU': ''
@@ -73,9 +62,6 @@ const gerarTemplateExcel = () => {
     
     const equipamentosSheet = XLSX.utils.json_to_sheet(equipamentosData);
     equipamentosSheet['!cols'] = [
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 25 },
       { wch: 20 },
       { wch: 20 },
       { wch: 15 }
@@ -101,21 +87,20 @@ const gerarTemplateExcel = () => {
       ['INSTRUÇÕES DE PREENCHIMENTO'],
       [''],
       ['COLUNAS OBRIGATÓRIAS:'],
-      ['• Contrato ID: ID numérico do contrato (obrigatório)'],
       ['• Nº Série: Número de série do equipamento (obrigatório)'],
       ['• Modelo: Modelo do equipamento (obrigatório)'],
       [''],
       ['COLUNAS OPCIONAIS:'],
-      ['• Número Contrato: Número do contrato (informativo)'],
-      ['• Cliente: Nome do cliente (informativo)'],
       ['• SKU: Código SKU do equipamento (opcional)'],
       [''],
-      ['REGRAS:'],
-      ['1. Não deixe campos obrigatórios em branco'],
-      ['2. Não modifique o nome das colunas'],
-      ['3. Não adicione novas colunas'],
-      ['4. Use apenas a aba "Equipamentos"'],
-      ['5. Equipamentos duplicados (mesma série) serão ignorados'],
+      ['FLUXO:'],
+      ['1. Preencha as colunas: Nº Série, Modelo e SKU (opcional)'],
+      ['2. Não deixe campos obrigatórios em branco'],
+      ['3. Não modifique o nome das colunas'],
+      ['4. Não adicione novas colunas'],
+      ['5. Use apenas a aba "Equipamentos"'],
+      ['6. Ao importar, selecione o contrato para vincular todos os equipamentos'],
+      ['7. Equipamentos duplicados (mesma série) serão ignorados'],
     ];
     
     const instrucoesSheet = XLSX.utils.aoa_to_sheet(instrucoesData);
@@ -157,6 +142,7 @@ export function GerenciarEquipamentos() {
   const [importProgress, setImportProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [selectedImportContrato, setSelectedImportContrato] = useState<string>('');
   
   // Form states
   const [formData, setFormData] = useState({
@@ -371,19 +357,25 @@ export function GerenciarEquipamentos() {
                 return;
               }
 
-              const rows = XLSX.utils.sheet_to_json(worksheet);
+                const rows = XLSX.utils.sheet_to_json(worksheet);
               let inserted = 0;
               let skipped = 0;
+              const contratoId = parseInt(selectedImportContrato);
+
+              if (!contratoId) {
+                alert('Selecione um contrato antes de importar');
+                setIsImporting(false);
+                return;
+              }
 
               for (let i = 0; i < rows.length; i++) {
                 const row: any = rows[i];
 
-                const contratoId = parseInt(row['Contrato ID'] || row['contrato_id'] || 0);
                 const numeroSerie = String(row['Nº Série'] || row['numero_serie'] || '').trim();
                 const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
                 const sku = String(row['SKU'] || row['sku'] || '').trim() || null;
 
-                if (!contratoId || !numeroSerie || !modelo) {
+                if (!numeroSerie || !modelo) {
                   skipped++;
                   continue;
                 }
@@ -424,6 +416,8 @@ export function GerenciarEquipamentos() {
               setShowImportModal(false);
               setImportFile(null);
               setImportProgress(0);
+              setSelectedImportContrato('');
+              setIsImporting(false);
               carregarEquipamentos();
             } catch (error) {
               console.error('Erro ao processar arquivo:', error);
@@ -554,7 +548,7 @@ export function GerenciarEquipamentos() {
                   onClick={() => setShowImportModal(true)}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
                 >
-                  Importar
+                  Importar em Massa
                 </button>
                 <button
                   onClick={() => handleOpenModal()}
@@ -875,7 +869,29 @@ export function GerenciarEquipamentos() {
 
                   <div>
                     <p className="text-sm text-gray-600 mb-3">
-                      📋 <strong>Passo 2:</strong> Preencha e selecione o arquivo
+                      📋 <strong>Passo 2:</strong> Selecione o contrato
+                    </p>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Selecione o contrato para vincular os equipamentos
+                    </label>
+                    <select
+                      value={selectedImportContrato}
+                      onChange={(e) => setSelectedImportContrato(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={isImporting}
+                    >
+                      <option value="">Selecione um contrato</option>
+                      {contratos.map((contrato) => (
+                        <option key={contrato.id} value={contrato.id}>
+                          {contrato.numero_contrato} - {contrato.nome_cliente}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      📄 <strong>Passo 3:</strong> Selecione o arquivo
                     </p>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Selecione arquivo Excel preenchido
@@ -912,7 +928,7 @@ export function GerenciarEquipamentos() {
                 <button
                   onClick={handleImportarEquipamentos}
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                  disabled={!importFile || isImporting}
+                  disabled={!importFile || !selectedImportContrato || isImporting}
                 >
                   {isImporting ? 'Importando...' : 'Importar'}
                 </button>
