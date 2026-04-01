@@ -267,135 +267,186 @@ export function GerenciarEquipamentos() {
       return;
     }
 
+    if (!selectedImportContrato) {
+      alert('Selecione um contrato antes de importar');
+      return;
+    }
+
     setIsImporting(true);
     setImportProgress(0);
 
     try {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-      script.onload = async () => {
+      // Carregar XLSX do CDN
+      await loadXLSXLibrary();
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
         try {
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            try {
-              const data = e.target?.result as ArrayBuffer;
-              const XLSX = (window as any).XLSX;
+          const data = e.target?.result as ArrayBuffer;
+          const XLSX = (window as any).XLSX;
 
-              const workbook = XLSX.read(data, { type: 'array' });
-              const worksheet = workbook.Sheets['Equipamentos'];
+          if (!XLSX) {
+            alert('Biblioteca XLSX não carregou. Tente novamente.');
+            setIsImporting(false);
+            return;
+          }
 
-              if (!worksheet) {
-                alert('Aba "Equipamentos" nao encontrada no arquivo');
-                setIsImporting(false);
-                return;
-              }
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets['Equipamentos'];
 
-              const rows = XLSX.utils.sheet_to_json(worksheet);
-              let inserted = 0;
-              let skipped = 0;
-              const contratoId = parseInt(selectedImportContrato);
+          if (!worksheet) {
+            alert('Aba "Equipamentos" não encontrada no arquivo');
+            setIsImporting(false);
+            return;
+          }
 
-              if (!contratoId) {
-                alert('Selecione um contrato antes de importar');
-                setIsImporting(false);
-                return;
-              }
+          const rows = XLSX.utils.sheet_to_json(worksheet);
+          let inserted = 0;
+          let skipped = 0;
+          const contratoId = parseInt(selectedImportContrato);
 
-              for (let i = 0; i < rows.length; i++) {
-                const row: any = rows[i];
+          for (let i = 0; i < rows.length; i++) {
+            const row: any = rows[i];
 
-                const numeroSerie = String(row['No Serie'] || row['numero_serie'] || '').trim();
-                const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
-                const sku = String(row['SKU'] || row['sku'] || '').trim() || null;
+            // Tentar diferentes nomes de coluna
+            const numeroSerie = String(
+              row['Nº Série'] || 
+              row['No Serie'] || 
+              row['numero_serie'] || 
+              row['N° Série'] ||
+              ''
+            ).trim();
+            
+            const modelo = String(
+              row['Modelo'] || 
+              row['modelo'] || 
+              ''
+            ).trim();
+            
+            const sku = String(
+              row['SKU'] || 
+              row['sku'] || 
+              ''
+            ).trim();
 
-                if (!numeroSerie || !modelo) {
-                  skipped++;
-                  continue;
-                }
-
-                try {
-                  const { data: existing } = await supabase
-                    .from('contrato_equipamentos')
-                    .select('id')
-                    .eq('numero_serie', numeroSerie)
-                    .single();
-
-                  if (existing) {
-                    skipped++;
-                  } else {
-                    const { error } = await supabase
-                      .from('contrato_equipamentos')
-                      .insert([{
-                        contrato_id: contratoId,
-                        numero_serie: numeroSerie,
-                        modelo: modelo,
-                        sku: sku,
-                      }]);
-
-                    if (error) {
-                      skipped++;
-                    } else {
-                      inserted++;
-                    }
-                  }
-                } catch (err) {
-                  skipped++;
-                }
-
-                setImportProgress(Math.round(((i + 1) / rows.length) * 100));
-              }
-
-              alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
-              setShowImportModal(false);
-              setImportFile(null);
-              setImportProgress(0);
-              setSelectedImportContrato('');
-              setIsImporting(false);
-              carregarEquipamentos();
-            } catch (error) {
-              console.error('Erro ao processar arquivo:', error);
-              alert('Erro ao processar arquivo');
-            } finally {
-              setIsImporting(false);
+            // Validar campos obrigatórios
+            if (!numeroSerie || !modelo || !sku) {
+              skipped++;
+              continue;
             }
-          };
-          reader.readAsArrayBuffer(importFile);
+
+            try {
+              // Verificar se já existe
+              const { data: existing, error: checkError } = await supabase
+                .from('contrato_equipamentos')
+                .select('id')
+                .eq('numero_serie', numeroSerie)
+                .single();
+
+              if (existing) {
+                skipped++;
+              } else if (checkError && checkError.code !== 'PGRST116') {
+                // PGRST116 = no rows found (esperado)
+                skipped++;
+              } else {
+                // Inserir novo equipamento
+                const { error: insertError } = await supabase
+                  .from('contrato_equipamentos')
+                  .insert([{
+                    contrato_id: contratoId,
+                    numero_serie: numeroSerie,
+                    modelo: modelo,
+                    sku: sku,
+                  }]);
+
+                if (insertError) {
+                  console.error('Erro ao inserir:', insertError);
+                  skipped++;
+                } else {
+                  inserted++;
+                }
+              }
+            } catch (err) {
+              console.error('Erro no loop:', err);
+              skipped++;
+            }
+
+            // Atualizar progresso
+            setImportProgress(Math.round(((i + 1) / rows.length) * 100));
+          }
+
+          alert(`✅ Importação concluída!\n\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
+          setShowImportModal(false);
+          setImportFile(null);
+          setSelectedImportContrato('');
+          setIsImporting(false);
+          carregarEquipamentos();
         } catch (error) {
-          console.error('Erro:', error);
-          alert('Erro ao importar equipamentos');
+          console.error('Erro ao processar arquivo:', error);
+          alert('Erro ao processar arquivo Excel');
           setIsImporting(false);
         }
       };
-      document.head.appendChild(script);
+
+      reader.onerror = () => {
+        alert('Erro ao ler arquivo');
+        setIsImporting(false);
+      };
+
+      reader.readAsArrayBuffer(importFile);
     } catch (error) {
-      console.error('Erro na importacao:', error);
+      console.error('Erro geral:', error);
       alert('Erro ao importar equipamentos');
       setIsImporting(false);
     }
   };
 
-  const totalPages = Math.ceil(totalEquipamentos / itemsPerPage);
-  const uniqueClientes = Array.from(
-    new Set(contratos.map((c) => c.nome_cliente).filter(Boolean))
-  ).sort();
+  // Função auxiliar para carregar XLSX
+  const loadXLSXLibrary = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // Se já está carregado, resolver imediatamente
+      if ((window as any).XLSX) {
+        resolve();
+        return;
+      }
 
-  // Filtrar contratos baseado no cliente selecionado
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+
+      script.onload = () => {
+        setTimeout(() => {
+          if ((window as any).XLSX) {
+            resolve();
+          } else {
+            reject(new Error('XLSX não carregou'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        reject(new Error('Erro ao carregar XLSX do CDN'));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
+  // Obter clientes únicos
+  const clientesUnicos = Array.from(
+    new Set(contratos.map((c) => c.nome_cliente).filter(Boolean))
+  ) as string[];
+
+  // Filtrar contratos por cliente selecionado
   const contratosDoCliente = selectedCliente
     ? contratos.filter((c) => c.nome_cliente === selectedCliente)
     : contratos;
 
-  // Função para baixar template
-  const handleBaixarTemplate = () => {
-    try {
-      gerarTemplateExcel();
-    } catch (error) {
-      console.error('Erro ao gerar template:', error);
-      alert('Erro ao gerar template');
-    }
-  };
+  const totalPages = Math.ceil(totalEquipamentos / itemsPerPage);
 
   if (loading) {
-    return <div className="p-8 text-center">Carregando...</div>;
+    return <div className="flex items-center justify-center h-screen">Carregando...</div>;
   }
 
   return (
@@ -416,12 +467,12 @@ export function GerenciarEquipamentos() {
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
-          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Contratos</span>}
-          </a>
-
           <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Clientes</span>}
+          </a>
+
+          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Contratos</span>}
           </a>
 
           <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
@@ -429,7 +480,7 @@ export function GerenciarEquipamentos() {
           </a>
 
           <a href="/confirmacoes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Confirmacoes</span>}
+            {sidebarOpen && <span>Confirmações</span>}
           </a>
 
           <a href="/fotos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
@@ -467,191 +518,188 @@ export function GerenciarEquipamentos() {
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
           <div className="p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900">Equipamentos</h2>
-              <div className="flex gap-3">
-                {(selectedContrato || selectedCliente || searchTerm) && (
+            {/* FILTROS */}
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-gray-900">Filtros</h3>
+                <div className="flex gap-3">
                   <button
                     onClick={() => {
                       setSelectedContrato('');
                       setSelectedCliente('');
                       setSearchTerm('');
                     }}
-                    className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition font-medium"
+                    className="px-4 py-2 text-sm font-semibold text-white bg-gray-600 rounded hover:bg-gray-700 transition"
                   >
-                    Limpar Filtros
+                    Limpar
                   </button>
-                )}
-                <button
-                  onClick={() => setShowImportModal(true)}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                >
-                  Importar em Massa
-                </button>
-                <button
-                  onClick={() => handleOpenModal()}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  Novo Equipamento
-                </button>
-              </div>
-            </div>
-
-            {/* FILTROS */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Contrato</label>
-                <select
-                  value={selectedContrato}
-                  onChange={(e) => setSelectedContrato(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={selectedCliente ? false : false}
-                >
-                  <option value="">Todos os contratos</option>
-                  {contratosDoCliente.map((contrato) => (
-                    <option key={contrato.id} value={contrato.id}>
-                      {contrato.numero_contrato}
-                    </option>
-                  ))}
-                </select>
+                  <button
+                    onClick={() => handleOpenModal()}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded hover:bg-green-700 transition"
+                  >
+                    Novo Equipamento
+                  </button>
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+                  >
+                    Importar em Massa
+                  </button>
+                  <button
+                    onClick={() => gerarTemplateExcel()}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-purple-600 rounded hover:bg-purple-700 transition"
+                  >
+                    Baixar Template
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Cliente</label>
-                <select
-                  value={selectedCliente}
-                  onChange={(e) => setSelectedCliente(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos os clientes</option>
-                  {uniqueClientes.map((cliente) => (
-                    <option key={cliente} value={cliente}>
-                      {cliente}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Cliente</label>
+                  <select
+                    value={selectedCliente}
+                    onChange={(e) => {
+                      setSelectedCliente(e.target.value);
+                      setSelectedContrato('');
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Clientes</option>
+                    {clientesUnicos.map((cliente) => (
+                      <option key={cliente} value={cliente}>
+                        {cliente}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar por Serie</label>
-                <input
-                  type="text"
-                  placeholder="Digite a serie..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Contrato</label>
+                  <select
+                    value={selectedContrato}
+                    onChange={(e) => setSelectedContrato(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Todos os Contratos</option>
+                    {contratosDoCliente.map((contrato) => (
+                      <option key={contrato.id} value={contrato.id}>
+                        {contrato.numero_contrato}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Buscar por Série</label>
+                  <input
+                    type="text"
+                    placeholder="Digite o número de série..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <div className="text-sm text-gray-600">
+                    Total: <span className="font-semibold">{totalEquipamentos}</span> equipamentos
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* TABELA */}
-            {equipamentos.length === 0 ? (
-              <div className="bg-white rounded-lg shadow p-8 text-center">
-                <p className="text-gray-600">Nenhum equipamento encontrado</p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">No Serie</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Acoes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {equipamentos.map((equip) => (
-                        <tr key={equip.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {equip.contratos?.numero_contrato}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {equip.contratos?.nome_cliente}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                            {equip.numero_serie}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {equip.modelo}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            {equip.sku || '-'}
-                          </td>
-                          <td className="px-6 py-4 text-sm space-x-2">
-                            <button
-                              onClick={() => handleOpenModal(equip)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleDelete(equip.id)}
-                              className="text-red-600 hover:text-red-800 font-medium"
-                            >
-                              Deletar
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Nº Série</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Modelo</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">SKU</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Contrato</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Cliente</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Data Criação</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipamentos.map((equip) => (
+                    <tr key={equip.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 text-sm text-gray-900">{equip.numero_serie}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{equip.modelo}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{equip.sku}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{equip.contratos?.numero_contrato}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{equip.contratos?.nome_cliente}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {new Date(equip.data_criacao).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-6 py-4 text-sm flex gap-2">
+                        <button
+                          onClick={() => handleOpenModal(equip)}
+                          className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(equip.id)}
+                          className="px-3 py-1 text-xs font-semibold text-white bg-red-600 rounded hover:bg-red-700 transition"
+                        >
+                          Deletar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-                {/* PAGINACAO */}
-                {totalPages > 1 && (
-                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
-                        Pagina {currentPage} de {totalPages} (Total: {totalEquipamentos} equipamentos)
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          disabled={currentPage === 1}
-                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                          Anterior
-                        </button>
-                        <button
-                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                          disabled={currentPage === totalPages}
-                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                          Proxima
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              {equipamentos.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-600 font-semibold">Nenhum equipamento encontrado</p>
+                </div>
+              )}
+            </div>
+
+            {/* PAGINAÇÃO */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex justify-between items-center">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-gray-600 rounded hover:bg-gray-700 transition disabled:opacity-50"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-gray-600 rounded hover:bg-gray-700 transition disabled:opacity-50"
+                >
+                  Próxima
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* MODAL NOVO/EDITAR */}
+      {/* MODAL DE NOVO/EDITAR EQUIPAMENTO */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">
-                {isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
-              </h2>
-            </div>
-            <div className="p-6 space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              {isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
+            </h2>
+
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contrato
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Contrato *</label>
                 <select
                   value={formData.contrato_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, contrato_id: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, contrato_id: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione um contrato</option>
@@ -664,165 +712,128 @@ export function GerenciarEquipamentos() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  No de Serie
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Nº Série *</label>
                 <input
                   type="text"
                   value={formData.numero_serie}
-                  onChange={(e) =>
-                    setFormData({ ...formData, numero_serie: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Digite o número de série"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Modelo
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Modelo *</label>
                 <input
                   type="text"
                   value={formData.modelo}
-                  onChange={(e) =>
-                    setFormData({ ...formData, modelo: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Digite o modelo"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SKU
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">SKU *</label>
                 <input
                   type="text"
                   value={formData.sku}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sku: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Digite o SKU"
                 />
               </div>
+            </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={handleCloseModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                >
-                  {isEditing ? 'Atualizar' : 'Adicionar'}
-                </button>
-              </div>
+            <div className="flex gap-3 pt-6">
+              <button
+                onClick={handleCloseModal}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+              >
+                {isEditing ? 'Atualizar' : 'Salvar'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL IMPORTACAO */}
+      {/* MODAL DE IMPORTAÇÃO */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Importar Equipamentos</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              {isImporting ? (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">Importando...</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-600 h-2 rounded-full transition-all"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-sm text-gray-600 text-center">{importProgress}%</p>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-3 font-medium">
-                      Passo 1: Baixe o template
-                    </p>
-                    <button
-                      onClick={handleBaixarTemplate}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-                    >
-                      Baixar Template Excel
-                    </button>
-                  </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Importar Equipamentos em Massa</h2>
 
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-3 font-medium">
-                      Passo 2: Selecione o contrato
-                    </p>
+            {!isImporting ? (
+              <>
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Selecione o Contrato *</label>
                     <select
                       value={selectedImportContrato}
                       onChange={(e) => setSelectedImportContrato(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={isImporting}
                     >
                       <option value="">Selecione um contrato</option>
-                      {contratosDoCliente.length > 0 ? (
-                        contratosDoCliente.map((contrato) => (
-                          <option key={contrato.id} value={contrato.id}>
-                            {contrato.numero_contrato} - {contrato.nome_cliente}
-                          </option>
-                        ))
-                      ) : (
-                        contratos.map((contrato) => (
-                          <option key={contrato.id} value={contrato.id}>
-                            {contrato.numero_contrato} - {contrato.nome_cliente}
-                          </option>
-                        ))
-                      )}
+                      {contratosDoCliente.map((contrato) => (
+                        <option key={contrato.id} value={contrato.id}>
+                          {contrato.numero_contrato} - {contrato.nome_cliente}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-3 font-medium">
-                      Passo 3: Selecione o arquivo
-                    </p>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Selecione o Arquivo *</label>
                     <input
                       type="file"
                       accept=".xlsx,.xls"
                       onChange={(e) => setImportFile(e.target.files?.[0] || null)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={isImporting}
                     />
                     {importFile && (
-                      <p className="text-xs text-green-600 mt-2">{importFile.name}</p>
+                      <p className="text-sm text-green-600 mt-2">{importFile.name}</p>
                     )}
                   </div>
+                </div>
 
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={() => {
-                        setShowImportModal(false);
-                        setImportFile(null);
-                        setSelectedImportContrato('');
-                      }}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                      disabled={isImporting}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleImportarEquipamentos}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
-                      disabled={!importFile || !selectedImportContrato || isImporting}
-                    >
-                      {isImporting ? 'Importando...' : 'Importar em Massa'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportFile(null);
+                      setSelectedImportContrato('');
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                    disabled={isImporting}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleImportarEquipamentos}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
+                    disabled={!importFile || !selectedImportContrato || isImporting}
+                  >
+                    Importar em Massa
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center">
+                <p className="text-gray-600 font-semibold mb-4">Importando... {importProgress}%</p>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${importProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
