@@ -235,6 +235,14 @@ export function Dashboard() {
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
+          {/* NOVO: Botão Clientes */}
+          <button
+            onClick={handleGoToClientes}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
+          >
+            {sidebarOpen && <span>Clientes</span>}
+          </button>
+
           {/* NOVO: Botão Contratos */}
           <button
             onClick={handleGoToContratos}
@@ -243,13 +251,7 @@ export function Dashboard() {
             {sidebarOpen && <span>Contratos</span>}
           </button>
 
-          {/* NOVO: Botão Clientes */}
-          <button
-            onClick={handleGoToClientes}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
-          >
-            {sidebarOpen && <span>Clientes</span>}
-          </button>
+          
 
           {/* NOVO: Botão Equipamentos */}
           <button

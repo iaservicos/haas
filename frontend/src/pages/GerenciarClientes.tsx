@@ -134,12 +134,12 @@ export function GerenciarClientes() {
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
-          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
-            {sidebarOpen && <span>Contratos</span>}
-          </a>
-
           <a href="/clientes" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
             {sidebarOpen && <span>Clientes</span>}
+          </a>
+          
+          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Contratos</span>}
           </a>
 
           <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
