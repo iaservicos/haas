@@ -332,30 +332,26 @@ export function GerenciarEquipamentos() {
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Série</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Data Criação</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Série</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredEquipamentos.map((equipamento) => (
                       <tr key={equipamento.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{equipamento.numero_serie}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.sku || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {equipamento.contratos?.numero_contrato || '-'}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {equipamento.contratos?.nome_cliente || '-'}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {new Date(equipamento.data_criacao).toLocaleDateString('pt-BR')}
-                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{equipamento.numero_serie}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.sku || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
                         <td className="px-6 py-4 text-sm space-x-2">
                           <button
                             onClick={() => handleOpenModal(equipamento)}
