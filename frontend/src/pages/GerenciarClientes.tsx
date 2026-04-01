@@ -33,7 +33,12 @@ export function GerenciarClientes() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(1000);
   const [totalUsuarios, setTotalUsuarios] = useState(0);
+
+  // Modal Novo/Editar
+  const [showModalForm, setShowModalForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Modal Reset Senha
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetUsuarioId, setResetUsuarioId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -119,7 +124,7 @@ export function GerenciarClientes() {
 
       // Carregar contratos de cada usuário
       const usuariosComContratos: UsuarioComContratos[] = [];
-      
+
       for (const usr of usuariosData || []) {
         const { data: usuarioContratos } = await supabase
           .from('usuario_contratos')
@@ -155,6 +160,30 @@ export function GerenciarClientes() {
       ...prev,
       contratos_ids: selectedOptions,
     }));
+  };
+
+  const handleNovoCliente = () => {
+    setEditingId(null);
+    setFormData({
+      email: '',
+      nome: '',
+      contratos_ids: [],
+      senha_hash: '',
+      role: 'VIEWER',
+    });
+    setShowModalForm(true);
+  };
+
+  const handleEditarUsuario = (usr: UsuarioComContratos) => {
+    setEditingId(usr.id);
+    setFormData({
+      email: usr.email,
+      nome: usr.nome,
+      contratos_ids: usr.contratos.map(c => c.id),
+      senha_hash: '',
+      role: 'VIEWER',
+    });
+    setShowModalForm(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,7 +229,6 @@ export function GerenciarClientes() {
         if (insertError) throw insertError;
 
         alert('Usuário atualizado com sucesso!');
-        setEditingId(null);
       } else {
         // Criar novo usuário
         const { data: novoUsuario, error: createError } = await supabase
@@ -235,7 +263,7 @@ export function GerenciarClientes() {
         alert('Usuário criado com sucesso!');
       }
 
-      setFormData({ email: '', nome: '', contratos_ids: [], senha_hash: '', role: 'VIEWER' });
+      setShowModalForm(false);
       carregarDados();
     } catch (error) {
       console.error('Erro ao salvar usuário:', error);
@@ -243,18 +271,6 @@ export function GerenciarClientes() {
     } finally {
       setEnviando(false);
     }
-  };
-
-  const handleEditarUsuario = (usr: UsuarioComContratos) => {
-    setEditingId(usr.id);
-      setFormData({
-            email: usr.email,
-            nome: usr.nome,
-            contratos_ids: usr.contratos.map(c => c.id),
-            senha_hash: '',
-            role: 'VIEWER',
-          });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleResetSenha = async () => {
@@ -279,11 +295,6 @@ export function GerenciarClientes() {
       console.error('Erro ao resetar senha:', error);
       alert('Erro ao resetar senha');
     }
-  };
-
-  const handleCancelarEdicao = () => {
-    setEditingId(null);
-    setFormData({ email: '', nome: '', contratos_ids: [], senha_hash: '', role: 'VIEWER' });
   };
 
   const getNomesContratos = (contratosDoUsuario: Contrato[]) => {
@@ -364,189 +375,194 @@ export function GerenciarClientes() {
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
           <div className="p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* FORMULÁRIO */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    {editingId ? 'Editar Cliente' : 'Criar Novo Cliente'}
-                  </h2>
+            {/* BOTÃO NOVO CLIENTE */}
+            <div className="mb-6">
+              <button
+                onClick={handleNovoCliente}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition font-medium"
+              >
+                + Novo Cliente
+              </button>
+            </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="email@example.com"
-                      />
-                    </div>
+            {/* LISTA DE CLIENTES */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Clientes Cadastrados</h2>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                      <input
-                        type="text"
-                        name="nome"
-                        value={formData.nome}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome do cliente"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
-                      <select
-                        multiple
-                        value={formData.contratos_ids.map(String)}
-                        onChange={handleContratoChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        size={5}
-                      >
-                        {contratos.map(contrato => (
-                          <option key={contrato.id} value={contrato.id}>
-                            {contrato.numero_contrato} - {contrato.nome_cliente}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
-                    </div>
-
-                    {/* Campo Role oculto - sempre VIEWER para clientes */}
-                    <input type="hidden" name="role" value="VIEWER" />
-
-                    {!editingId && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                        <input
-                          type="password"
-                          name="senha_hash"
-                          value={formData.senha_hash}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Senha de acesso"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={enviando}
-                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                      >
-                        {enviando ? 'Salvando...' : editingId ? 'Atualizar' : 'Criar Cliente'}
-                      </button>
-                      {editingId && (
-                        <button
-                          type="button"
-                          onClick={handleCancelarEdicao}
-                          className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                </div>
+              {/* FILTROS */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Nome</label>
+                <input
+                  type="text"
+                  value={filtroNome}
+                  onChange={(e) => setFiltroNome(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome do cliente"
+                />
               </div>
 
-              {/* LISTA DE CLIENTES */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Clientes Cadastrados</h2>
-
-                  {/* FILTROS */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Nome</label>
-                    <input
-                      type="text"
-                      value={filtroNome}
-                      onChange={(e) => setFiltroNome(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Nome do cliente"
-                    />
+              {loading ? (
+                <p className="text-center text-gray-600">Carregando clientes...</p>
+              ) : usuarios.length === 0 ? (
+                <p className="text-center text-gray-600">Nenhum cliente encontrado</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Nome</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Contratos</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {usuarios.map((usr) => (
+                          <tr key={usr.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{usr.nome}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{usr.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{getNomesContratos(usr.contratos)}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditarUsuario(usr)}
+                                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setResetUsuarioId(usr.id);
+                                    setShowResetModal(true);
+                                  }}
+                                  className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-xs"
+                                >
+                                  Reset Senha
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
-                  {loading ? (
-                    <p className="text-center text-gray-600">Carregando clientes...</p>
-                  ) : usuarios.length === 0 ? (
-                    <p className="text-center text-gray-600">Nenhum cliente encontrado</p>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Nome</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Contratos</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {usuarios.map((usr) => (
-                              <tr key={usr.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{usr.nome}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{usr.email}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{getNomesContratos(usr.contratos)}</td>
-                                <td className="px-4 py-3 text-sm">
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => handleEditarUsuario(usr)}
-                                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setResetUsuarioId(usr.id);
-                                        setShowResetModal(true);
-                                      }}
-                                      className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-xs"
-                                    >
-                                      Reset Senha
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="mt-6 flex items-center justify-between">
-                        <div className="text-sm text-gray-600">
-                          Página {currentPage} de {totalPages} (Total: {totalUsuarios} cliente(s))
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                          >
-                            Anterior
-                          </button>
-                          <button
-                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                            disabled={currentPage === totalPages}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                          >
-                            Próxima
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+                  <div className="mt-6 flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      Página {currentPage} de {totalPages} (Total: {totalUsuarios} cliente(s))
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      >
+                        Anterior
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      >
+                        Próxima
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* MODAL NOVO/EDITAR */}
+      {showModalForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-96 overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                {editingId ? 'Editar Cliente' : 'Criar Novo Cliente'}
+              </h3>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="email@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+                  <input
+                    type="text"
+                    name="nome"
+                    value={formData.nome}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nome do cliente"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
+                  <select
+                    multiple
+                    value={formData.contratos_ids.map(String)}
+                    onChange={handleContratoChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    size={4}
+                  >
+                    {contratos.map(contrato => (
+                      <option key={contrato.id} value={contrato.id}>
+                        {contrato.numero_contrato} - {contrato.nome_cliente}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
+                </div>
+
+                {!editingId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+                    <input
+                      type="password"
+                      name="senha_hash"
+                      value={formData.senha_hash}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Senha de acesso"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  <button
+                    type="submit"
+                    disabled={enviando}
+                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {enviando ? 'Salvando...' : editingId ? 'Atualizar' : 'Criar Cliente'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowModalForm(false)}
+                    className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL RESET SENHA */}
       {showResetModal && (
