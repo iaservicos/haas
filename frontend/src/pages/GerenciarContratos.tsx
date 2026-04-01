@@ -17,7 +17,6 @@ export function GerenciarContratos() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModalCadastro, setShowModalCadastro] = useState(false);
-  const [showModalImportacao, setShowModalImportacao] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(1000);
   const [totalContratos, setTotalContratos] = useState(0);
@@ -131,20 +130,7 @@ export function GerenciarContratos() {
     }
   };
 
-  const handleImportacao = async () => {
-    if (!arquivoImportacao) {
-      alert('Selecione um arquivo para importar');
-      return;
-    }
 
-    try {
-      alert('Funcionalidade de importação em desenvolvimento. Por favor, use o script de importação.');
-      setShowModalImportacao(false);
-    } catch (error) {
-      console.error('Erro na importação:', error);
-      alert('Erro ao importar contratos');
-    }
-  };
 
   const totalPages = Math.ceil(totalContratos / itemsPerPage);
 
@@ -221,20 +207,12 @@ export function GerenciarContratos() {
           <div className="p-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold text-gray-900">Contratos Importados</h2>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowModalImportacao(true)}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                >
-                  Importar
-                </button>
-                <button
-                  onClick={() => setShowModalCadastro(true)}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  + Novo Contrato
-                </button>
-              </div>
+              <button
+                onClick={() => setShowModalCadastro(true)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+              >
+                + Novo Contrato
+              </button>
             </div>
 
             {/* SEARCH */}
@@ -379,52 +357,7 @@ export function GerenciarContratos() {
         </div>
       )}
 
-      {/* MODAL IMPORTAÇÃO */}
-      {showModalImportacao && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-2xl font-bold text-gray-900">Importar Contratos</h3>
-                <button
-                  onClick={() => setShowModalImportacao(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ✕
-                </button>
-              </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Selecionar arquivo
-                  </label>
-                  <input
-                    type="file"
-                    onChange={(e) => setArquivoImportacao(e.target.files?.[0] || null)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowModalImportacao(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleImportacao}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
-                >
-                  Importar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
