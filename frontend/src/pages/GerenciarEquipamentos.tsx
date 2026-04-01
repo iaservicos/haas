@@ -405,7 +405,7 @@ export function GerenciarEquipamentos() {
         <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-gray-400 hover:text-white"
           >
             ☰
           </button>
