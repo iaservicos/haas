@@ -451,6 +451,8 @@ export function GerenciarEquipamentos() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
+          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
+          
           <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Dashboard</span>}
           </a>
