@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from "../context/AuthContext";
+import { supabase } from '../services/supabase';
 
 interface Contrato {
-  id: string;
-  nome: string;
-  cliente: string;
+  id: number;
+  numero_contrato: string;
+  nome_cliente: string;
 }
 
 interface Cliente {
-  id: string;
+  id: number;
   nome: string;
   email: string;
-  contrato_id: string;
-  contrato_nome: string;
+  contratos_ids: number[] | null;
   data_criacao: string;
 }
 
@@ -25,11 +25,18 @@ export function GerenciarClientes() {
   const [filtroCliente, setFiltroCliente] = useState('');
   const [filtroContrato, setFiltroContrato] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(1000);
+  const [totalClientes, setTotalClientes] = useState(0);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetClienteId, setResetClienteId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   const [formData, setFormData] = useState({
     email: '',
     nome: '',
-    contrato_id: '',
+    contratos_ids: [] as number[],
     senha: '',
   });
 
@@ -37,31 +44,73 @@ export function GerenciarClientes() {
     carregarDados();
   }, []);
 
+  // Recarregar clientes quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+    carregarClientes();
+  }, [filtroCliente, filtroContrato]);
+
+  // Recarregar quando página muda
+  useEffect(() => {
+    carregarClientes();
+  }, [currentPage]);
+
   const carregarDados = async () => {
     try {
       setLoading(true);
-      
+
       // Carregar contratos
-      const respContratos = await fetch('/api/contratos/listar', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
-      const dataContratos = await respContratos.json();
-      if (dataContratos.success) {
-        setContratos(dataContratos.data || []);
-      }
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('contratos')
+        .select('id, numero_contrato, nome_cliente')
+        .order('numero_contrato', { ascending: true });
+
+      if (contratosError) throw contratosError;
+      setContratos(contratosData || []);
 
       // Carregar clientes
-      const respClientes = await fetch('/api/clientes/listar', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
-      const dataClientes = await respClientes.json();
-      if (dataClientes.success) {
-        setClientes(dataClientes.data || []);
-      }
+      carregarClientes();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      alert('Erro ao carregar dados');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarClientes = async () => {
+    try {
+      const offset = (currentPage - 1) * itemsPerPage;
+
+      // Contar total de clientes
+      let countQuery = supabase
+        .from('clientes')
+        .select('id', { count: 'exact', head: true });
+
+      if (filtroCliente) {
+        countQuery = countQuery.ilike('nome', `%${filtroCliente}%`);
+      }
+
+      const { count } = await countQuery;
+      setTotalClientes(count || 0);
+
+      // Carregar clientes COM PAGINAÇÃO
+      let query = supabase
+        .from('clientes')
+        .select('*')
+        .order('data_criacao', { ascending: false })
+        .range(offset, offset + itemsPerPage - 1);
+
+      if (filtroCliente) {
+        query = query.ilike('nome', `%${filtroCliente}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setClientes(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
     }
   };
 
@@ -73,46 +122,114 @@ export function GerenciarClientes() {
     }));
   };
 
+  const handleContratoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value));
+    setFormData(prev => ({
+      ...prev,
+      contratos_ids: selectedOptions,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.nome || !formData.contrato_id || !formData.senha) {
-      alert('Preencha todos os campos');
+    if (!formData.email || !formData.nome || formData.contratos_ids.length === 0 || !formData.senha) {
+      alert('Preencha todos os campos e selecione pelo menos um contrato');
       return;
     }
 
     try {
       setEnviando(true);
-      const response = await fetch('/api/clientes/criar', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
 
-      const data = await response.json();
-      if (data.success) {
-        alert('Cliente criado com sucesso!');
-        setFormData({ email: '', nome: '', contrato_id: '', senha: '' });
-        carregarDados();
+      if (editingId) {
+        // Atualizar cliente
+        const { error } = await supabase
+          .from('clientes')
+          .update({
+            nome: formData.nome,
+            email: formData.email,
+            contratos_ids: formData.contratos_ids,
+          })
+          .eq('id', editingId);
+
+        if (error) throw error;
+        alert('Cliente atualizado com sucesso!');
+        setEditingId(null);
       } else {
-        alert('Erro ao criar cliente: ' + data.message);
+        // Criar novo cliente
+        const { error } = await supabase
+          .from('clientes')
+          .insert([{
+            nome: formData.nome,
+            email: formData.email,
+            contratos_ids: formData.contratos_ids,
+            senha: formData.senha,
+          }]);
+
+        if (error) throw error;
+        alert('Cliente criado com sucesso!');
       }
+
+      setFormData({ email: '', nome: '', contratos_ids: [], senha: '' });
+      carregarDados();
     } catch (error) {
-      console.error('Erro ao criar cliente:', error);
-      alert('Erro ao criar cliente');
+      console.error('Erro ao salvar cliente:', error);
+      alert('Erro ao salvar cliente');
     } finally {
       setEnviando(false);
     }
   };
 
-  const clientesFiltrados = clientes.filter(cliente => {
-    if (filtroCliente && !cliente.nome.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
-    if (filtroContrato && cliente.contrato_id !== filtroContrato) return false;
-    return true;
-  });
+  const handleEditarCliente = (cliente: Cliente) => {
+    setEditingId(cliente.id);
+    setFormData({
+      email: cliente.email,
+      nome: cliente.nome,
+      contratos_ids: cliente.contratos_ids || [],
+      senha: '',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleResetSenha = async () => {
+    if (!newPassword || !resetClienteId) {
+      alert('Preencha a nova senha');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ senha: newPassword })
+        .eq('id', resetClienteId);
+
+      if (error) throw error;
+      alert('Senha resetada com sucesso!');
+      setShowResetModal(false);
+      setNewPassword('');
+      setResetClienteId(null);
+      carregarClientes();
+    } catch (error) {
+      console.error('Erro ao resetar senha:', error);
+      alert('Erro ao resetar senha');
+    }
+  };
+
+  const handleCancelarEdicao = () => {
+    setEditingId(null);
+    setFormData({ email: '', nome: '', contratos_ids: [], senha: '' });
+  };
+
+  const getNomesContratos = (contratoIds: number[] | null) => {
+    if (!contratoIds || contratoIds.length === 0) return '-';
+    return contratos
+      .filter(c => contratoIds.includes(c.id))
+      .map(c => c.numero_contrato)
+      .join(', ');
+  };
+
+  const totalPages = Math.ceil(totalClientes / itemsPerPage);
+  const clientesFiltrados = clientes;
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -129,7 +246,7 @@ export function GerenciarClientes() {
 
         <nav className="flex-1 p-4 space-y-2">
           <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
-          
+
           <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Dashboard</span>}
           </a>
@@ -137,7 +254,7 @@ export function GerenciarClientes() {
           <a href="/clientes" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
             {sidebarOpen && <span>Clientes</span>}
           </a>
-          
+
           <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Contratos</span>}
           </a>
@@ -189,8 +306,10 @@ export function GerenciarClientes() {
               {/* FORMULÁRIO */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Criar Novo Cliente</h2>
-                  
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">
+                    {editingId ? 'Editar Cliente' : 'Criar Novo Cliente'}
+                  </h2>
+
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
@@ -217,41 +336,55 @@ export function GerenciarClientes() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contrato *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
                       <select
-                        name="contrato_id"
-                        value={formData.contrato_id}
-                        onChange={handleInputChange}
+                        multiple
+                        value={formData.contratos_ids.map(String)}
+                        onChange={handleContratoChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        size={5}
                       >
-                        <option value="">Selecione um contrato</option>
                         {contratos.map(contrato => (
                           <option key={contrato.id} value={contrato.id}>
-                            {contrato.nome} - {contrato.cliente}
+                            {contrato.numero_contrato} - {contrato.nome_cliente}
                           </option>
                         ))}
                       </select>
+                      <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                      <input
-                        type="password"
-                        name="senha"
-                        value={formData.senha}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Senha de acesso"
-                      />
-                    </div>
+                    {!editingId && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+                        <input
+                          type="password"
+                          name="senha"
+                          value={formData.senha}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Senha de acesso"
+                        />
+                      </div>
+                    )}
 
-                    <button
-                      type="submit"
-                      disabled={enviando}
-                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                    >
-                      {enviando ? 'Criando...' : 'Criar Cliente'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={enviando}
+                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                      >
+                        {enviando ? 'Salvando...' : editingId ? 'Atualizar' : 'Criar Cliente'}
+                      </button>
+                      {editingId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelarEdicao}
+                          className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
                   </form>
                 </div>
               </div>
@@ -262,32 +395,15 @@ export function GerenciarClientes() {
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Clientes Cadastrados</h2>
 
                   {/* FILTROS */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Cliente</label>
-                      <input
-                        type="text"
-                        value={filtroCliente}
-                        onChange={(e) => setFiltroCliente(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome do cliente"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Contrato</label>
-                      <select
-                        value={filtroContrato}
-                        onChange={(e) => setFiltroContrato(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos os contratos</option>
-                        {contratos.map(contrato => (
-                          <option key={contrato.id} value={contrato.id}>
-                            {contrato.nome}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Cliente</label>
+                    <input
+                      type="text"
+                      value={filtroCliente}
+                      onChange={(e) => setFiltroCliente(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Nome do cliente"
+                    />
                   </div>
 
                   {loading ? (
@@ -295,30 +411,70 @@ export function GerenciarClientes() {
                   ) : clientesFiltrados.length === 0 ? (
                     <p className="text-center text-gray-600">Nenhum cliente encontrado</p>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Nome</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Contrato</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Data Criação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {clientesFiltrados.map((cliente) => (
-                            <tr key={cliente.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{cliente.nome}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{cliente.email}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{cliente.contrato_nome}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {new Date(cliente.data_criacao).toLocaleDateString('pt-BR')}
-                              </td>
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Nome</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Contratos</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Ações</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {clientesFiltrados.map((cliente) => (
+                              <tr key={cliente.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{cliente.nome}</td>
+                                <td className="px-4 py-3 text-sm text-gray-600">{cliente.email}</td>
+                                <td className="px-4 py-3 text-sm text-gray-600">{getNomesContratos(cliente.contratos_ids)}</td>
+                                <td className="px-4 py-3 text-sm">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleEditarCliente(cliente)}
+                                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setResetClienteId(cliente.id);
+                                        setShowResetModal(true);
+                                      }}
+                                      className="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-xs"
+                                    >
+                                      Reset Senha
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-6 flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
+                          Página {currentPage} de {totalPages} (Total: {totalClientes} cliente(s))
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                          >
+                            Anterior
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                          >
+                            Próxima
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -326,6 +482,51 @@ export function GerenciarClientes() {
           </div>
         </div>
       </div>
+
+      {/* MODAL RESET SENHA */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Resetar Senha</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nova Senha
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Digite a nova senha"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowResetModal(false);
+                    setNewPassword('');
+                    setResetClienteId(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleResetSenha}
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium"
+                >
+                  Resetar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
