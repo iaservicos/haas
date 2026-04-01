@@ -261,9 +261,44 @@ export function GerenciarEquipamentos() {
     }
   };
 
+  const loadXLSXLibrary = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).XLSX) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+
+      script.onload = () => {
+        setTimeout(() => {
+          if ((window as any).XLSX) {
+            resolve();
+          } else {
+            reject(new Error('XLSX não carregou'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        reject(new Error('Erro ao carregar XLSX do CDN'));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
   const handleImportarEquipamentos = async () => {
     if (!importFile) {
       alert('Selecione um arquivo para importar');
+      return;
+    }
+
+    if (!selectedImportContrato) {
+      alert('Selecione um contrato antes de importar');
       return;
     }
 
@@ -271,104 +306,108 @@ export function GerenciarEquipamentos() {
     setImportProgress(0);
 
     try {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js';
-      script.onload = async () => {
+      await loadXLSXLibrary();
+
+      const XLSX = (window as any).XLSX;
+      if (!XLSX) {
+        alert('Biblioteca XLSX não carregou. Tente novamente.');
+        setIsImporting(false);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
         try {
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            try {
-              const data = e.target?.result as ArrayBuffer;
-              const XLSX = (window as any).XLSX;
+          const data = e.target?.result as ArrayBuffer;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets['Equipamentos'];
 
-              const workbook = XLSX.read(data, { type: 'array' });
-              const worksheet = workbook.Sheets['Equipamentos'];
+          if (!worksheet) {
+            alert('Aba "Equipamentos" não encontrada no arquivo');
+            setIsImporting(false);
+            return;
+          }
 
-              if (!worksheet) {
-                alert('Aba "Equipamentos" nao encontrada no arquivo');
-                setIsImporting(false);
-                return;
-              }
+          const rows = XLSX.utils.sheet_to_json(worksheet);
+          let inserted = 0;
+          let skipped = 0;
+          const contratoId = parseInt(selectedImportContrato);
 
-              const rows = XLSX.utils.sheet_to_json(worksheet);
-              let inserted = 0;
-              let skipped = 0;
-              const contratoId = parseInt(selectedImportContrato);
+          for (let i = 0; i < rows.length; i++) {
+            const row: any = rows[i];
 
-              if (!contratoId) {
-                alert('Selecione um contrato antes de importar');
-                setIsImporting(false);
-                return;
-              }
+            const numeroSerie = String(
+              row['Nº Série'] || 
+              row['No Serie'] || 
+              row['numero_serie'] || 
+              row['N° Série'] ||
+              ''
+            ).trim();
+            const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
+            const sku = String(row['SKU'] || row['sku'] || '').trim();
 
-              for (let i = 0; i < rows.length; i++) {
-                const row: any = rows[i];
-
-                const numeroSerie = String(row['No Serie'] || row['numero_serie'] || '').trim();
-                const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
-                const sku = String(row['SKU'] || row['sku'] || '').trim() || null;
-
-                if (!numeroSerie || !modelo) {
-                  skipped++;
-                  continue;
-                }
-
-                try {
-                  const { data: existing } = await supabase
-                    .from('contrato_equipamentos')
-                    .select('id')
-                    .eq('numero_serie', numeroSerie)
-                    .single();
-
-                  if (existing) {
-                    skipped++;
-                  } else {
-                    const { error } = await supabase
-                      .from('contrato_equipamentos')
-                      .insert([{
-                        contrato_id: contratoId,
-                        numero_serie: numeroSerie,
-                        modelo: modelo,
-                        sku: sku,
-                      }]);
-
-                    if (error) {
-                      skipped++;
-                    } else {
-                      inserted++;
-                    }
-                  }
-                } catch (err) {
-                  skipped++;
-                }
-
-                setImportProgress(Math.round(((i + 1) / rows.length) * 100));
-              }
-
-              alert(`Importacao concluida!\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
-              setShowImportModal(false);
-              setImportFile(null);
-              setImportProgress(0);
-              setSelectedImportContrato('');
-              setIsImporting(false);
-              carregarEquipamentos();
-            } catch (error) {
-              console.error('Erro ao processar arquivo:', error);
-              alert('Erro ao processar arquivo');
-            } finally {
-              setIsImporting(false);
+            if (!numeroSerie || !modelo || !sku) {
+              skipped++;
+              continue;
             }
-          };
-          reader.readAsArrayBuffer(importFile);
+
+            try {
+              const { data: existing, error: checkError } = await supabase
+                .from('contrato_equipamentos')
+                .select('id')
+                .eq('numero_serie', numeroSerie)
+                .single();
+
+              if (existing) {
+                skipped++;
+              } else if (checkError && checkError.code !== 'PGRST116') {
+                skipped++;
+              } else {
+                const { error } = await supabase
+                  .from('contrato_equipamentos')
+                  .insert([{
+                    contrato_id: contratoId,
+                    numero_serie: numeroSerie,
+                    modelo: modelo,
+                    sku: sku,
+                  }]);
+
+                if (error) {
+                  console.error('Erro ao inserir:', error);
+                  skipped++;
+                } else {
+                  inserted++;
+                }
+              }
+            } catch (err) {
+              console.error('Erro no loop:', err);
+              skipped++;
+            }
+
+            setImportProgress(Math.round(((i + 1) / rows.length) * 100));
+          }
+
+          alert(`✅ Importação concluída!\n\nInseridos: ${inserted}\nIgnorados: ${skipped}`);
+          setShowImportModal(false);
+          setImportFile(null);
+          setSelectedImportContrato('');
+          setIsImporting(false);
+          carregarEquipamentos();
         } catch (error) {
-          console.error('Erro:', error);
-          alert('Erro ao importar equipamentos');
+          console.error('Erro ao processar arquivo:', error);
+          alert('Erro ao processar arquivo Excel');
           setIsImporting(false);
         }
       };
-      document.head.appendChild(script);
+
+      reader.onerror = () => {
+        alert('Erro ao ler arquivo');
+        setIsImporting(false);
+      };
+
+      reader.readAsArrayBuffer(importFile);
     } catch (error) {
-      console.error('Erro na importacao:', error);
+      console.error('Erro geral:', error);
       alert('Erro ao importar equipamentos');
       setIsImporting(false);
     }
