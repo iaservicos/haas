@@ -16,6 +16,14 @@ export function GerenciarContratos() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showModalCadastro, setShowModalCadastro] = useState(false);
+  const [showModalImportacao, setShowModalImportacao] = useState(false);
+  const [formData, setFormData] = useState({
+    numero_contrato: '',
+    nome_cliente: '',
+    cliente: '',
+  });
+  const [arquivoImportacao, setArquivoImportacao] = useState<File | null>(null);
 
   useEffect(() => {
     carregarContratos();
@@ -27,7 +35,7 @@ export function GerenciarContratos() {
       const { data, error } = await supabase
         .from('contratos')
         .select('*')
-        .order('data_criacao', { ascending: false });
+        .order('numero_contrato', { ascending: true });
 
       if (error) throw error;
       setContratos(data || []);
@@ -36,6 +44,65 @@ export function GerenciarContratos() {
       alert('Erro ao carregar contratos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCadastroContrato = async () => {
+    if (!formData.numero_contrato || !formData.nome_cliente) {
+      alert('Preencha os campos obrigatórios: Número do Contrato e Nome do Cliente');
+      return;
+    }
+
+    try {
+      // Verificar se contrato já existe
+      const { data: existing } = await supabase
+        .from('contratos')
+        .select('id')
+        .eq('numero_contrato', formData.numero_contrato)
+        .single();
+
+      if (existing) {
+        alert('Este número de contrato já existe!');
+        return;
+      }
+
+      // Inserir novo contrato
+      const { error } = await supabase
+        .from('contratos')
+        .insert([{
+          numero_contrato: formData.numero_contrato,
+          nome_cliente: formData.nome_cliente,
+          cliente: formData.cliente || null,
+        }]);
+
+      if (error) throw error;
+
+      alert('Contrato cadastrado com sucesso!');
+      setFormData({
+        numero_contrato: '',
+        nome_cliente: '',
+        cliente: '',
+      });
+      setShowModalCadastro(false);
+      carregarContratos();
+    } catch (error) {
+      console.error('Erro ao cadastrar contrato:', error);
+      alert('Erro ao cadastrar contrato');
+    }
+  };
+
+  const handleImportacao = async () => {
+    if (!arquivoImportacao) {
+      alert('Selecione um arquivo para importar');
+      return;
+    }
+
+    try {
+      alert('Funcionalidade de importação em desenvolvimento. Por favor, use o script de importação.');
+      setShowModalImportacao(false);
+    } catch (error) {
+      console.error('Erro na importação:', error);
+      alert('Erro ao importar contratos');
     }
   };
 
@@ -118,12 +185,20 @@ export function GerenciarContratos() {
           <div className="p-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-3xl font-bold text-gray-900">Contratos Importados</h2>
-              <button
-                onClick={carregarContratos}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-              >
-                Atualizar
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowModalImportacao(true)}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
+                >
+                  Importar
+                </button>
+                <button
+                  onClick={() => setShowModalCadastro(true)}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                >
+                  + Novo Contrato
+                </button>
+              </div>
             </div>
 
             {/* SEARCH */}
@@ -151,7 +226,6 @@ export function GerenciarContratos() {
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Nº Contrato</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Código Cliente</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Data Criação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -160,9 +234,6 @@ export function GerenciarContratos() {
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{contrato.numero_contrato}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{contrato.nome_cliente || '-'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{contrato.cliente || '-'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {new Date(contrato.data_criacao).toLocaleDateString('pt-BR')}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -176,6 +247,130 @@ export function GerenciarContratos() {
           </div>
         </div>
       </div>
+
+      {/* MODAL CADASTRO */}
+      {showModalCadastro && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-2xl font-bold text-gray-900">Novo Contrato</h3>
+                <button
+                  onClick={() => setShowModalCadastro(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Número do Contrato *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.numero_contrato}
+                    onChange={(e) => setFormData({ ...formData, numero_contrato: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: CT-001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome do Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.nome_cliente}
+                    onChange={(e) => setFormData({ ...formData, nome_cliente: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: Empresa XYZ"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Código do Cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.cliente}
+                    onChange={(e) => setFormData({ ...formData, cliente: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: CLI-001"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowModalCadastro(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCadastroContrato}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Cadastrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL IMPORTAÇÃO */}
+      {showModalImportacao && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-2xl font-bold text-gray-900">Importar Contratos</h3>
+                <button
+                  onClick={() => setShowModalImportacao(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Selecione o arquivo Excel
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => setArquivoImportacao(e.target.files?.[0] || null)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">Formatos aceitos: Excel (.xlsx, .xls) ou CSV</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowModalImportacao(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleImportacao}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                >
+                  Importar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
