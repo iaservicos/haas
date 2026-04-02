@@ -1,5 +1,3 @@
-// backend/src/routes/auth.ts - VERSÃO ATUALIZADA
-
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -60,7 +58,8 @@ router.post('/login', async (req: Request, res: Response) => {
       contrato_id: usuario.contrato_id,  // NOVO: contrato do cliente
     };
 
-    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '24h' });
+    // ⚡ MUDANÇA: Token expira em 40 minutos (em vez de 24h)
+    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '40m' });
 
     // Retornar resposta com tipo de usuário
     res.json({
