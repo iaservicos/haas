@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,8 +7,21 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, usuario } = useAuth();
   const navigate = useNavigate();
+
+  // ⚡ NOVO: Redirecionar baseado em user_type após login
+  useEffect(() => {
+    if (usuario) {
+      if (usuario.user_type === 'analyst') {
+        navigate('/');
+      } else if (usuario.user_type === 'client') {
+        navigate('/dashboard-cliente');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [usuario, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,7 +30,7 @@ export function Login() {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      // O redirecionamento acontece no useEffect acima
     } catch (err) {
       setError('Credenciais inválidas');
     } finally {
