@@ -50,29 +50,61 @@ export function DashboardCliente() {
   const loadContratos = async () => {
     try {
       setLoading(true);
-      if (!usuario?.contrato_id) {
-        console.log('Usuário não tem contrato vinculado');
+      
+      if (!usuario?.id) {
+        console.log('Usuário não identificado');
         setLoading(false);
         return;
       }
 
-      // Buscar contratos do cliente
+      console.log('Buscando contratos para usuário:', usuario.id);
+
+      // ⚡ CORRIGIDO: Buscar contratos vinculados ao usuário cliente
       const { data, error } = await supabase
-        .from('contratos')
-        .select('*')
+        .from('usuario_contratos')
+        .select('contrato_id')
         .eq('usuario_id', usuario.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar usuario_contratos:', error);
+        throw error;
+      }
 
-      setContratos(data || []);
+      console.log('usuario_contratos encontrados:', data);
+
+      if (!data || data.length === 0) {
+        console.log('Nenhum contrato vinculado ao usuário');
+        setContratos([]);
+        setLoading(false);
+        return;
+      }
+
+      // Extrair IDs dos contratos
+      const contratoIds = data.map((uc: any) => uc.contrato_id);
+      console.log('Contrato IDs:', contratoIds);
+
+      // Buscar dados dos contratos
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('contratos')
+        .select('*')
+        .in('id', contratoIds);
+
+      if (contratosError) {
+        console.error('Erro ao buscar contratos:', contratosError);
+        throw contratosError;
+      }
+
+      console.log('Contratos encontrados:', contratosData);
+
+      setContratos(contratosData || []);
       setStats(prev => ({
         ...prev,
-        totalContratos: data?.length || 0,
+        totalContratos: contratosData?.length || 0,
       }));
 
       // Selecionar primeiro contrato por padrão
-      if (data && data.length > 0) {
-        setContratoSelecionado(data[0].id);
+      if (contratosData && contratosData.length > 0) {
+        setContratoSelecionado(contratosData[0].id);
       }
     } catch (error) {
       console.error('Erro ao carregar contratos:', error);
@@ -83,18 +115,30 @@ export function DashboardCliente() {
 
   const loadEquipamentos = async (contratoId: number) => {
     try {
-      // Buscar equipamentos do contrato
+      console.log('Buscando equipamentos para contrato:', contratoId);
+
+      // ⚡ CORRIGIDO: Buscar equipamentos do contrato
       const { data, error } = await supabase
-        .from('equipamentos')
+        .from('equipamentos_cliente')
         .select('*')
         .eq('contrato_id', contratoId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar equipamentos:', error);
+        throw error;
+      }
+
+      console.log('Equipamentos encontrados:', data);
 
       setEquipamentos(data || []);
+      
+      // Contar checklists pendentes
+      const pendentes = data?.filter((e: any) => e.status === 'Pendente').length || 0;
+      
       setStats(prev => ({
         ...prev,
         totalEquipamentos: data?.length || 0,
+        checklistsPendentes: pendentes,
       }));
     } catch (error) {
       console.error('Erro ao carregar equipamentos:', error);
@@ -168,7 +212,7 @@ export function DashboardCliente() {
                 <h2 className="text-lg font-semibold text-blue-900 mb-4"> Instruções Importantes</h2>
                 <div className="space-y-3 text-blue-800 text-sm">
                   <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
-                  <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas.</p>
+                  <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
                   <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
                   <p><strong>4. Higienização:</strong> Após vistoria, higienize e embale o equipamento.</p>
                   <p><strong>5. Embalagem:</strong> Use fita transparente e lacre bem a caixa.</p>
