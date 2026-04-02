@@ -61,8 +61,8 @@ export function GerenciarClientes() {
   }, [filtroNome]);
 
   useEffect(() => {
-    carregarUsuarios();
-  }, [currentPage]);
+  carregarUsuarios();
+  }, [currentPage, contratos]);
 
   const carregarDados = async () => {
     try {
