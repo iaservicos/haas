@@ -3,6 +3,8 @@ export interface Usuario {
   email: string;
   nome: string;
   role: 'ADMIN' | 'ANALISTA' | 'VIEWER';
+  user_type?: 'analyst' | 'client';
+  contrato_id?: number; 
 }
 
 export interface Vistoria {

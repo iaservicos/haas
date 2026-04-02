@@ -8,6 +8,7 @@ import { GerenciarContratos } from './pages/GerenciarContratos';
 import { GerenciarClientes } from './pages/GerenciarClientes';
 import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
 import { VerConfirmacoes } from './pages/VerConfirmacoes';
+import { DashboardCliente } from './pages/DashboardCliente';
 
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <VerConfirmacoes />
+          </ProtectedRoute>
+        }
+      />
+      {/* NOVO: Dashboard do Cliente */}
+      <Route
+        path="/dashboard-cliente"
+        element={
+          <ProtectedRoute>
+            <DashboardCliente />
           </ProtectedRoute>
         }
       />
