@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
@@ -33,6 +33,24 @@ export function DashboardCliente() {
     totalEquipamentos: 0,
     checklistsPendentes: 0,
   });
+
+  // FILTRO E MODAL
+  const [filtroSerial, setFiltroSerial] = useState('');
+  const [showAdicionarEquipamento, setShowAdicionarEquipamento] = useState(false);
+  const [novoSerial, setNovoSerial] = useState('');
+  const [verificando, setVerificando] = useState(false);
+  const [mensagemEquipamento, setMensagemEquipamento] = useState('');
+  const [tipoMensagem, setTipoMensagem] = useState<'sucesso' | 'erro' | 'aviso'>('sucesso');
+
+  // Filtrar equipamentos em tempo real
+  const equipamentosFiltrados = useMemo(() => {
+    if (!filtroSerial.trim()) {
+      return equipamentos;
+    }
+    return equipamentos.filter(eq =>
+      eq.numero_serie.toLowerCase().includes(filtroSerial.toLowerCase())
+    );
+  }, [filtroSerial, equipamentos]);
 
   // CARREGAR CONTRATOS E EQUIPAMENTOS
   useEffect(() => {
@@ -72,7 +90,6 @@ export function DashboardCliente() {
 
       const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
       console.log('Contrato IDs:', contratoIds);
-      console.log('Tipo de contratoIds:', typeof contratoIds[0], 'Valores:', contratoIds);
 
       // 2. Buscar dados dos contratos
       const { data: contratosData, error: contratosError } = await supabase
@@ -101,10 +118,6 @@ export function DashboardCliente() {
       }
 
       console.log('Equipamentos encontrados:', equipamentosData?.length, 'registros');
-      if (equipamentosData && equipamentosData.length > 0) {
-        console.log('Primeiro equipamento:', equipamentosData[0]);
-        console.log('Contratos dos equipamentos:', [...new Set(equipamentosData.map((e: any) => e.contrato_id))]);
-      }
       setEquipamentos(equipamentosData || []);
 
       // Contar checklists pendentes
@@ -119,6 +132,79 @@ export function DashboardCliente() {
       console.error('Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const verificarEquipamento = async () => {
+    if (!novoSerial.trim()) {
+      setMensagemEquipamento('Por favor, informe um número de série');
+      setTipoMensagem('erro');
+      return;
+    }
+
+    setVerificando(true);
+    try {
+      // 1. Verificar se o serial já existe nos equipamentos do cliente
+      const jaExiste = equipamentos.some(
+        eq => eq.numero_serie.toLowerCase() === novoSerial.toLowerCase()
+      );
+
+      if (jaExiste) {
+        setMensagemEquipamento('Este equipamento já está listado para você!');
+        setTipoMensagem('aviso');
+        setVerificando(false);
+        return;
+      }
+
+      // 2. Buscar se o serial existe em outro contrato
+      const { data: equipamentoExistente } = await supabase
+        .from('contrato_equipamentos')
+        .select('*, contratos(numero_contrato)')
+        .eq('numero_serie', novoSerial)
+        .single();
+
+      if (equipamentoExistente) {
+        // Serial existe em outro contrato
+        const numeroContrato = (equipamentoExistente.contratos as any)?.numero_contrato || 'desconhecido';
+        setMensagemEquipamento(
+          `Este número de série (${novoSerial}) pertence ao contrato ${numeroContrato}. ` +
+          `Não pode ser devolvido neste contrato. Entre em contato com sua gestão de cliente.`
+        );
+        setTipoMensagem('erro');
+        setVerificando(false);
+        return;
+      }
+
+      // 3. Serial não existe - enviar para analista revisar
+      const { error: insertError } = await supabase
+        .from('equipamentos_pendentes_analise')
+        .insert({
+          numero_serie: novoSerial,
+          usuario_id: usuario.id,
+          status: 'Pendente',
+          data_criacao: new Date().toISOString(),
+        });
+
+      if (insertError && insertError.code !== 'PGRST116') {
+        console.error('Erro ao salvar equipamento pendente:', insertError);
+      }
+
+      setMensagemEquipamento(
+        `Equipamento ${novoSerial} será enviado para análise da equipe. Você receberá uma confirmação em breve.`
+      );
+      setTipoMensagem('sucesso');
+
+      setTimeout(() => {
+        setNovoSerial('');
+        setShowAdicionarEquipamento(false);
+        setMensagemEquipamento('');
+      }, 2000);
+    } catch (error) {
+      console.error('Erro ao verificar equipamento:', error);
+      setMensagemEquipamento('Erro ao verificar equipamento. Tente novamente.');
+      setTipoMensagem('erro');
+    } finally {
+      setVerificando(false);
     }
   };
 
@@ -188,7 +274,7 @@ export function DashboardCliente() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* INSTRUÇÕES */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <h2 className="text-lg font-semibold text-blue-900 mb-4">📋 Instruções Importantes</h2>
+                  <h2 className="text-lg font-semibold text-blue-900 mb-4">Instruções Importantes</h2>
                   <div className="space-y-3 text-blue-800 text-sm">
                     <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
                     <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
@@ -201,7 +287,7 @@ export function DashboardCliente() {
 
                 {/* VÍDEO */}
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">🎥 Vídeo de Instruções</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Vídeo de Instruções</h2>
                   <div className="bg-gray-100 rounded-lg flex items-center justify-center h-64">
                     <div className="text-center">
                       <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,6 +317,88 @@ export function DashboardCliente() {
                 </div>
               </div>
 
+              {/* FILTRO E AÇÕES */}
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Filtrar por Número de Série
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Digite o número de série..."
+                      value={filtroSerial}
+                      onChange={(e) => setFiltroSerial(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowAdicionarEquipamento(true)}
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                  >
+                    + Adicionar Equipamento
+                  </button>
+                </div>
+              </div>
+
+              {/* MODAL ADICIONAR EQUIPAMENTO */}
+              {showAdicionarEquipamento && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <h3 className="text-xl font-bold mb-4">Adicionar Equipamento Não Listado</h3>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Número de Série
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 123456789"
+                        value={novoSerial}
+                        onChange={(e) => setNovoSerial(e.target.value)}
+                        disabled={verificando}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      />
+                    </div>
+
+                    {mensagemEquipamento && (
+                      <div
+                        className={`p-3 rounded-lg mb-4 text-sm ${
+                          tipoMensagem === 'sucesso'
+                            ? 'bg-green-50 text-green-800 border border-green-200'
+                            : tipoMensagem === 'erro'
+                            ? 'bg-red-50 text-red-800 border border-red-200'
+                            : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                        }`}
+                      >
+                        {mensagemEquipamento}
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setShowAdicionarEquipamento(false);
+                          setNovoSerial('');
+                          setMensagemEquipamento('');
+                        }}
+                        disabled={verificando}
+                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={verificarEquipamento}
+                        disabled={verificando || !novoSerial.trim()}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                      >
+                        {verificando ? 'Verificando...' : 'Verificar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* EQUIPAMENTOS */}
               <div className="bg-white rounded-lg shadow">
                 <div className="border-b border-gray-200 px-6 py-4">
@@ -250,14 +418,14 @@ export function DashboardCliente() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {equipamentos.length === 0 ? (
+                      {equipamentosFiltrados.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="px-6 py-4 text-center text-gray-600">
-                            Nenhum equipamento para vistoria
+                            {filtroSerial ? 'Nenhum equipamento encontrado com este filtro' : 'Nenhum equipamento para vistoria'}
                           </td>
                         </tr>
                       ) : (
-                        equipamentos.map(equipamento => (
+                        equipamentosFiltrados.map(equipamento => (
                           <tr key={equipamento.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
