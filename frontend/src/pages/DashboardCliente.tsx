@@ -8,8 +8,6 @@ interface Contrato {
   nome: string;
   numero_contrato: string;
   status: string;
-  data_inicio: string;
-  data_fim: string;
 }
 
 interface Equipamento {
@@ -17,8 +15,10 @@ interface Equipamento {
   numero_serie: string;
   modelo: string;
   tipo: string;
-  localizacao: string;
+  destino?: string;
+  nota_fiscal?: string;
   status: string;
+  contrato_id: number;
 }
 
 export function DashboardCliente() {
@@ -28,26 +28,18 @@ export function DashboardCliente() {
   const [loading, setLoading] = useState(true);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
-  const [contratoSelecionado, setContratoSelecionado] = useState<number | null>(null);
   const [stats, setStats] = useState({
     totalContratos: 0,
     totalEquipamentos: 0,
     checklistsPendentes: 0,
   });
 
-  // CARREGAR CONTRATOS DO CLIENTE
+  // CARREGAR CONTRATOS E EQUIPAMENTOS
   useEffect(() => {
-    loadContratos();
+    loadData();
   }, [usuario]);
 
-  // CARREGAR EQUIPAMENTOS QUANDO CONTRATO É SELECIONADO
-  useEffect(() => {
-    if (contratoSelecionado) {
-      loadEquipamentos(contratoSelecionado);
-    }
-  }, [contratoSelecionado]);
-
-  const loadContratos = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       
@@ -57,33 +49,31 @@ export function DashboardCliente() {
         return;
       }
 
-      console.log('Buscando contratos para usuário:', usuario.id);
+      console.log('Buscando dados para usuário:', usuario.id);
 
-      // ⚡ CORRIGIDO: Buscar contratos vinculados ao usuário cliente
-      const { data, error } = await supabase
+      // 1. Buscar contratos do cliente
+      const { data: usuarioContratos, error: ucError } = await supabase
         .from('usuario_contratos')
         .select('contrato_id')
         .eq('usuario_id', usuario.id);
 
-      if (error) {
-        console.error('Erro ao buscar usuario_contratos:', error);
-        throw error;
+      if (ucError) {
+        console.error('Erro ao buscar usuario_contratos:', ucError);
+        throw ucError;
       }
 
-      console.log('usuario_contratos encontrados:', data);
-
-      if (!data || data.length === 0) {
+      if (!usuarioContratos || usuarioContratos.length === 0) {
         console.log('Nenhum contrato vinculado ao usuário');
         setContratos([]);
+        setEquipamentos([]);
         setLoading(false);
         return;
       }
 
-      // Extrair IDs dos contratos
-      const contratoIds = data.map((uc: any) => uc.contrato_id);
+      const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
       console.log('Contrato IDs:', contratoIds);
 
-      // Buscar dados dos contratos
+      // 2. Buscar dados dos contratos
       const { data: contratosData, error: contratosError } = await supabase
         .from('contratos')
         .select('*')
@@ -95,53 +85,34 @@ export function DashboardCliente() {
       }
 
       console.log('Contratos encontrados:', contratosData);
-
       setContratos(contratosData || []);
-      setStats(prev => ({
-        ...prev,
-        totalContratos: contratosData?.length || 0,
-      }));
 
-      // Selecionar primeiro contrato por padrão
-      if (contratosData && contratosData.length > 0) {
-        setContratoSelecionado(contratosData[0].id);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar contratos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadEquipamentos = async (contratoId: number) => {
-    try {
-      console.log('Buscando equipamentos para contrato:', contratoId);
-
-      // ⚡ CORRIGIDO: Buscar equipamentos do contrato
-      const { data, error } = await supabase
+      // 3. Buscar TODOS os equipamentos de TODOS os contratos
+      const { data: equipamentosData, error: equipError } = await supabase
         .from('contrato_equipamentos')
         .select('*')
-        .eq('contrato_id', contratoId);
+        .in('contrato_id', contratoIds);
 
-      if (error) {
-        console.error('Erro ao buscar equipamentos:', error);
-        throw error;
+      if (equipError) {
+        console.error('Erro ao buscar equipamentos:', equipError);
+        throw equipError;
       }
 
-      console.log('Equipamentos encontrados:', data);
+      console.log('Equipamentos encontrados:', equipamentosData);
+      setEquipamentos(equipamentosData || []);
 
-      setEquipamentos(data || []);
-      
       // Contar checklists pendentes
-      const pendentes = data?.filter((e: any) => e.status === 'Pendente').length || 0;
-      
-      setStats(prev => ({
-        ...prev,
-        totalEquipamentos: data?.length || 0,
+      const pendentes = equipamentosData?.filter((e: any) => e.status === 'Pendente').length || 0;
+
+      setStats({
+        totalContratos: contratosData?.length || 0,
+        totalEquipamentos: equipamentosData?.length || 0,
         checklistsPendentes: pendentes,
-      }));
+      });
     } catch (error) {
-      console.error('Erro ao carregar equipamentos:', error);
+      console.error('Erro ao carregar dados:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -207,16 +178,34 @@ export function DashboardCliente() {
             </div>
           ) : (
             <>
-              {/* INSTRUÇÕES INICIAIS */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-                <h2 className="text-lg font-semibold text-blue-900 mb-4">📋 Instruções Importantes</h2>
-                <div className="space-y-3 text-blue-800 text-sm">
-                  <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
-                  <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
-                  <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
-                  <p><strong>4. Higienização:</strong> Após vistoria, higienize e embale o equipamento.</p>
-                  <p><strong>5. Embalagem:</strong> Use fita transparente e lacre bem a caixa.</p>
-                  <p><strong>6. Identificação:</strong> Coloque folha com série, modelo, quantidade, dimensões e peso.</p>
+              {/* INSTRUÇÕES E VÍDEO */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* INSTRUÇÕES */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-blue-900 mb-4">📋 Instruções Importantes</h2>
+                  <div className="space-y-3 text-blue-800 text-sm">
+                    <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
+                    <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
+                    <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
+                    <p><strong>4. Higienização:</strong> Após vistoria, higienize e embale o equipamento.</p>
+                    <p><strong>5. Embalagem:</strong> Use fita transparente e lacre bem a caixa.</p>
+                    <p><strong>6. Identificação:</strong> Coloque folha com série, modelo, quantidade, dimensões e peso.</p>
+                  </div>
+                </div>
+
+                {/* VÍDEO */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">🎥 Vídeo de Instruções</h2>
+                  <div className="bg-gray-100 rounded-lg flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-gray-600 mb-2">Vídeo de instruções</p>
+                      <p className="text-xs text-gray-500">(A ser inserido)</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -247,14 +236,9 @@ export function DashboardCliente() {
                   ) : (
                     <div className="space-y-3">
                       {contratos.map(contrato => (
-                        <button
+                        <div
                           key={contrato.id}
-                          onClick={() => setContratoSelecionado(contrato.id)}
-                          className={`w-full p-4 rounded-lg border-2 transition text-left ${
-                            contratoSelecionado === contrato.id
-                              ? 'border-blue-600 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-400'
-                          }`}
+                          className="p-4 rounded-lg border border-gray-200 hover:border-blue-400 transition"
                         >
                           <div className="flex justify-between items-start">
                             <div>
@@ -269,7 +253,7 @@ export function DashboardCliente() {
                               {contrato.status}
                             </span>
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -277,64 +261,64 @@ export function DashboardCliente() {
               </div>
 
               {/* EQUIPAMENTOS */}
-              {contratoSelecionado && (
-                <div className="bg-white rounded-lg shadow">
-                  <div className="border-b border-gray-200 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-gray-900">Equipamentos para Vistoria</h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
+              <div className="bg-white rounded-lg shadow">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Equipamentos para Vistoria</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Série</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Modelo</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Tipo</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Destino</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Nota Fiscal</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {equipamentos.length === 0 ? (
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Série</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Modelo</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Tipo</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Localização</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ação</th>
+                          <td colSpan={7} className="px-6 py-4 text-center text-gray-600">
+                            Nenhum equipamento para vistoria
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {equipamentos.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="px-6 py-4 text-center text-gray-600">
-                              Nenhum equipamento neste contrato
+                      ) : (
+                        equipamentos.map(equipamento => (
+                          <tr key={equipamento.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{equipamento.tipo}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{equipamento.destino || '—'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{equipamento.nota_fiscal || '—'}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                equipamento.status === 'Pendente'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : equipamento.status === 'Concluído'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {equipamento.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <button
+                                onClick={() => handleIniciarChecklist(equipamento.id)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition"
+                              >
+                                Iniciar Vistoria
+                              </button>
                             </td>
                           </tr>
-                        ) : (
-                          equipamentos.map(equipamento => (
-                            <tr key={equipamento.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.tipo}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.localizacao}</td>
-                              <td className="px-6 py-4 text-sm">
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                  equipamento.status === 'Pendente'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : equipamento.status === 'Concluído'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {equipamento.status}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-sm">
-                                <button
-                                  onClick={() => handleIniciarChecklist(equipamento.id)}
-                                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition"
-                                >
-                                  Iniciar Vistoria
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
             </>
           )}
         </div>
