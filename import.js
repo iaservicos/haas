@@ -1,11 +1,6 @@
 #!/usr/bin/env node
-/**
- * Script OTIMIZADO para importar 244k+ equipamentos
- * - Carrega contratos em memória (1 query)
- * - Carrega equipamentos existentes em memória (1 query)
- * - Insere em batches de 1000 (muito mais rápido)
- * - Deve terminar em MINUTOS, não DIAS
- */
+
+
 
 require('dotenv').config({ path: './backend/.env' });
 const { createClient } = require('@supabase/supabase-js');
@@ -122,26 +117,68 @@ async function importEquipamentos(data) {
   console.log('=====================================');
   console.log(`📊 Total de equipamentos a importar: ${data.length}\n`);
   
-  // ⚡ OTIMIZAÇÃO 1: Carregar TODOS os contratos em memória
-  console.log('⚡ Carregando contratos em memória...');
-  const { data: allContratos } = await supabase
-    .from('contratos')
-    .select('id, numero_contrato');
-  
+  // ⚡ OTIMIZAÇÃO 1: Carregar TODOS os contratos em memória COM PAGINAÇÃO
+  console.log('⚡ Carregando contratos em memória (com paginação)...');
   const contratoMap = new Map();
-  allContratos.forEach(c => {
-    contratoMap.set(String(c.numero_contrato), c.id);
-  });
-  console.log(`✅ ${allContratos.length} contratos carregados\n`);
+  let offset = 0;
+  const pageSize = 1000;
+  let totalCarregados = 0;
   
-  // ⚡ OTIMIZAÇÃO 2: Carregar TODOS os equipamentos existentes em memória
-  console.log('⚡ Carregando equipamentos existentes em memória...');
-  const { data: allEquipamentos } = await supabase
-    .from('contrato_equipamentos')
-    .select('numero_serie');
+  while (true) {
+    const { data: batch, error } = await supabase
+      .from('contratos')
+      .select('id, numero_contrato')
+      .range(offset, offset + pageSize - 1);
+    
+    if (error) {
+      console.error('❌ Erro ao carregar contratos:', error.message);
+      break;
+    }
+    
+    if (!batch || batch.length === 0) {
+      break;
+    }
+    
+    batch.forEach(c => {
+      contratoMap.set(String(c.numero_contrato), c.id);
+    });
+    
+    totalCarregados += batch.length;
+    offset += pageSize;
+  }
   
-  const equipamentoSet = new Set(allEquipamentos.map(e => String(e.numero_serie)));
-  console.log(`✅ ${allEquipamentos.length} equipamentos existentes carregados\n`);
+  console.log(`✅ ${totalCarregados} contratos carregados\n`);
+  
+  // ⚡ OTIMIZAÇÃO 2: Carregar TODOS os equipamentos existentes em memória COM PAGINAÇÃO
+  console.log('⚡ Carregando equipamentos existentes em memória (com paginação)...');
+  const equipamentoSet = new Set();
+  offset = 0;
+  let totalEquipamentos = 0;
+  
+  while (true) {
+    const { data: batch, error } = await supabase
+      .from('contrato_equipamentos')
+      .select('numero_serie')
+      .range(offset, offset + pageSize - 1);
+    
+    if (error) {
+      console.error('❌ Erro ao carregar equipamentos:', error.message);
+      break;
+    }
+    
+    if (!batch || batch.length === 0) {
+      break;
+    }
+    
+    batch.forEach(e => {
+      equipamentoSet.add(String(e.numero_serie));
+    });
+    
+    totalEquipamentos += batch.length;
+    offset += pageSize;
+  }
+  
+  console.log(`✅ ${totalEquipamentos} equipamentos existentes carregados\n`);
   
   // ⚡ OTIMIZAÇÃO 3: Preparar dados para inserção em batch
   console.log('⚡ Preparando dados para inserção em batch...');
@@ -219,7 +256,7 @@ async function importEquipamentos(data) {
 
 async function main() {
   try {
-    console.log('🚀 INICIANDO IMPORTAÇÃO OTIMIZADA');
+    console.log('🚀 INICIANDO IMPORTAÇÃO OTIMIZADA COM PAGINAÇÃO');
     console.log('=====================================\n');
     
     const startTime = Date.now();
