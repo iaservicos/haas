@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Script para importar 244k+ equipamentos da planilha Excel para Supabase
- * Usa as credenciais do .env local
+ * Script OTIMIZADO para importar 244k+ equipamentos
+ * - Carrega contratos em memória (1 query)
+ * - Carrega equipamentos existentes em memória (1 query)
+ * - Insere em batches de 1000 (muito mais rápido)
+ * - Deve terminar em MINUTOS, não DIAS
  */
 
 require('dotenv').config({ path: './backend/.env' });
@@ -16,6 +19,7 @@ const XLSX = require('xlsx');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const EXCEL_FILE = './seriaisencerrando.XLSX';
+const BATCH_SIZE = 1000; // Inserir 1000 por vez
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('❌ ERRO: SUPABASE_URL ou SUPABASE_KEY/VITE_SUPABASE_ANON_KEY não configurados no .env');
@@ -24,7 +28,8 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 console.log('📋 CONFIGURAÇÃO:');
 console.log(`URL: ${SUPABASE_URL}`);
-console.log(`Arquivo: ${EXCEL_FILE}\n`);
+console.log(`Arquivo: ${EXCEL_FILE}`);
+console.log(`Batch Size: ${BATCH_SIZE}\n`);
 
 // ============================================
 // INICIALIZAR SUPABASE
@@ -73,53 +78,43 @@ async function importContratos(data) {
   let inserted = 0;
   let skipped = 0;
   
-  for (const contract of contracts) {
+  // Inserir em batches
+  for (let i = 0; i < contracts.length; i += BATCH_SIZE) {
+    const batch = contracts.slice(i, i + BATCH_SIZE);
+    
     try {
-      // Check if exists
+      // Buscar contratos existentes em batch
       const { data: existing } = await supabase
         .from('contratos')
-        .select('id')
-        .eq('numero_contrato', contract.numero_contrato)
-        .single();
+        .select('numero_contrato')
+        .in('numero_contrato', batch.map(c => c.numero_contrato));
       
-      if (existing) {
-        skipped++;
-        continue;
+      const existingSet = new Set(existing.map(c => c.numero_contrato));
+      
+      // Filtrar apenas novos
+      const newContracts = batch.filter(c => !existingSet.has(c.numero_contrato));
+      
+      if (newContracts.length > 0) {
+        const { error } = await supabase
+          .from('contratos')
+          .insert(newContracts);
+        
+        if (error) {
+          console.warn(`⚠️ Erro ao inserir batch: ${error.message}`);
+          skipped += newContracts.length;
+        } else {
+          inserted += newContracts.length;
+        }
       }
       
-      // Insert new contract
-      const { error } = await supabase
-        .from('contratos')
-        .insert([{
-          numero_contrato: contract.numero_contrato,
-          nome_cliente: contract.nome_cliente,
-          cliente: contract.cliente,
-        }]);
-      
-      if (error) {
-        console.warn(`⚠️ Erro ao inserir contrato ${contract.numero_contrato}: ${error.message}`);
-        skipped++;
-      } else {
-        inserted++;
-      }
+      skipped += existingSet.size;
     } catch (err) {
       console.warn(`⚠️ Erro: ${err.message}`);
-      skipped++;
+      skipped += batch.length;
     }
   }
   
   console.log(`✅ Contratos: ${inserted} inseridos, ${skipped} ignorados\n`);
-}
-
-async function getContratoId(numero_contrato) {
-  const { data, error } = await supabase
-    .from('contratos')
-    .select('id')
-    .eq('numero_contrato', String(numero_contrato))
-    .single();
-  
-  if (error) return null;
-  return data?.id;
 }
 
 async function importEquipamentos(data) {
@@ -127,66 +122,95 @@ async function importEquipamentos(data) {
   console.log('=====================================');
   console.log(`📊 Total de equipamentos a importar: ${data.length}\n`);
   
-  let inserted = 0;
-  let skipped = 0;
-  let errors = 0;
-  const batchSize = 500;
+  // ⚡ OTIMIZAÇÃO 1: Carregar TODOS os contratos em memória
+  console.log('⚡ Carregando contratos em memória...');
+  const { data: allContratos } = await supabase
+    .from('contratos')
+    .select('id, numero_contrato');
   
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-    
+  const contratoMap = new Map();
+  allContratos.forEach(c => {
+    contratoMap.set(String(c.numero_contrato), c.id);
+  });
+  console.log(`✅ ${allContratos.length} contratos carregados\n`);
+  
+  // ⚡ OTIMIZAÇÃO 2: Carregar TODOS os equipamentos existentes em memória
+  console.log('⚡ Carregando equipamentos existentes em memória...');
+  const { data: allEquipamentos } = await supabase
+    .from('contrato_equipamentos')
+    .select('numero_serie');
+  
+  const equipamentoSet = new Set(allEquipamentos.map(e => String(e.numero_serie)));
+  console.log(`✅ ${allEquipamentos.length} equipamentos existentes carregados\n`);
+  
+  // ⚡ OTIMIZAÇÃO 3: Preparar dados para inserção em batch
+  console.log('⚡ Preparando dados para inserção em batch...');
+  const equipamentosParaInserir = [];
+  
+  for (const row of data) {
     try {
-      // Get contract ID
-      const contratoId = await getContratoId(row.Contrato);
+      const contratoId = contratoMap.get(String(row.Contrato));
+      const numeroSerie = String(row['Nº de série']);
       
-      if (!contratoId) {
-        skipped++;
-        continue;
-      }
+      // Validar
+      if (!contratoId || !numeroSerie) continue;
       
-      // Check if equipment already exists
-      const { data: existing } = await supabase
-        .from('contrato_equipamentos')
-        .select('id')
-        .eq('numero_serie', String(row['Nº de série']))
-        .single();
+      // Verificar duplicata em memória (muito mais rápido!)
+      if (equipamentoSet.has(numeroSerie)) continue;
       
-      if (existing) {
-        skipped++;
-      } else {
-        // Insert equipment
-        const { error } = await supabase
-          .from('contrato_equipamentos')
-          .insert([{
-            contrato_id: contratoId,
-            numero_serie: String(row['Nº de série']),
-            modelo: String(row.Modelo),
-            sku: row.SKU ? String(row.SKU) : null,
-          }]);
-        
-        if (error) {
-          errors++;
-        } else {
-          inserted++;
-        }
-      }
+      equipamentosParaInserir.push({
+        contrato_id: contratoId,
+        numero_serie: numeroSerie,
+        modelo: String(row.Modelo),
+        sku: row.SKU ? String(row.SKU) : null,
+      });
       
-      // Progress log
-      if ((i + 1) % batchSize === 0) {
-        const percent = Math.round(((i + 1) / data.length) * 100);
-        console.log(`📈 ${i + 1}/${data.length} (${percent}%) - ${inserted} inseridos, ${skipped} ignorados`);
-      }
-      
-      if (errors > 100) {
-        console.error('❌ Muitos erros! Parando.');
-        break;
-      }
+      // Marcar como inserido para evitar duplicatas no mesmo batch
+      equipamentoSet.add(numeroSerie);
     } catch (err) {
-      errors++;
+      // Ignorar linhas com erro
     }
   }
   
-  console.log(`\n✅ Equipamentos: ${inserted} inseridos, ${skipped} ignorados, ${errors} erros\n`);
+  console.log(`✅ ${equipamentosParaInserir.length} equipamentos prontos para inserir\n`);
+  
+  // ⚡ OTIMIZAÇÃO 4: Inserir em batches de 1000
+  console.log('⚡ Iniciando inserção em batches...\n');
+  
+  let inserted = 0;
+  let errors = 0;
+  const startTime = Date.now();
+  
+  for (let i = 0; i < equipamentosParaInserir.length; i += BATCH_SIZE) {
+    const batch = equipamentosParaInserir.slice(i, i + BATCH_SIZE);
+    
+    try {
+      const { error } = await supabase
+        .from('contrato_equipamentos')
+        .insert(batch);
+      
+      if (error) {
+        console.warn(`⚠️ Erro ao inserir batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`);
+        errors += batch.length;
+      } else {
+        inserted += batch.length;
+      }
+      
+      // Progress log
+      const percent = Math.round(((i + batch.length) / equipamentosParaInserir.length) * 100);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      const rate = (inserted / (elapsed / 60)).toFixed(0);
+      
+      console.log(`📈 ${i + batch.length}/${equipamentosParaInserir.length} (${percent}%) - ${inserted} inseridos - ${rate} eq/min - ${elapsed}s`);
+    } catch (err) {
+      console.warn(`⚠️ Erro: ${err.message}`);
+      errors += batch.length;
+    }
+  }
+  
+  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`\n✅ Equipamentos: ${inserted} inseridos, ${errors} erros`);
+  console.log(`⏱️ Tempo total: ${totalTime}s (${(inserted / (totalTime / 60)).toFixed(0)} eq/min)\n`);
 }
 
 // ============================================
@@ -195,8 +219,10 @@ async function importEquipamentos(data) {
 
 async function main() {
   try {
-    console.log('🚀 INICIANDO IMPORTAÇÃO COMPLETA');
+    console.log('🚀 INICIANDO IMPORTAÇÃO OTIMIZADA');
     console.log('=====================================\n');
+    
+    const startTime = Date.now();
     
     // Read Excel
     const data = await readExcelFile(EXCEL_FILE);
@@ -211,8 +237,10 @@ async function main() {
     // Import equipment
     await importEquipamentos(filteredData);
     
+    const totalTime = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
     console.log('✅ IMPORTAÇÃO CONCLUÍDA!');
     console.log('=====================================');
+    console.log(`⏱️ Tempo total: ${totalTime} minutos`);
     
   } catch (err) {
     console.error('\n❌ ERRO:');

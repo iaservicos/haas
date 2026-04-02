@@ -85,6 +85,7 @@ export function GerenciarClientes() {
     }
   };
 
+  // ⚡ OTIMIZAÇÃO: Carregar TODOS os contratos de uma vez com IN
   const carregarUsuarios = async () => {
     try {
       const offset = (currentPage - 1) * itemsPerPage;
@@ -116,22 +117,42 @@ export function GerenciarClientes() {
 
       if (error) throw error;
 
-      const usuariosComContratos: UsuarioComContratos[] = [];
+      // ⚡ OTIMIZAÇÃO 1: Se não há usuários, retorna vazio
+      if (!usuariosData || usuariosData.length === 0) {
+        setUsuarios([]);
+        return;
+      }
 
-      for (const usr of usuariosData || []) {
-        const { data: usuarioContratos } = await supabase
-          .from('usuario_contratos')
-          .select('contrato_id')
-          .eq('usuario_id', usr.id);
+      // ⚡ OTIMIZAÇÃO 2: Carregar TODOS os contratos de uma vez com IN
+      const usuarioIds = usuariosData.map(u => u.id);
+      
+      const { data: todosUsuarioContratos, error: contratoError } = await supabase
+        .from('usuario_contratos')
+        .select('usuario_id, contrato_id')
+        .in('usuario_id', usuarioIds);  // ← Uma única query para TODOS!
 
-        const contratoIds = usuarioContratos?.map(uc => uc.contrato_id) || [];
+      if (contratoError) throw contratoError;
+
+      // ⚡ OTIMIZAÇÃO 3: Mapear em memória (muito mais rápido)
+      const contratosPorUsuario = new Map<string, number[]>();
+      
+      (todosUsuarioContratos || []).forEach(uc => {
+        if (!contratosPorUsuario.has(uc.usuario_id)) {
+          contratosPorUsuario.set(uc.usuario_id, []);
+        }
+        contratosPorUsuario.get(uc.usuario_id)!.push(uc.contrato_id);
+      });
+
+      // ⚡ OTIMIZAÇÃO 4: Construir resultado em memória (sem loops)
+      const usuariosComContratos: UsuarioComContratos[] = usuariosData.map(usr => {
+        const contratoIds = contratosPorUsuario.get(usr.id) || [];
         const contratosDoUsuario = contratos.filter(c => contratoIds.includes(c.id));
 
-        usuariosComContratos.push({
+        return {
           ...usr,
           contratos: contratosDoUsuario,
-        });
-      }
+        };
+      });
 
       setUsuarios(usuariosComContratos);
     } catch (error) {
@@ -336,281 +357,265 @@ export function GerenciarClientes() {
           <a href="/fotos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Fotos</span>}
           </a>
+        </nav>
 
+        <div className="p-4 border-t border-gray-700">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
+            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm"
           >
-            {sidebarOpen && <span>Sair</span>}
+            {sidebarOpen ? 'Logout' : 'X'}
           </button>
-        </nav>
+        </div>
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* HEADER */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img
-                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
-                alt="Logo Positivo"
-                className="h-10 w-auto"
+      <div className="flex-1 flex gap-6 p-6 overflow-hidden">
+        {/* LEFT PANEL - CRIAR NOVO CLIENTE */}
+        <div className="w-1/3 bg-white rounded-lg shadow-md p-6 overflow-y-auto">
+          <h2 className="text-2xl font-bold mb-6">Criar Novo Cliente</h2>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="Email do cliente"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               />
-              <h1 className="text-2xl font-bold text-gray-900">Gerenciar Clientes</h1>
             </div>
-            <div className="text-right text-sm text-gray-600">
-              <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+              <input
+                type="text"
+                name="nome"
+                value={formData.nome}
+                onChange={handleInputChange}
+                placeholder="Nome do cliente"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
             </div>
-          </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
+              <select
+                name="contratos"
+                multiple
+                value={formData.contratos_ids.map(String)}
+                onChange={handleContratoChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                size={6}
+                required
+              >
+                {contratos.map(contrato => (
+                  <option key={contrato.id} value={contrato.id}>
+                    {contrato.numero_contrato} - {contrato.nome_cliente}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
+              <input
+                type="password"
+                name="senha_hash"
+                value={formData.senha_hash}
+                onChange={handleInputChange}
+                placeholder="Senha do cliente"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="VIEWER">VIEWER</option>
+                <option value="ANALISTA">ANALISTA</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={enviando}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
+            >
+              {enviando ? 'Criando...' : 'Criar Cliente'}
+            </button>
+          </form>
         </div>
 
-        {/* SCROLL CONTENT */}
-        <div className="flex-1 overflow-auto">
-          <div className="p-8">
-            <div className="grid grid-cols-3 gap-8 mb-8">
-              {/* COLUNA ESQUERDA - FORMULÁRIO NOVO */}
-              <div className="col-span-1">
-                <div className="bg-white rounded-lg shadow p-6 sticky top-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-6">Criar Novo Cliente</h2>
+        {/* RIGHT PANEL - LISTA DE CLIENTES */}
+        <div className="flex-1 bg-white rounded-lg shadow-md p-6 flex flex-col overflow-hidden">
+          <h2 className="text-2xl font-bold mb-4">Clientes Cadastrados</h2>
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="email@example.com"
-                      />
-                    </div>
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Filtrar por Nome"
+              value={filtroNome}
+              onChange={(e) => setFiltroNome(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                      <input
-                        type="text"
-                        name="nome"
-                        value={formData.nome}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome do cliente"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
-                      <select
-                        multiple
-                        value={formData.contratos_ids.map(String)}
-                        onChange={handleContratoChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        size={5}
-                      >
-                        {contratos.map(contrato => (
-                          <option key={contrato.id} value={contrato.id}>
-                            {contrato.numero_contrato} - {contrato.nome_cliente}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                      <input
-                        type="password"
-                        name="senha_hash"
-                        value={formData.senha_hash}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Senha de acesso"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={enviando}
-                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
-                    >
-                      {enviando ? 'Salvando...' : 'Criar Cliente'}
-                    </button>
-                  </form>
-                </div>
-              </div>
-
-              {/* COLUNA DIREITA - LISTAGEM */}
-              <div className="col-span-2">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Clientes Cadastrados</h2>
-
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por Nome</label>
-                    <input
-                      type="text"
-                      value={filtroNome}
-                      onChange={(e) => setFiltroNome(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Nome do cliente"
-                    />
-                  </div>
-
-                  {loading ? (
-                    <p className="text-center text-gray-600">Carregando clientes...</p>
-                  ) : usuarios.length === 0 ? (
-                    <p className="text-center text-gray-600">Nenhum cliente encontrado</p>
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-900">Nome</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-900">Email</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-900">Contratos</th>
-                              <th className="px-4 py-3 text-left font-semibold text-gray-900">Ações</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {usuarios.map((usr) => (
-                              <tr key={usr.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium text-gray-900">{usr.nome}</td>
-                                <td className="px-4 py-3 text-gray-600">{usr.email}</td>
-                                <td className="px-4 py-3 text-gray-600">{getNomesContratos(usr.contratos)}</td>
-                                <td className="px-4 py-3">
-                                  <button
-                                    onClick={() => handleEditarUsuario(usr)}
-                                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-medium"
-                                  >
-                                    Editar
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="mt-6 flex items-center justify-between">
-                        <div className="text-sm text-gray-600">
-                          Página {currentPage} de {totalPages} (Total: {totalUsuarios} cliente(s))
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                          >
-                            Anterior
-                          </button>
-                          <button
-                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                            disabled={currentPage === totalPages}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                          >
-                            Próxima
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+          {loading ? (
+            <div className="flex items-center justify-center flex-1">
+              <p className="text-gray-500">Carregando...</p>
             </div>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold">Nome</th>
+                      <th className="px-4 py-2 text-left font-semibold">Email</th>
+                      <th className="px-4 py-2 text-left font-semibold">Contratos</th>
+                      <th className="px-4 py-2 text-left font-semibold">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usuarios.map(usr => (
+                      <tr key={usr.id} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-2">{usr.nome}</td>
+                        <td className="px-4 py-2">{usr.email}</td>
+                        <td className="px-4 py-2 text-xs">{getNomesContratos(usr.contratos)}</td>
+                        <td className="px-4 py-2">
+                          <button
+                            onClick={() => handleEditarUsuario(usr)}
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                          >
+                            Editar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* PAINEL DE EDIÇÃO - EMBAIXO */}
-            {showEditPanel && (
-              <div className="bg-white rounded-lg shadow p-6 border-t-4 border-blue-500">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Editar Cliente</h2>
+              {/* PAGINAÇÃO */}
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span>Página {currentPage} de {totalPages} (Total: {totalUsuarios} cliente(s))</span>
+                <div className="space-x-2">
                   <button
-                    onClick={handleCancelarEdit}
-                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded disabled:opacity-50"
                   >
-                    ✕
+                    Anterior
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 bg-gray-300 hover:bg-gray-400 rounded disabled:opacity-50"
+                  >
+                    Próxima
                   </button>
                 </div>
-
-                <form onSubmit={handleSubmitEdit}>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={editFormData.email}
-                        onChange={handleEditInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="email@example.com"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                      <input
-                        type="text"
-                        name="nome"
-                        value={editFormData.nome}
-                        onChange={handleEditInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome do cliente"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contratos * (Selecione um ou mais)</label>
-                      <select
-                        multiple
-                        value={editFormData.contratos_ids.map(String)}
-                        onChange={handleEditContratoChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        size={5}
-                      >
-                        {contratos.map(contrato => (
-                          <option key={contrato.id} value={contrato.id}>
-                            {contrato.numero_contrato} - {contrato.nome_cliente}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">Use Ctrl+Click para selecionar múltiplos</p>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha (deixe em branco para não alterar)</label>
-                      <input
-                        type="password"
-                        name="nova_senha"
-                        value={editFormData.nova_senha}
-                        onChange={handleEditInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Digite a nova senha (opcional)"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      type="submit"
-                      disabled={enviando}
-                      className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-medium"
-                    >
-                      {enviando ? 'Salvando...' : 'Atualizar Cliente'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelarEdit}
-                      className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition font-medium"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* PAINEL DE EDIÇÃO (EXPANSÍVEL) */}
+      {showEditPanel && (
+        <div className="fixed bottom-0 right-0 w-96 bg-white shadow-lg rounded-t-lg p-6 border-t border-gray-300 max-h-96 overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold">Editar Cliente</h3>
+            <button
+              onClick={handleCancelarEdit}
+              className="text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmitEdit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={editFormData.email}
+                onChange={handleEditInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+              <input
+                type="text"
+                name="nome"
+                value={editFormData.nome}
+                onChange={handleEditInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contratos</label>
+              <select
+                multiple
+                value={editFormData.contratos_ids.map(String)}
+                onChange={handleEditContratoChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                size={4}
+              >
+                {contratos.map(contrato => (
+                  <option key={contrato.id} value={contrato.id}>
+                    {contrato.numero_contrato}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha (deixe em branco para manter)</label>
+              <input
+                type="password"
+                name="nova_senha"
+                value={editFormData.nova_senha}
+                onChange={handleEditInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={enviando}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md disabled:opacity-50"
+              >
+                {enviando ? 'Salvando...' : 'Salvar'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelarEdit}
+                className="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
