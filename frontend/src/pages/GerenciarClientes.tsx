@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from "../context/AuthContext";
 import { supabase } from '../services/supabase';
 
@@ -62,7 +62,7 @@ export function GerenciarClientes() {
 
   useEffect(() => {
     carregarUsuarios();
-  }, [currentPage]); // Não adicione contratos aqui para evitar loop infinito
+  }, [currentPage, contratos]);
 
   const carregarDados = async () => {
     try {
@@ -85,7 +85,7 @@ export function GerenciarClientes() {
     }
   };
 
-  const carregarUsuarios = async () => {
+  const carregarUsuarios = useCallback(async () => {
     try {
       const offset = (currentPage - 1) * itemsPerPage;
 
@@ -152,7 +152,7 @@ export function GerenciarClientes() {
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
     }
-  };
+  }, [currentPage, itemsPerPage, filtroNome, contratos]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
