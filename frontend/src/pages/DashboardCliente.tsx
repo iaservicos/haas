@@ -72,6 +72,7 @@ export function DashboardCliente() {
 
       const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
       console.log('Contrato IDs:', contratoIds);
+      console.log('Tipo de contratoIds:', typeof contratoIds[0], 'Valores:', contratoIds);
 
       // 2. Buscar dados dos contratos
       const { data: contratosData, error: contratosError } = await supabase
@@ -88,6 +89,7 @@ export function DashboardCliente() {
       setContratos(contratosData || []);
 
       // 3. Buscar TODOS os equipamentos de TODOS os contratos
+      console.log('Buscando equipamentos para contratos:', contratoIds);
       const { data: equipamentosData, error: equipError } = await supabase
         .from('contrato_equipamentos')
         .select('*')
@@ -98,7 +100,11 @@ export function DashboardCliente() {
         throw equipError;
       }
 
-      console.log('Equipamentos encontrados:', equipamentosData);
+      console.log('Equipamentos encontrados:', equipamentosData?.length, 'registros');
+      if (equipamentosData && equipamentosData.length > 0) {
+        console.log('Primeiro equipamento:', equipamentosData[0]);
+        console.log('Contratos dos equipamentos:', [...new Set(equipamentosData.map((e: any) => e.contrato_id))]);
+      }
       setEquipamentos(equipamentosData || []);
 
       // Contar checklists pendentes
@@ -222,41 +228,6 @@ export function DashboardCliente() {
                 <div className="bg-white rounded-lg shadow p-6">
                   <div className="text-3xl font-bold text-orange-600 mb-2">{stats.checklistsPendentes}</div>
                   <p className="text-gray-600">Checklists Pendentes</p>
-                </div>
-              </div>
-
-              {/* CONTRATOS */}
-              <div className="bg-white rounded-lg shadow mb-8">
-                <div className="border-b border-gray-200 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Contratos Vinculados</h2>
-                </div>
-                <div className="p-6">
-                  {contratos.length === 0 ? (
-                    <p className="text-gray-600">Nenhum contrato vinculado</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {contratos.map(contrato => (
-                        <div
-                          key={contrato.id}
-                          className="p-4 rounded-lg border border-gray-200 hover:border-blue-400 transition"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-semibold text-gray-900">{contrato.nome}</p>
-                              <p className="text-sm text-gray-600">Nº {contrato.numero_contrato}</p>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              contrato.status === 'Ativo'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {contrato.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
 
