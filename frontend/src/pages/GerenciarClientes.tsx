@@ -61,8 +61,8 @@ export function GerenciarClientes() {
   }, [filtroNome]);
 
   useEffect(() => {
-  carregarUsuarios();
-  }, [currentPage, contratos]);
+    carregarUsuarios();
+  }, [currentPage]); // Não adicione contratos aqui para evitar loop infinito
 
   const carregarDados = async () => {
     try {
