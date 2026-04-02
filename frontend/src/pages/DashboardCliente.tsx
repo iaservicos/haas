@@ -165,10 +165,10 @@ export function DashboardCliente() {
             <>
               {/* INSTRUÇÕES INICIAIS */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-                <h2 className="text-lg font-semibold text-blue-900 mb-4">📋 Instruções Importantes</h2>
+                <h2 className="text-lg font-semibold text-blue-900 mb-4"> Instruções Importantes</h2>
                 <div className="space-y-3 text-blue-800 text-sm">
                   <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
-                  <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
+                  <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas.</p>
                   <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
                   <p><strong>4. Higienização:</strong> Após vistoria, higienize e embale o equipamento.</p>
                   <p><strong>5. Embalagem:</strong> Use fita transparente e lacre bem a caixa.</p>
