@@ -176,12 +176,6 @@ export function Dashboard() {
         updated_at: new Date().toISOString(),
       };
 
-      if (novoStatus === 'Aprovado') {
-        updateData.contrato_id = parseInt(contratoSelecionado);
-        updateData.modelo = modelo;
-        updateData.sku = sku;
-      }
-
       const { error } = await supabase
         .from('pendingequipment')
         .update(updateData)
