@@ -198,7 +198,7 @@ export function DashboardCliente() {
       console.log('Dados a inserir:', dataInsercao);
 
       const { data: insertData, error: insertError } = await supabase
-        .from('pendingEquipment')
+        .from('pendingequipment')
         .insert([dataInsercao])
         .select();
 

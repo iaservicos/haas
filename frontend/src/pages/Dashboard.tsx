@@ -81,7 +81,7 @@ export function Dashboard() {
   const loadEquipamentosPendentes = async () => {
     try {
       let query = supabase
-        .from('pendingEquipment')
+        .from('pendingequipment')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -154,7 +154,7 @@ export function Dashboard() {
     setAtualizando(true);
     try {
       const { error } = await supabase
-        .from('pendingEquipment')
+        .from('pendingequipment')
         .update({
           status: novoStatus,
           analyst_notes: notas,
