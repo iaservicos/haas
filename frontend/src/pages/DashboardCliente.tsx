@@ -177,12 +177,12 @@ export function DashboardCliente() {
 
       // 3. Serial não existe - enviar para analista revisar
       const { error: insertError } = await supabase
-        .from('equipamentos_pendentes_analise')
+        .from('pendingEquipment')
         .insert({
+          user_id: usuario.id,
           numero_serie: novoSerial,
-          usuario_id: usuario.id,
           status: 'Pendente',
-          data_criacao: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         });
 
       if (insertError && insertError.code !== 'PGRST116') {
