@@ -205,25 +205,11 @@ export function DashboardCliente() {
 
       const contrato = contratosData[0];
       const numeroContrato = contrato.numero_contrato;
-      const clienteId = (contrato as any).cliente_id;
-
-      // 5. Buscar dados do cliente
-      let clienteNome = 'Desconhecido';
-      if (clienteId) {
-        const { data: clienteData, error: clienteError } = await supabase
-          .from('clientes')
-          .select('nome')
-          .eq('id', clienteId)
-          .single();
-
-        if (!clienteError && clienteData) {
-          clienteNome = (clienteData as any).nome;
-        }
-      }
+      const clienteNome = (contrato as any).nome_cliente || 'Desconhecido';
 
       console.log('Informações do cliente:', { clienteNome, numeroContrato, usuarioEmail });
 
-      // 6. Preparar dados para inserção
+      // 5. Preparar dados para inserção
       const dataInsercao = {
         user_id: usuario?.id,
         numero_serie: novoSerial,
@@ -236,7 +222,7 @@ export function DashboardCliente() {
 
       console.log('Dados a inserir:', dataInsercao);
 
-      // 7. Inserir na tabela pendingequipment
+      // 6. Inserir na tabela pendingequipment
       const { data: insertData, error: insertError } = await supabase
         .from('pendingequipment')
         .insert([dataInsercao])
