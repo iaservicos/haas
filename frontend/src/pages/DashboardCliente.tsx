@@ -187,15 +187,8 @@ export function DashboardCliente() {
 
       console.log('Serial não existe em nenhum contrato. Salvando como pendente...');
 
-      // 3. Buscar informações do usuário autenticado
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        console.error('Erro ao buscar usuário:', userError);
-        throw new Error('Não foi possível buscar informações do usuário');
-      }
-
-      const usuarioEmail = user.email || 'desconhecido@email.com';
+      // 3. Usar informações do usuário do contexto
+      const usuarioEmail = usuario?.email || 'desconhecido@email.com';
       console.log('Email do usuário:', usuarioEmail);
 
       // 4. Buscar primeiro contrato com informações do cliente
