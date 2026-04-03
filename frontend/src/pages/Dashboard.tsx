@@ -12,7 +12,7 @@ export function Dashboard() {
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('vistorias'); // 'vistorias' ou 'pendentes'
+  const [activeTab, setActiveTab] = useState('vistorias');
   
   // FILTROS VISTORIAS
   const [filtroTecnico, setFiltroTecnico] = useState('');
@@ -43,8 +43,14 @@ export function Dashboard() {
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
   const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
   const [equipamentoSelecionado, setEquipamentoSelecionado] = useState<any>(null);
+  const [infoEquipamento, setInfoEquipamento] = useState<any>(null);
   const [notas, setNotas] = useState('');
+  const [modelo, setModelo] = useState('');
+  const [sku, setSku] = useState('');
+  const [contratoSelecionado, setContratoSelecionado] = useState('');
+  const [contratos, setContratos] = useState<any[]>([]);
   const [atualizando, setAtualizando] = useState(false);
+  const [modoAprovacao, setModoAprovacao] = useState<'visualizar' | 'aprovar' | 'rejeitar'>('visualizar');
 
   // CARREGAR DADOS INICIAIS
   useEffect(() => {
@@ -63,7 +69,6 @@ export function Dashboard() {
       const response = await vistoriaService.listar({ limit: 1000 });
       setVistorias(response.data);
       
-      // EXTRAIR LISTAS ÚNICAS PARA OS DROPDOWNS
       const clientesUnicos = [...new Set(response.data.map((v: any) => v.cliente))].filter(Boolean).sort();
       const equipamentosUnicos = [...new Set(response.data.map((v: any) => v.equipamento))].filter(Boolean).sort();
       const tecnicosUnicos = [...new Set(response.data.map((v: any) => v.tecnico))].filter(Boolean).sort();
@@ -99,6 +104,141 @@ export function Dashboard() {
       setEquipamentosPendentes(data || []);
     } catch (error) {
       console.error('Erro ao carregar equipamentos pendentes:', error);
+    }
+  };
+
+  const buscarInfoEquipamento = async (equipamento: any) => {
+    try {
+      console.log('Buscando informações para user_id:', equipamento.user_id);
+
+      // Buscar dados do usuário via auth
+      const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(equipamento.user_id);
+
+      if (userError) {
+        console.error('Erro ao buscar usuário:', userError);
+      }
+
+      // Buscar contratos do usuário
+      const { data: usuarioContratos, error: ucError } = await supabase
+        .from('usuario_contratos')
+        .select('contrato_id')
+        .eq('usuario_id', equipamento.user_id);
+
+      if (ucError) {
+        console.error('Erro ao buscar contratos:', ucError);
+        return;
+      }
+
+      if (!usuarioContratos || usuarioContratos.length === 0) {
+        console.log('Nenhum contrato encontrado');
+        return;
+      }
+
+      const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
+
+      // Buscar dados dos contratos e clientes
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('contratos')
+        .select('*, clientes(nome)')
+        .in('id', contratoIds);
+
+      if (contratosError) {
+        console.error('Erro ao buscar contratos:', contratosError);
+        return;
+      }
+
+      console.log('Contratos encontrados:', contratosData);
+
+      setContratos(contratosData || []);
+      setInfoEquipamento({
+        usuarioNome: user?.email || 'Desconhecido',
+        usuarioId: equipamento.user_id,
+      });
+    } catch (error) {
+      console.error('Erro ao buscar informações:', error);
+    }
+  };
+
+  const abrirModalAprovacao = async (equipamento: any) => {
+    setEquipamentoSelecionado(equipamento);
+    setModoAprovacao('aprovar');
+    setNotas('');
+    setModelo('');
+    setSku('');
+    setContratoSelecionado('');
+    await buscarInfoEquipamento(equipamento);
+  };
+
+  const abrirModalRejeicao = (equipamento: any) => {
+    setEquipamentoSelecionado(equipamento);
+    setModoAprovacao('rejeitar');
+    setNotas('');
+  };
+
+  const salvarDecisao = async (novoStatus: 'Aprovado' | 'Rejeitado') => {
+    if (!equipamentoSelecionado) return;
+
+    if (novoStatus === 'Aprovado' && (!contratoSelecionado || !modelo || !sku)) {
+      alert('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    setAtualizando(true);
+    try {
+      const updateData: any = {
+        status: novoStatus,
+        analyst_notes: notas,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (novoStatus === 'Aprovado') {
+        updateData.contrato_id = parseInt(contratoSelecionado);
+        updateData.modelo = modelo;
+        updateData.sku = sku;
+      }
+
+      const { error } = await supabase
+        .from('pendingequipment')
+        .update(updateData)
+        .eq('id', equipamentoSelecionado.id);
+
+      if (error) {
+        console.error('Erro ao atualizar equipamento:', error);
+        throw error;
+      }
+
+      // Se aprovado, criar equipamento na tabela contrato_equipamentos
+      if (novoStatus === 'Aprovado') {
+        const { error: insertError } = await supabase
+          .from('contrato_equipamentos')
+          .insert({
+            numero_serie: equipamentoSelecionado.numero_serie,
+            modelo: modelo,
+            sku: sku,
+            contrato_id: parseInt(contratoSelecionado),
+            tipo: 'Equipamento Pendente', // ou outro tipo apropriado
+            status: 'Pendente',
+          });
+
+        if (insertError) {
+          console.error('Erro ao criar equipamento:', insertError);
+          throw insertError;
+        }
+      }
+
+      // Recarregar lista
+      await loadEquipamentosPendentes();
+      setEquipamentoSelecionado(null);
+      setInfoEquipamento(null);
+      setNotas('');
+      setModelo('');
+      setSku('');
+      setContratoSelecionado('');
+    } catch (error) {
+      console.error('Erro ao salvar decisão:', error);
+      alert('Erro ao processar equipamento. Tente novamente.');
+    } finally {
+      setAtualizando(false);
     }
   };
 
@@ -146,36 +286,6 @@ export function Dashboard() {
     };
     
     setStats(newStats);
-  };
-
-  const salvarDecisao = async (novoStatus: 'Aprovado' | 'Rejeitado') => {
-    if (!equipamentoSelecionado) return;
-
-    setAtualizando(true);
-    try {
-      const { error } = await supabase
-        .from('pendingequipment')
-        .update({
-          status: novoStatus,
-          analyst_notes: notas,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', equipamentoSelecionado.id);
-
-      if (error) {
-        console.error('Erro ao atualizar equipamento:', error);
-        throw error;
-      }
-
-      // Recarregar lista
-      await loadEquipamentosPendentes();
-      setEquipamentoSelecionado(null);
-      setNotas('');
-    } catch (error) {
-      console.error('Erro ao salvar decisão:', error);
-    } finally {
-      setAtualizando(false);
-    }
   };
 
   const formatarData = (data: string) => {
@@ -670,7 +780,7 @@ export function Dashboard() {
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Usuário ID</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Usuário</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Ação</th>
@@ -699,19 +809,13 @@ export function Dashboard() {
                                 {equipamento.status === 'Pendente' ? (
                                   <div className="flex gap-2">
                                     <button
-                                      onClick={() => {
-                                        setEquipamentoSelecionado(equipamento);
-                                        setNotas('');
-                                      }}
+                                      onClick={() => abrirModalAprovacao(equipamento)}
                                       className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition"
                                     >
                                       Aprovar
                                     </button>
                                     <button
-                                      onClick={() => {
-                                        setEquipamentoSelecionado(equipamento);
-                                        setNotas('');
-                                      }}
+                                      onClick={() => abrirModalRejeicao(equipamento)}
                                       className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition"
                                     >
                                       Rejeitar
@@ -740,31 +844,140 @@ export function Dashboard() {
       </div>
 
       {/* MODAL DE DECISÃO */}
-      {equipamentoSelecionado && (
+      {equipamentoSelecionado && modoAprovacao === 'aprovar' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Aprovar Equipamento</h3>
+
+            {/* INFO DO EQUIPAMENTO */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Série</p>
+                  <p className="text-lg font-bold text-gray-900">{equipamentoSelecionado.numero_serie}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Usuário</p>
+                  <p className="text-sm text-gray-900">{infoEquipamento?.usuarioNome || 'Carregando...'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Data</p>
+                  <p className="text-sm text-gray-900">{new Date(equipamentoSelecionado.created_at).toLocaleDateString('pt-BR')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* CAMPOS DE APROVAÇÃO */}
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Contrato *
+                </label>
+                <select
+                  value={contratoSelecionado}
+                  onChange={(e) => setContratoSelecionado(e.target.value)}
+                  disabled={atualizando}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                >
+                  <option value="">Selecione um contrato</option>
+                  {contratos.map(contrato => (
+                    <option key={contrato.id} value={contrato.id}>
+                      {contrato.numero_contrato} - {(contrato.clientes as any)?.nome || 'Sem cliente'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Modelo *
+                </label>
+                <input
+                  type="text"
+                  value={modelo}
+                  onChange={(e) => setModelo(e.target.value)}
+                  disabled={atualizando}
+                  placeholder="Ex: Notebook Dell"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  SKU *
+                </label>
+                <input
+                  type="text"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  disabled={atualizando}
+                  placeholder="Ex: SKU-12345"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Notas da Análise
+                </label>
+                <textarea
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  disabled={atualizando}
+                  placeholder="Digite suas notas aqui..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setEquipamentoSelecionado(null);
+                  setInfoEquipamento(null);
+                  setNotas('');
+                  setModelo('');
+                  setSku('');
+                  setContratoSelecionado('');
+                }}
+                disabled={atualizando}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => salvarDecisao('Aprovado')}
+                disabled={atualizando}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+              >
+                {atualizando ? 'Processando...' : 'Aprovar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE REJEIÇÃO */}
+      {equipamentoSelecionado && modoAprovacao === 'rejeitar' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">
-              {equipamentoSelecionado.status === 'Pendente' ? 'Tomar Decisão' : 'Editar Notas'}
-            </h3>
+            <h3 className="text-xl font-bold mb-4">Rejeitar Equipamento</h3>
 
             <div className="mb-4 p-3 bg-gray-50 rounded">
               <p className="text-sm text-gray-600">
                 <strong>Série:</strong> {equipamentoSelecionado.numero_serie}
               </p>
-              <p className="text-sm text-gray-600">
-                <strong>Status:</strong> {equipamentoSelecionado.status}
-              </p>
             </div>
 
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Notas da Análise
+                Motivo da Rejeição *
               </label>
               <textarea
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
                 disabled={atualizando}
-                placeholder="Digite suas notas aqui..."
+                placeholder="Explique o motivo da rejeição..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-24"
               />
             </div>
@@ -780,24 +993,13 @@ export function Dashboard() {
               >
                 Cancelar
               </button>
-              {equipamentoSelecionado.status === 'Pendente' && (
-                <>
-                  <button
-                    onClick={() => salvarDecisao('Rejeitado')}
-                    disabled={atualizando}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
-                  >
-                    {atualizando ? 'Processando...' : 'Rejeitar'}
-                  </button>
-                  <button
-                    onClick={() => salvarDecisao('Aprovado')}
-                    disabled={atualizando}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                  >
-                    {atualizando ? 'Processando...' : 'Aprovar'}
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => salvarDecisao('Rejeitado')}
+                disabled={atualizando || !notas.trim()}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {atualizando ? 'Processando...' : 'Rejeitar'}
+              </button>
             </div>
           </div>
         </div>
