@@ -135,6 +135,55 @@ export function DashboardCliente() {
     }
   };
 
+  const buscarInfosDoCliente = async () => {
+    try {
+      // Buscar informações do usuário (email)
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Erro ao buscar usuário:', userError);
+        return null;
+      }
+
+      // Buscar contratos do usuário com informações do cliente
+      const { data: usuarioContratos, error: ucError } = await supabase
+        .from('usuario_contratos')
+        .select('contrato_id')
+        .eq('usuario_id', usuario.id);
+
+      if (ucError || !usuarioContratos || usuarioContratos.length === 0) {
+        console.error('Erro ao buscar contratos:', ucError);
+        return null;
+      }
+
+      const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
+
+      // Buscar primeiro contrato com informações do cliente
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('contratos')
+        .select('*, clientes(nome)')
+        .in('id', contratoIds)
+        .limit(1);
+
+      if (contratosError || !contratosData || contratosData.length === 0) {
+        console.error('Erro ao buscar contrato:', contratosError);
+        return null;
+      }
+
+      const contrato = contratosData[0];
+      const clienteNome = (contrato.clientes as any)?.nome || 'Desconhecido';
+
+      return {
+        usuarioEmail: user.email || 'Desconhecido',
+        clienteNome: clienteNome,
+        numeroContrato: contrato.numero_contrato,
+      };
+    } catch (error) {
+      console.error('Erro ao buscar informações do cliente:', error);
+      return null;
+    }
+  };
+
   const verificarEquipamento = async () => {
     if (!novoSerial.trim()) {
       setMensagemEquipamento('Por favor, informe um número de série');
@@ -185,13 +234,25 @@ export function DashboardCliente() {
         return;
       }
 
-      console.log('Serial não existe em nenhum contrato. Salvando como pendente...');
+      console.log('Serial não existe em nenhum contrato. Buscando informações do cliente...');
 
-      // 3. Serial não existe - enviar para analista revisar
+      // 3. Buscar informações do cliente
+      const infosCliente = await buscarInfosDoCliente();
+
+      if (!infosCliente) {
+        throw new Error('Não foi possível buscar informações do cliente');
+      }
+
+      console.log('Informações do cliente:', infosCliente);
+
+      // 4. Serial não existe - enviar para analista revisar
       const dataInsercao = {
         user_id: usuario?.id,
         numero_serie: novoSerial,
         status: 'Pendente',
+        usuario_email: infosCliente.usuarioEmail,
+        cliente_nome: infosCliente.clienteNome,
+        numero_contrato: infosCliente.numeroContrato,
         created_at: new Date().toISOString(),
       };
 
@@ -278,7 +339,6 @@ export function DashboardCliente() {
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')}</p>
-            <p className="text-xs text-gray-500">ID: {usuario?.id?.substring(0, 8)}...</p>
           </div>
         </div>
 

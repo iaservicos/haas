@@ -43,7 +43,6 @@ export function Dashboard() {
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
   const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
   const [equipamentoSelecionado, setEquipamentoSelecionado] = useState<any>(null);
-  const [infoEquipamento, setInfoEquipamento] = useState<any>(null);
   const [notas, setNotas] = useState('');
   const [modelo, setModelo] = useState('');
   const [sku, setSku] = useState('');
@@ -107,17 +106,8 @@ export function Dashboard() {
     }
   };
 
-  const buscarInfoEquipamento = async (equipamento: any) => {
+  const buscarContratosDoUsuario = async (equipamento: any) => {
     try {
-      console.log('Buscando informações para user_id:', equipamento.user_id);
-
-      // Buscar dados do usuário via auth
-      const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(equipamento.user_id);
-
-      if (userError) {
-        console.error('Erro ao buscar usuário:', userError);
-      }
-
       // Buscar contratos do usuário
       const { data: usuarioContratos, error: ucError } = await supabase
         .from('usuario_contratos')
@@ -148,14 +138,9 @@ export function Dashboard() {
       }
 
       console.log('Contratos encontrados:', contratosData);
-
       setContratos(contratosData || []);
-      setInfoEquipamento({
-        usuarioNome: user?.email || 'Desconhecido',
-        usuarioId: equipamento.user_id,
-      });
     } catch (error) {
-      console.error('Erro ao buscar informações:', error);
+      console.error('Erro ao buscar contratos:', error);
     }
   };
 
@@ -166,7 +151,7 @@ export function Dashboard() {
     setModelo('');
     setSku('');
     setContratoSelecionado('');
-    await buscarInfoEquipamento(equipamento);
+    await buscarContratosDoUsuario(equipamento);
   };
 
   const abrirModalRejeicao = (equipamento: any) => {
@@ -216,7 +201,7 @@ export function Dashboard() {
             modelo: modelo,
             sku: sku,
             contrato_id: parseInt(contratoSelecionado),
-            tipo: 'Equipamento Pendente', // ou outro tipo apropriado
+            tipo: 'Equipamento Pendente',
             status: 'Pendente',
           });
 
@@ -229,7 +214,6 @@ export function Dashboard() {
       // Recarregar lista
       await loadEquipamentosPendentes();
       setEquipamentoSelecionado(null);
-      setInfoEquipamento(null);
       setNotas('');
       setModelo('');
       setSku('');
@@ -781,6 +765,8 @@ export function Dashboard() {
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Usuário</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Ação</th>
@@ -790,7 +776,9 @@ export function Dashboard() {
                           {equipamentosPendentes.map(equipamento => (
                             <tr key={equipamento.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.user_id.substring(0, 8)}...</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.usuario_email || 'N/A'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.cliente_nome || 'N/A'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.numero_contrato || 'N/A'}</td>
                               <td className="px-6 py-4 text-sm">
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                   equipamento.status === 'Pendente'
@@ -858,7 +846,11 @@ export function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 uppercase font-semibold">Usuário</p>
-                  <p className="text-sm text-gray-900">{infoEquipamento?.usuarioNome || 'Carregando...'}</p>
+                  <p className="text-sm text-gray-900">{equipamentoSelecionado.usuario_email || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Cliente</p>
+                  <p className="text-sm text-gray-900">{equipamentoSelecionado.cliente_nome || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 uppercase font-semibold">Data</p>
@@ -934,7 +926,6 @@ export function Dashboard() {
               <button
                 onClick={() => {
                   setEquipamentoSelecionado(null);
-                  setInfoEquipamento(null);
                   setNotas('');
                   setModelo('');
                   setSku('');
@@ -966,6 +957,12 @@ export function Dashboard() {
             <div className="mb-4 p-3 bg-gray-50 rounded">
               <p className="text-sm text-gray-600">
                 <strong>Série:</strong> {equipamentoSelecionado.numero_serie}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Usuário:</strong> {equipamentoSelecionado.usuario_email || 'N/A'}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Cliente:</strong> {equipamentoSelecionado.cliente_nome || 'N/A'}
               </p>
             </div>
 
