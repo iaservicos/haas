@@ -191,10 +191,10 @@ export function DashboardCliente() {
       const usuarioEmail = usuario?.email || 'desconhecido@email.com';
       console.log('Email do usuário:', usuarioEmail);
 
-      // 4. Buscar primeiro contrato com informações do cliente
+      // 4. Buscar primeiro contrato
       const { data: contratosData, error: contratosError } = await supabase
         .from('contratos')
-        .select('*, clientes(nome)')
+        .select('*')
         .in('id', contratos.map(c => c.id))
         .limit(1);
 
@@ -204,12 +204,26 @@ export function DashboardCliente() {
       }
 
       const contrato = contratosData[0];
-      const clienteNome = (contrato.clientes as any)?.nome || 'Desconhecido';
       const numeroContrato = contrato.numero_contrato;
+      const clienteId = (contrato as any).cliente_id;
+
+      // 5. Buscar dados do cliente
+      let clienteNome = 'Desconhecido';
+      if (clienteId) {
+        const { data: clienteData, error: clienteError } = await supabase
+          .from('clientes')
+          .select('nome')
+          .eq('id', clienteId)
+          .single();
+
+        if (!clienteError && clienteData) {
+          clienteNome = (clienteData as any).nome;
+        }
+      }
 
       console.log('Informações do cliente:', { clienteNome, numeroContrato, usuarioEmail });
 
-      // 5. Preparar dados para inserção
+      // 6. Preparar dados para inserção
       const dataInsercao = {
         user_id: usuario?.id,
         numero_serie: novoSerial,
@@ -222,7 +236,7 @@ export function DashboardCliente() {
 
       console.log('Dados a inserir:', dataInsercao);
 
-      // 6. Inserir na tabela pendingequipment
+      // 7. Inserir na tabela pendingequipment
       const { data: insertData, error: insertError } = await supabase
         .from('pendingequipment')
         .insert([dataInsercao])
