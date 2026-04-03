@@ -144,12 +144,17 @@ export function DashboardCliente() {
 
     setVerificando(true);
     try {
+      console.log('=== INICIANDO VERIFICAÇÃO ===');
+      console.log('Usuário ID:', usuario?.id);
+      console.log('Serial:', novoSerial);
+
       // 1. Verificar se o serial já existe nos equipamentos do cliente
       const jaExiste = equipamentos.some(
         eq => eq.numero_serie.toLowerCase() === novoSerial.toLowerCase()
       );
 
       if (jaExiste) {
+        console.log('Serial já existe nos equipamentos do cliente');
         setMensagemEquipamento('Este equipamento já está listado para você!');
         setTipoMensagem('aviso');
         setVerificando(false);
@@ -157,14 +162,19 @@ export function DashboardCliente() {
       }
 
       // 2. Buscar se o serial existe em outro contrato
-      const { data: equipamentoExistente } = await supabase
+      console.log('Buscando serial em outro contrato...');
+      const { data: equipamentoExistente, error: searchError } = await supabase
         .from('contrato_equipamentos')
         .select('*, contratos(numero_contrato)')
         .eq('numero_serie', novoSerial)
         .single();
 
+      if (searchError && searchError.code !== 'PGRST116') {
+        console.error('Erro ao buscar serial:', searchError);
+      }
+
       if (equipamentoExistente) {
-        // Serial existe em outro contrato
+        console.log('Serial encontrado em outro contrato:', equipamentoExistente);
         const numeroContrato = (equipamentoExistente.contratos as any)?.numero_contrato || 'desconhecido';
         setMensagemEquipamento(
           `Este número de série (${novoSerial}) pertence ao contrato ${numeroContrato}. ` +
@@ -175,19 +185,31 @@ export function DashboardCliente() {
         return;
       }
 
-      // 3. Serial não existe - enviar para analista revisar
-      const { error: insertError } = await supabase
-        .from('pendingEquipment')
-        .insert({
-          user_id: usuario.id,
-          numero_serie: novoSerial,
-          status: 'Pendente',
-          created_at: new Date().toISOString(),
-        });
+      console.log('Serial não existe em nenhum contrato. Salvando como pendente...');
 
-      if (insertError && insertError.code !== 'PGRST116') {
+      // 3. Serial não existe - enviar para analista revisar
+      const dataInsercao = {
+        user_id: usuario?.id,
+        numero_serie: novoSerial,
+        status: 'Pendente',
+        created_at: new Date().toISOString(),
+      };
+
+      console.log('Dados a inserir:', dataInsercao);
+
+      const { data: insertData, error: insertError } = await supabase
+        .from('pendingEquipment')
+        .insert([dataInsercao])
+        .select();
+
+      console.log('Resposta da inserção:', { data: insertData, error: insertError });
+
+      if (insertError) {
         console.error('Erro ao salvar equipamento pendente:', insertError);
+        throw insertError;
       }
+
+      console.log('Equipamento salvo com sucesso!');
 
       setMensagemEquipamento(
         `Equipamento ${novoSerial} será enviado para análise da equipe. Você receberá uma confirmação em breve.`
@@ -201,7 +223,7 @@ export function DashboardCliente() {
       }, 2000);
     } catch (error) {
       console.error('Erro ao verificar equipamento:', error);
-      setMensagemEquipamento('Erro ao verificar equipamento. Tente novamente.');
+      setMensagemEquipamento('Erro ao verificar equipamento. Tente novamente. Verifique o console para mais detalhes.');
       setTipoMensagem('erro');
     } finally {
       setVerificando(false);
@@ -256,6 +278,7 @@ export function DashboardCliente() {
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')}</p>
+            <p className="text-xs text-gray-500">ID: {usuario?.id?.substring(0, 8)}...</p>
           </div>
         </div>
 
