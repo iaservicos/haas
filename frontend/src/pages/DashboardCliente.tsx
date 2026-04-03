@@ -135,55 +135,6 @@ export function DashboardCliente() {
     }
   };
 
-  const buscarInfosDoCliente = async () => {
-    try {
-      // Buscar informações do usuário (email)
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        console.error('Erro ao buscar usuário:', userError);
-        return null;
-      }
-
-      // Buscar contratos do usuário com informações do cliente
-      const { data: usuarioContratos, error: ucError } = await supabase
-        .from('usuario_contratos')
-        .select('contrato_id')
-        .eq('usuario_id', usuario.id);
-
-      if (ucError || !usuarioContratos || usuarioContratos.length === 0) {
-        console.error('Erro ao buscar contratos:', ucError);
-        return null;
-      }
-
-      const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
-
-      // Buscar primeiro contrato com informações do cliente
-      const { data: contratosData, error: contratosError } = await supabase
-        .from('contratos')
-        .select('*, clientes(nome)')
-        .in('id', contratoIds)
-        .limit(1);
-
-      if (contratosError || !contratosData || contratosData.length === 0) {
-        console.error('Erro ao buscar contrato:', contratosError);
-        return null;
-      }
-
-      const contrato = contratosData[0];
-      const clienteNome = (contrato.clientes as any)?.nome || 'Desconhecido';
-
-      return {
-        usuarioEmail: user.email || 'Desconhecido',
-        clienteNome: clienteNome,
-        numeroContrato: contrato.numero_contrato,
-      };
-    } catch (error) {
-      console.error('Erro ao buscar informações do cliente:', error);
-      return null;
-    }
-  };
-
   const verificarEquipamento = async () => {
     if (!novoSerial.trim()) {
       setMensagemEquipamento('Por favor, informe um número de série');
@@ -234,30 +185,51 @@ export function DashboardCliente() {
         return;
       }
 
-      console.log('Serial não existe em nenhum contrato. Buscando informações do cliente...');
+      console.log('Serial não existe em nenhum contrato. Salvando como pendente...');
 
-      // 3. Buscar informações do cliente
-      const infosCliente = await buscarInfosDoCliente();
-
-      if (!infosCliente) {
-        throw new Error('Não foi possível buscar informações do cliente');
+      // 3. Buscar informações do usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Erro ao buscar usuário:', userError);
+        throw new Error('Não foi possível buscar informações do usuário');
       }
 
-      console.log('Informações do cliente:', infosCliente);
+      const usuarioEmail = user.email || 'desconhecido@email.com';
+      console.log('Email do usuário:', usuarioEmail);
 
-      // 4. Serial não existe - enviar para analista revisar
+      // 4. Buscar primeiro contrato com informações do cliente
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('contratos')
+        .select('*, clientes(nome)')
+        .in('id', contratos.map(c => c.id))
+        .limit(1);
+
+      if (contratosError || !contratosData || contratosData.length === 0) {
+        console.error('Erro ao buscar contrato:', contratosError);
+        throw new Error('Não foi possível buscar informações do contrato');
+      }
+
+      const contrato = contratosData[0];
+      const clienteNome = (contrato.clientes as any)?.nome || 'Desconhecido';
+      const numeroContrato = contrato.numero_contrato;
+
+      console.log('Informações do cliente:', { clienteNome, numeroContrato, usuarioEmail });
+
+      // 5. Preparar dados para inserção
       const dataInsercao = {
         user_id: usuario?.id,
         numero_serie: novoSerial,
         status: 'Pendente',
-        usuario_email: infosCliente.usuarioEmail,
-        cliente_nome: infosCliente.clienteNome,
-        numero_contrato: infosCliente.numeroContrato,
+        usuario_email: usuarioEmail,
+        cliente_nome: clienteNome,
+        numero_contrato: numeroContrato,
         created_at: new Date().toISOString(),
       };
 
       console.log('Dados a inserir:', dataInsercao);
 
+      // 6. Inserir na tabela pendingequipment
       const { data: insertData, error: insertError } = await supabase
         .from('pendingequipment')
         .insert([dataInsercao])
@@ -270,10 +242,10 @@ export function DashboardCliente() {
         throw insertError;
       }
 
-      console.log('Equipamento salvo com sucesso!');
+      console.log('✅ Equipamento salvo com sucesso!');
 
       setMensagemEquipamento(
-        `Equipamento ${novoSerial} será enviado para análise da equipe. Você receberá uma confirmação em breve.`
+        `✅ Equipamento ${novoSerial} será enviado para análise da equipe. Você receberá uma confirmação em breve.`
       );
       setTipoMensagem('sucesso');
 
