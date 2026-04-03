@@ -126,10 +126,10 @@ export function Dashboard() {
 
       const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
 
-      // Buscar dados dos contratos e clientes
+      // Buscar dados dos contratos
       const { data: contratosData, error: contratosError } = await supabase
         .from('contratos')
-        .select('*, clientes(nome)')
+        .select('id, numero_contrato, nome_cliente')
         .in('id', contratoIds);
 
       if (contratosError) {
@@ -874,7 +874,7 @@ export function Dashboard() {
                   <option value="">Selecione um contrato</option>
                   {contratos.map(contrato => (
                     <option key={contrato.id} value={contrato.id}>
-                      {contrato.numero_contrato} - {(contrato.clientes as any)?.nome || 'Sem cliente'}
+                      {contrato.numero_contrato} - {(contrato as any).nome_cliente || 'Sem cliente'}
                     </option>
                   ))}
                 </select>
