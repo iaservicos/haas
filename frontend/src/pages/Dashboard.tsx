@@ -5,6 +5,7 @@ import { vistoriaService } from '../services/vistoria.service';
 import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import * as XLSX from 'xlsx';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -50,6 +51,13 @@ export function Dashboard() {
   const [contratos, setContratos] = useState<any[]>([]);
   const [atualizando, setAtualizando] = useState(false);
   const [modoAprovacao, setModoAprovacao] = useState<'visualizar' | 'aprovar' | 'rejeitar'>('visualizar');
+
+  // IMPORTAÇÃO DE EQUIPAMENTOS
+  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
+  const [importandoArquivo, setImportandoArquivo] = useState(false);
+  const [mensagemImportacao, setMensagemImportacao] = useState('');
+  const [tipoMensagemImportacao, setTipoMensagemImportacao] = useState<'sucesso' | 'erro' | 'aviso'>('sucesso');
+  const [equipamentosImportacao, setEquipamentosImportacao] = useState<any[]>([]);
 
   // CARREGAR DADOS INICIAIS
   useEffect(() => {
@@ -336,6 +344,96 @@ export function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const processarArquivoExcel = async (file: File) => {
+    try {
+      setImportandoArquivo(true);
+      setMensagemImportacao('');
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          console.log('Dados do Excel:', jsonData);
+
+          // Validar estrutura
+          const equipamentosValidos = jsonData.filter((row: any) => {
+            return row.numero_serie && row.nota_fiscal && row.destino;
+          });
+
+          if (equipamentosValidos.length === 0) {
+            setMensagemImportacao('Nenhum equipamento válido encontrado. Verifique as colunas: numero_serie, nota_fiscal, destino');
+            setTipoMensagemImportacao('erro');
+            setImportandoArquivo(false);
+            return;
+          }
+
+          console.log('Equipamentos válidos:', equipamentosValidos.length);
+          setEquipamentosImportacao(equipamentosValidos);
+          setMensagemImportacao(`${equipamentosValidos.length} equipamentos encontrados. Clique em "Confirmar Importação" para salvar.`);
+          setTipoMensagemImportacao('sucesso');
+        } catch (error) {
+          console.error('Erro ao processar Excel:', error);
+          setMensagemImportacao('Erro ao processar arquivo. Verifique o formato.');
+          setTipoMensagemImportacao('erro');
+        } finally {
+          setImportandoArquivo(false);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Erro ao ler arquivo:', error);
+      setMensagemImportacao('Erro ao ler arquivo.');
+      setTipoMensagemImportacao('erro');
+      setImportandoArquivo(false);
+    }
+  };
+
+  const confirmarImportacao = async () => {
+    if (equipamentosImportacao.length === 0) {
+      alert('Nenhum equipamento para importar');
+      return;
+    }
+
+    setImportandoArquivo(true);
+    try {
+      // Atualizar cada equipamento na tabela contrato_equipamentos
+      for (const equipamento of equipamentosImportacao) {
+        const { error } = await supabase
+          .from('contrato_equipamentos')
+          .update({
+            nota_fiscal: equipamento.nota_fiscal,
+            destino: equipamento.destino,
+          })
+          .eq('numero_serie', equipamento.numero_serie);
+
+        if (error) {
+          console.error(`Erro ao atualizar ${equipamento.numero_serie}:`, error);
+        }
+      }
+
+      setMensagemImportacao(`✅ ${equipamentosImportacao.length} equipamentos importados com sucesso!`);
+      setTipoMensagemImportacao('sucesso');
+      setEquipamentosImportacao([]);
+      setArquivoSelecionado(null);
+
+      // Limpar mensagem após 3 segundos
+      setTimeout(() => {
+        setMensagemImportacao('');
+      }, 3000);
+    } catch (error) {
+      console.error('Erro ao importar:', error);
+      setMensagemImportacao('Erro ao importar equipamentos.');
+      setTipoMensagemImportacao('erro');
+    } finally {
+      setImportandoArquivo(false);
+    }
   };
 
   const handleGoToPhotos = () => {
