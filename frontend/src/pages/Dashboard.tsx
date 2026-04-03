@@ -196,7 +196,6 @@ export function Dashboard() {
             sku: sku,
             contrato_id: parseInt(contratoSelecionado),
             tipo: 'Equipamento Pendente',
-            status: 'Pendente',
           });
 
         if (insertError) {
