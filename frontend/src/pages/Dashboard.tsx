@@ -1,349 +1,155 @@
-import React, { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { vistoriaService } from '../services/vistoria.service';
 import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
-import * as XLSX from 'xlsx';
+
+declare global {
+  interface Window {
+    XLSX: any;
+  }
+}
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
+  const [stats, setStats] = useState({ total: 0, comAvaria: 0, semAvaria: 0 });
+  const [statsPendentes, setStatsPendentes] = useState({ pendentes: 0, aprovados: 0, rejeitados: 0 });
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState('vistorias');
   
-  // FILTROS VISTORIAS
+  // Filtros
   const [filtroTecnico, setFiltroTecnico] = useState('');
   const [filtroCliente, setFiltroCliente] = useState('');
-  const [filtroEquipamento, setFiltroEquipamento] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('');
-  const [filtroMouse, setFiltroMouse] = useState('');
-  const [filtroTeclado, setFiltroTeclado] = useState('');
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  
-  // LISTAS PARA OS DROPDOWNS
-  const [clientes, setClientes] = useState<string[]>([]);
-  const [equipamentos, setEquipamentos] = useState<string[]>([]);
+  const [filtroStatus, setFiltroStatus] = useState('');
   const [tecnicos, setTecnicos] = useState<string[]>([]);
-  
-  // ESTATÍSTICAS VISTORIAS
-  const [stats, setStats] = useState({
-    total: 0,
-    comAvaria: 0,
-    semAvaria: 0,
-    mouseOk: 0,
-    mouseAusente: 0,
-    tecladoOk: 0,
-    tecladoAusente: 0,
-  });
+  const [clientes, setClientes] = useState<string[]>([]);
 
-  // EQUIPAMENTOS PENDENTES
+  // Estados de equipamentos pendentes
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
-  const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
   const [equipamentoSelecionado, setEquipamentoSelecionado] = useState<any>(null);
-  const [notas, setNotas] = useState('');
+  const [modoAprovacao, setModoAprovacao] = useState<'aprovar' | 'rejeitar' | null>(null);
+  const [contratos, setContratos] = useState<any[]>([]);
+  const [contratoSelecionado, setContratoSelecionado] = useState('');
   const [modelo, setModelo] = useState('');
   const [sku, setSku] = useState('');
-  const [contratoSelecionado, setContratoSelecionado] = useState('');
-  const [contratos, setContratos] = useState<any[]>([]);
+  const [notas, setNotas] = useState('');
   const [atualizando, setAtualizando] = useState(false);
-  const [modoAprovacao, setModoAprovacao] = useState<'visualizar' | 'aprovar' | 'rejeitar'>('visualizar');
+  const [filtroStatusPendentes, setFiltroStatusPendentes] = useState('Pendente');
 
-  // IMPORTAÇÃO DE EQUIPAMENTOS
+  // Estados de importação
+  const [equipamentosImportacao, setEquipamentosImportacao] = useState<any[]>([]);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
   const [importandoArquivo, setImportandoArquivo] = useState(false);
   const [mensagemImportacao, setMensagemImportacao] = useState('');
   const [tipoMensagemImportacao, setTipoMensagemImportacao] = useState<'sucesso' | 'erro' | 'aviso'>('sucesso');
-  const [equipamentosImportacao, setEquipamentosImportacao] = useState<any[]>([]);
 
-  // CARREGAR DADOS INICIAIS
   useEffect(() => {
-    loadVistorias();
-    loadEquipamentosPendentes();
+    carregarDados();
   }, []);
 
-  // ATUALIZAR QUANDO FILTROS MUDAM
-  useEffect(() => {
-    aplicarFiltros();
-  }, [filtroTecnico, filtroCliente, filtroEquipamento, filtroEstado, filtroMouse, filtroTeclado, vistorias]);
-
-  const loadVistorias = async () => {
+  const carregarDados = async () => {
     try {
       setLoading(true);
-      const response = await vistoriaService.listar({ limit: 1000 });
-      setVistorias(response.data);
-      
-      const clientesUnicos = [...new Set(response.data.map((v: any) => v.cliente))].filter(Boolean).sort();
-      const equipamentosUnicos = [...new Set(response.data.map((v: any) => v.equipamento))].filter(Boolean).sort();
-      const tecnicosUnicos = [...new Set(response.data.map((v: any) => v.tecnico))].filter(Boolean).sort();
-      
-      setClientes(clientesUnicos as string[]);
-      setEquipamentos(equipamentosUnicos as string[]);
-      setTecnicos(tecnicosUnicos as string[]);
+      await carregarVistorias();
+      await carregarEquipamentosPendentes();
+      await carregarContratos();
     } catch (error) {
-      console.error('Erro ao carregar vistorias:', error);
+      console.error('Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadEquipamentosPendentes = async () => {
+  const carregarVistorias = async () => {
     try {
-      let query = supabase
+      const data = await vistoriaService.getVistorias();
+      setVistorias(data);
+
+      // Calcular estatísticas
+      const total = data.length;
+      const comAvaria = data.filter(v => v.status === 'Com Avaria').length;
+      const semAvaria = data.filter(v => v.status === 'Sem Avaria').length;
+      setStats({ total, comAvaria, semAvaria });
+
+      // Extrair técnicos e clientes únicos
+      const tecnicos = [...new Set(data.map(v => v.tecnico))].filter(Boolean) as string[];
+      const clientes = [...new Set(data.map(v => v.cliente))].filter(Boolean) as string[];
+      setTecnicos(tecnicos);
+      setClientes(clientes);
+    } catch (error) {
+      console.error('Erro ao carregar vistorias:', error);
+    }
+  };
+
+  const carregarEquipamentosPendentes = async () => {
+    try {
+      const { data, error } = await supabase
         .from('pendingequipment')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (filtroStatusPendente !== 'Todos') {
-        query = query.eq('status', filtroStatusPendente);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Erro ao buscar equipamentos pendentes:', error);
-        return;
-      }
+      if (error) throw error;
 
       setEquipamentosPendentes(data || []);
+
+      // Calcular estatísticas
+      const pendentes = (data || []).filter(e => e.status === 'Pendente').length;
+      const aprovados = (data || []).filter(e => e.status === 'Aprovado').length;
+      const rejeitados = (data || []).filter(e => e.status === 'Rejeitado').length;
+      setStatsPendentes({ pendentes, aprovados, rejeitados });
     } catch (error) {
       console.error('Erro ao carregar equipamentos pendentes:', error);
     }
   };
 
-  const buscarContratosDoUsuario = async (equipamento: any) => {
+  const carregarContratos = async () => {
     try {
-      // Buscar contratos do usuário
-      const { data: usuarioContratos, error: ucError } = await supabase
-        .from('usuario_contratos')
-        .select('contrato_id')
-        .eq('usuario_id', equipamento.user_id);
-
-      if (ucError) {
-        console.error('Erro ao buscar contratos:', ucError);
-        return;
-      }
-
-      if (!usuarioContratos || usuarioContratos.length === 0) {
-        console.log('Nenhum contrato encontrado');
-        return;
-      }
-
-      const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
-
-      // Buscar dados dos contratos
-      const { data: contratosData, error: contratosError } = await supabase
+      const { data, error } = await supabase
         .from('contratos')
         .select('id, numero_contrato, nome_cliente')
-        .in('id', contratoIds);
+        .order('numero_contrato', { ascending: true });
 
-      if (contratosError) {
-        console.error('Erro ao buscar contratos:', contratosError);
+      if (error) throw error;
+      setContratos(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar contratos:', error);
+    }
+  };
+
+  const loadXLSXLibrary = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (window.XLSX) {
+        resolve();
         return;
       }
 
-      console.log('Contratos encontrados:', contratosData);
-      setContratos(contratosData || []);
-    } catch (error) {
-      console.error('Erro ao buscar contratos:', error);
-    }
-  };
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
 
-  const abrirModalAprovacao = async (equipamento: any) => {
-    setEquipamentoSelecionado(equipamento);
-    setModoAprovacao('aprovar');
-    setNotas('');
-    setModelo('');
-    setSku('');
-    setContratoSelecionado('');
-    await buscarContratosDoUsuario(equipamento);
-  };
-
-  const abrirModalRejeicao = (equipamento: any) => {
-    setEquipamentoSelecionado(equipamento);
-    setModoAprovacao('rejeitar');
-    setNotas('');
-  };
-
-  const salvarDecisao = async (novoStatus: 'Aprovado' | 'Rejeitado') => {
-    if (!equipamentoSelecionado) return;
-
-    if (novoStatus === 'Aprovado' && (!contratoSelecionado || !modelo || !sku)) {
-      alert('Por favor, preencha todos os campos obrigatórios');
-      return;
-    }
-
-    setAtualizando(true);
-    try {
-      const updateData: any = {
-        status: novoStatus,
-        analyst_notes: notas,
-        updated_at: new Date().toISOString(),
+      script.onload = () => {
+        setTimeout(() => {
+          if (window.XLSX) {
+            resolve();
+          } else {
+            reject(new Error('XLSX não carregou'));
+          }
+        }, 100);
       };
 
-      const { error } = await supabase
-        .from('pendingequipment')
-        .update(updateData)
-        .eq('id', equipamentoSelecionado.id);
+      script.onerror = () => {
+        reject(new Error('Erro ao carregar XLSX do CDN'));
+      };
 
-      if (error) {
-        console.error('Erro ao atualizar equipamento:', error);
-        throw error;
-      }
-
-      // Se aprovado, criar equipamento na tabela contrato_equipamentos
-      if (novoStatus === 'Aprovado') {
-        const { error: insertError } = await supabase
-          .from('contrato_equipamentos')
-          .insert({
-            numero_serie: equipamentoSelecionado.numero_serie,
-            modelo: modelo,
-            sku: sku,
-            contrato_id: parseInt(contratoSelecionado),
-          });
-
-        if (insertError) {
-          console.error('Erro ao criar equipamento:', insertError);
-          throw insertError;
-        }
-      }
-
-      // Recarregar lista
-      await loadEquipamentosPendentes();
-      setEquipamentoSelecionado(null);
-      setNotas('');
-      setModelo('');
-      setSku('');
-      setContratoSelecionado('');
-    } catch (error) {
-      console.error('Erro ao salvar decisão:', error);
-      alert('Erro ao processar equipamento. Tente novamente.');
-    } finally {
-      setAtualizando(false);
-    }
-  };
-
-  const aplicarFiltros = () => {
-    let filtered = [...vistorias];
-
-    if (filtroTecnico) {
-      filtered = filtered.filter((v: any) =>
-        v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())
-      );
-    }
-
-    if (filtroCliente) {
-      filtered = filtered.filter((v: any) =>
-        v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())
-      );
-    }
-
-    if (filtroEquipamento) {
-      filtered = filtered.filter((v: any) =>
-        v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())
-      );
-    }
-
-    if (filtroEstado) {
-      filtered = filtered.filter((v: any) => v.estado === filtroEstado);
-    }
-
-    if (filtroMouse) {
-      filtered = filtered.filter((v: any) => v.mouse_status === filtroMouse);
-    }
-
-    if (filtroTeclado) {
-      filtered = filtered.filter((v: any) => v.teclado_status === filtroTeclado);
-    }
-
-    const newStats = {
-      total: filtered.length,
-      comAvaria: filtered.filter((v: any) => v.estado === 'Equip. com AVARIA').length,
-      semAvaria: filtered.filter((v: any) => v.estado === 'Equipamento OK').length,
-      mouseOk: filtered.filter((v: any) => v.mouse_status === 'Mouse, OK').length,
-      mouseAusente: filtered.filter((v: any) => v.mouse_status === 'Mouse, AUSENTE').length,
-      tecladoOk: filtered.filter((v: any) => v.teclado_status === 'Teclado, OK').length,
-      tecladoAusente: filtered.filter((v: any) => v.teclado_status === 'Teclado, AUSENTE').length,
-    };
-    
-    setStats(newStats);
-  };
-
-  const formatarData = (data: string) => {
-    const dataParte = data.split('T')[0];
-    const [ano, mes, dia] = dataParte.split('-');
-    return `${dia}/${mes}/${ano}`;
-  };
-
-  const getCorEstado = (estado: string) => {
-    const isAvaria = estado === 'Equip. com AVARIA';
-    return isAvaria ? 'text-black font-bold' : 'text-black';
-  };
-
-  const getCorComponente = (status: string) => {
-    const isOk = status?.includes('OK');
-    return isOk ? 'text-black' : 'text-black font-bold';
-  };
-
-  const limparFiltros = () => {
-    setFiltroTecnico('');
-    setFiltroCliente('');
-    setFiltroEquipamento('');
-    setFiltroEstado('');
-    setFiltroMouse('');
-    setFiltroTeclado('');
-  };
-
-  const exportarRelatorio = () => {
-    const vistoriasExportacao = vistorias.filter((v: any) => {
-      if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
-      if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
-      if (filtroEquipamento && !v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())) return false;
-      if (filtroEstado && v.estado !== filtroEstado) return false;
-      if (filtroMouse && v.mouse_status !== filtroMouse) return false;
-      if (filtroTeclado && v.teclado_status !== filtroTeclado) return false;
-      return true;
+      document.head.appendChild(script);
     });
-
-    if (vistoriasExportacao.length === 0) {
-      alert('Nenhuma vistoria para exportar com os filtros aplicados');
-      return;
-    }
-
-    const headers = ['Data', 'Série', 'Equipamento', 'Cliente', 'Técnico', 'Estado', 'Laudo', 'Avaria', 'Teclado', 'Mouse'];
-    
-    const rows = vistoriasExportacao.map((v: any) => [
-      formatarData(v.data_vistoria),
-      v.numero_serie,
-      v.equipamento,
-      v.cliente,
-      v.tecnico,
-      v.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK',
-      v.laudo || '—',
-      v.avaria || '—',
-      v.teclado_status || '—',
-      v.mouse_status || '—',
-    ]);
-
-    let csvContent = headers.join(',') + '\n';
-    rows.forEach((row: any[]) => {
-      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `relatorio_vistorias_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const processarArquivoExcel = async (file: File) => {
@@ -351,23 +157,40 @@ export function Dashboard() {
       setImportandoArquivo(true);
       setMensagemImportacao('');
 
+      await loadXLSXLibrary();
+
+      const XLSX = window.XLSX;
+      if (!XLSX) {
+        setMensagemImportacao('Biblioteca XLSX não carregou. Tente novamente.');
+        setTipoMensagemImportacao('erro');
+        setImportandoArquivo(false);
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const data = e.target?.result as ArrayBuffer;
           const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          const worksheet = workbook.Sheets['Equipamentos'];
 
-          console.log('Dados do Excel:', jsonData);
+          if (!worksheet) {
+            setMensagemImportacao('Aba "Equipamentos" não encontrada no arquivo');
+            setTipoMensagemImportacao('erro');
+            setImportandoArquivo(false);
+            return;
+          }
 
-          // Validar estrutura
-          const equipamentosValidos = jsonData.filter((row: any) => {
-            return row.numero_serie && row.nota_fiscal && row.destino;
-          });
+          const rows = XLSX.utils.sheet_to_json(worksheet);
+          
+          const equipamentosValidos = rows.map((row: any) => ({
+            numero_serie: String(row['Nº Série'] || row['No Serie'] || row['numero_serie'] || '').trim(),
+            nota_fiscal: String(row['Nota Fiscal'] || row['nota_fiscal'] || '').trim(),
+            destino: String(row['Destino'] || row['destino'] || '').trim()
+          })).filter(eq => eq.numero_serie && eq.nota_fiscal && eq.destino);
 
           if (equipamentosValidos.length === 0) {
-            setMensagemImportacao('Nenhum equipamento válido encontrado. Verifique as colunas: numero_serie, nota_fiscal, destino');
+            setMensagemImportacao('Nenhum equipamento válido encontrado. Verifique as colunas: Nº Série, Nota Fiscal, Destino');
             setTipoMensagemImportacao('erro');
             setImportandoArquivo(false);
             return;
@@ -388,8 +211,8 @@ export function Dashboard() {
 
       reader.readAsArrayBuffer(file);
     } catch (error) {
-      console.error('Erro ao ler arquivo:', error);
-      setMensagemImportacao('Erro ao ler arquivo.');
+      console.error('Erro ao carregar XLSX:', error);
+      setMensagemImportacao('Erro ao carregar biblioteca XLSX. Verifique sua conexão.');
       setTipoMensagemImportacao('erro');
       setImportandoArquivo(false);
     }
@@ -403,7 +226,6 @@ export function Dashboard() {
 
     setImportandoArquivo(true);
     try {
-      // Atualizar cada equipamento na tabela contrato_equipamentos
       for (const equipamento of equipamentosImportacao) {
         const { error } = await supabase
           .from('contrato_equipamentos')
@@ -423,7 +245,6 @@ export function Dashboard() {
       setEquipamentosImportacao([]);
       setArquivoSelecionado(null);
 
-      // Limpar mensagem após 3 segundos
       setTimeout(() => {
         setMensagemImportacao('');
       }, 3000);
@@ -436,37 +257,109 @@ export function Dashboard() {
     }
   };
 
-  const handleGoToPhotos = () => {
-    navigate('/fotos');
+  const salvarDecisao = async (status: 'Aprovado' | 'Rejeitado') => {
+    if (!equipamentoSelecionado) return;
+
+    if (status === 'Aprovado') {
+      if (!contratoSelecionado || !modelo || !sku) {
+        alert('Preencha todos os campos obrigatórios');
+        return;
+      }
+    } else if (status === 'Rejeitado') {
+      if (!notas.trim()) {
+        alert('Informe o motivo da rejeição');
+        return;
+      }
+    }
+
+    setAtualizando(true);
+    try {
+      // Atualizar status na tabela pendingequipment
+      const { error: updateError } = await supabase
+        .from('pendingequipment')
+        .update({
+          status,
+          analyst_notes: notas
+        })
+        .eq('id', equipamentoSelecionado.id);
+
+      if (updateError) throw updateError;
+
+      // Se aprovado, inserir na tabela contrato_equipamentos
+      if (status === 'Aprovado') {
+        const { error: insertError } = await supabase
+          .from('contrato_equipamentos')
+          .insert([{
+            contrato_id: parseInt(contratoSelecionado),
+            numero_serie: equipamentoSelecionado.numero_serie,
+            modelo,
+            sku
+          }]);
+
+        if (insertError) throw insertError;
+      }
+
+      alert(`Equipamento ${status.toLowerCase()} com sucesso!`);
+      setEquipamentoSelecionado(null);
+      setModoAprovacao(null);
+      setNotas('');
+      setModelo('');
+      setSku('');
+      setContratoSelecionado('');
+      await carregarEquipamentosPendentes();
+    } catch (error) {
+      console.error('Erro ao salvar decisão:', error);
+      alert('Erro ao salvar decisão');
+    } finally {
+      setAtualizando(false);
+    }
   };
 
-  const handleGoToContratos = () => {
-    navigate('/contratos');
+  const handleGoToClientes = () => navigate('/clientes');
+  const handleGoToContratos = () => navigate('/contratos');
+  const handleGoToEquipamentos = () => navigate('/equipamentos');
+  const handleGoToConfirmacoes = () => navigate('/confirmacoes');
+  const handleGoToPhotos = () => navigate('/fotos');
+
+  const filtrarVistorias = () => {
+    let filtered = vistorias;
+
+    if (filtroTecnico) {
+      filtered = filtered.filter(v => v.tecnico === filtroTecnico);
+    }
+    if (filtroCliente) {
+      filtered = filtered.filter(v => v.cliente === filtroCliente);
+    }
+    if (filtroStatus) {
+      filtered = filtered.filter(v => v.status === filtroStatus);
+    }
+
+    return filtered;
   };
 
-  const handleGoToClientes = () => {
-    navigate('/clientes');
+  const limparFiltros = () => {
+    setFiltroTecnico('');
+    setFiltroCliente('');
+    setFiltroStatus('');
   };
 
-  const handleGoToEquipamentos = () => {
-    navigate('/equipamentos');
-  };
-
-  const handleGoToConfirmacoes = () => {
-    navigate('/confirmacoes');
-  };
-
-  const statsPendentes = {
-    pendentes: equipamentosPendentes.filter(e => e.status === 'Pendente').length,
-    aprovados: equipamentosPendentes.filter(e => e.status === 'Aprovado').length,
-    rejeitados: equipamentosPendentes.filter(e => e.status === 'Rejeitado').length,
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-700">
+        <div className="p-4 flex items-center justify-between">
+          <h2 className={`font-bold ${sidebarOpen ? 'text-lg' : 'text-xs'}`}>Menu</h2>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="text-gray-400 hover:text-white"
@@ -568,7 +461,7 @@ export function Dashboard() {
             <button
               onClick={() => {
                 setActiveTab('pendentes');
-                loadEquipamentosPendentes();
+                carregarEquipamentosPendentes();
               }}
               className={`px-4 py-3 font-semibold border-b-2 transition relative ${
                 activeTab === 'pendentes'
@@ -582,6 +475,16 @@ export function Dashboard() {
                   {statsPendentes.pendentes}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('importacao')}
+              className={`px-4 py-3 font-semibold border-b-2 transition ${
+                activeTab === 'importacao'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📥 Importar Informações
             </button>
           </div>
         </div>
@@ -614,12 +517,6 @@ export function Dashboard() {
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-gray-900">Filtros Avançados</h3>
                     <div className="flex gap-3">
-                      <button
-                        onClick={exportarRelatorio}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded hover:bg-green-700 transition"
-                      >
-                        Exportar Relatório
-                      </button>
                       <button
                         onClick={limparFiltros}
                         className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
@@ -663,57 +560,15 @@ export function Dashboard() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Equipamento</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                       <select
-                        value={filtroEquipamento}
-                        onChange={(e) => setFiltroEquipamento(e.target.value)}
+                        value={filtroStatus}
+                        onChange={(e) => setFiltroStatus(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="">Todos os Equipamentos</option>
-                        {equipamentos.map((equipamento) => (
-                          <option key={equipamento} value={equipamento}>
-                            {equipamento}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
-                      <select
-                        value={filtroEstado}
-                        onChange={(e) => setFiltroEstado(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos os Estados</option>
-                        <option value="Equipamento OK">Equipamento OK</option>
-                        <option value="Equip. com AVARIA">Com Avaria</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Mouse</label>
-                      <select
-                        value={filtroMouse}
-                        onChange={(e) => setFiltroMouse(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos os Mouses</option>
-                        <option value="Mouse, OK">Mouse OK</option>
-                        <option value="Mouse, AUSENTE">Mouse Ausente</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Teclado</label>
-                      <select
-                        value={filtroTeclado}
-                        onChange={(e) => setFiltroTeclado(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Todos os Teclados</option>
-                        <option value="Teclado, OK">Teclado OK</option>
-                        <option value="Teclado, AUSENTE">Teclado Ausente</option>
+                        <option value="">Todos os Status</option>
+                        <option value="Com Avaria">Com Avaria</option>
+                        <option value="Sem Avaria">Sem Avaria</option>
                       </select>
                     </div>
                   </div>
@@ -721,81 +576,156 @@ export function Dashboard() {
 
                 {/* TABELA DE VISTORIAS */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900">Vistorias Recentes ({stats.total})</h3>
+                  <div className="px-6 py-4 bg-gray-900 border-b-4 border-gray-800">
+                    <h3 className="text-lg font-bold text-white">Vistorias Realizadas</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Técnico</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Cliente</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Data</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {filtrarVistorias().map((vistoria) => (
+                          <tr key={vistoria.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{vistoria.tecnico}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{vistoria.cliente}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{new Date(vistoria.data).toLocaleDateString('pt-BR')}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                vistoria.status === 'Com Avaria' 
+                                  ? 'bg-red-100 text-red-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {vistoria.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : activeTab === 'importacao' ? (
+              <>
+                {/* INSTRUÇÕES */}
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-8">
+                  <h3 className="text-lg font-bold text-blue-900 mb-4">📥 Importar Informações de Equipamentos</h3>
+                  <div className="space-y-2 text-blue-800 text-sm">
+                    <p><strong>Instruções:</strong></p>
+                    <p>1. Prepare um arquivo Excel com as colunas: <code className="bg-white px-2 py-1 rounded font-mono">Nº Série</code>, <code className="bg-white px-2 py-1 rounded font-mono">Nota Fiscal</code>, <code className="bg-white px-2 py-1 rounded font-mono">Destino</code></p>
+                    <p>2. Selecione o arquivo abaixo</p>
+                    <p>3. Revise os equipamentos encontrados</p>
+                    <p>4. Clique em "Confirmar Importação"</p>
+                  </div>
+                </div>
+
+                {/* UPLOAD DE ARQUIVO */}
+                <div className="bg-white rounded-lg shadow p-8 mb-8">
+                  <div className="border-3 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-500 transition">
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          setArquivoSelecionado(e.target.files[0]);
+                          processarArquivoExcel(e.target.files[0]);
+                        }
+                      }}
+                      disabled={importandoArquivo}
+                      className="hidden"
+                      id="fileInput"
+                    />
+                    <label htmlFor="fileInput" className="cursor-pointer block">
+                      <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <p className="text-gray-700 font-bold mb-2 text-lg">
+                        {arquivoSelecionado ? `📄 ${arquivoSelecionado.name}` : 'Clique para selecionar arquivo'}
+                      </p>
+                      <p className="text-gray-500 text-sm">ou arraste o arquivo aqui</p>
+                      <p className="text-gray-400 text-xs mt-3">Formatos suportados: Excel (.xlsx, .xls)</p>
+                    </label>
                   </div>
 
-                  {loading ? (
-                    <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Carregando dados...</p>
+                  {mensagemImportacao && (
+                    <div
+                      className={`mt-6 p-4 rounded-lg text-sm font-semibold ${
+                        tipoMensagemImportacao === 'sucesso'
+                          ? 'bg-green-50 text-green-800 border-2 border-green-200'
+                          : tipoMensagemImportacao === 'erro'
+                          ? 'bg-red-50 text-red-800 border-2 border-red-200'
+                          : 'bg-yellow-50 text-yellow-800 border-2 border-yellow-200'
+                      }`}
+                    >
+                      {mensagemImportacao}
                     </div>
-                  ) : stats.total === 0 ? (
-                    <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Nenhuma vistoria encontrada com esses filtros</p>
+                  )}
+                </div>
+
+                {/* TABELA DE PREVIEW */}
+                {equipamentosImportacao.length > 0 && (
+                  <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
+                    <div className="px-6 py-4 bg-gray-900 border-b-4 border-gray-800">
+                      <h3 className="text-lg font-bold text-white">✅ Equipamentos a Importar ({equipamentosImportacao.length})</h3>
                     </div>
-                  ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Estado</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Laudo</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Número de Série</th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nota Fiscal</th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Destino</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {vistorias
-                            .filter((v: any) => {
-                              if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
-                              if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
-                              if (filtroEquipamento && !v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())) return false;
-                              if (filtroEstado && v.estado !== filtroEstado) return false;
-                              if (filtroMouse && v.mouse_status !== filtroMouse) return false;
-                              if (filtroTeclado && v.teclado_status !== filtroTeclado) return false;
-                              return true;
-                            })
-                            .map((vistoria: any) => (
-                              <tr key={vistoria.id} className="hover:bg-gray-50 transition">
-                                <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
-                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
-                                <td className="px-6 py-4 text-sm">
-                                  <span className={`${getCorEstado(vistoria.estado)}`}>
-                                    {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.laudo || '—'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.avaria || '—'}</td>
-                                <td className="px-6 py-4 text-sm">
-                                  <span className={`${getCorComponente(vistoria.teclado_status)}`}>
-                                    {vistoria.teclado_status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm">
-                                  <span className={`${getCorComponente(vistoria.mouse_status)}`}>
-                                    {vistoria.mouse_status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                          {equipamentosImportacao.slice(0, 10).map((eq: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{eq.numero_serie}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{eq.nota_fiscal}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{eq.destino}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
+                      {equipamentosImportacao.length > 10 && (
+                        <div className="px-6 py-4 bg-gray-50 text-center text-sm text-gray-600 font-semibold">
+                          ... e mais {equipamentosImportacao.length - 10} equipamentos
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+
+                    <div className="px-6 py-4 bg-white border-t border-gray-200 flex gap-3">
+                      <button
+                        onClick={() => {
+                          setEquipamentosImportacao([]);
+                          setArquivoSelecionado(null);
+                          setMensagemImportacao('');
+                        }}
+                        disabled={importandoArquivo}
+                        className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 font-bold"
+                      >
+                        ✕ Cancelar
+                      </button>
+                      <button
+                        onClick={confirmarImportacao}
+                        disabled={importandoArquivo}
+                        className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-bold"
+                      >
+                        {importandoArquivo ? '⏳ Importando...' : '✅ Confirmar Importação'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <>
-                {/* CARDS DE ESTATÍSTICAS - PENDENTES */}
+                {/* EQUIPAMENTOS PENDENTES */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <div className="bg-yellow-100 rounded-lg shadow p-6">
                     <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Pendentes</p>
@@ -813,21 +743,15 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                {/* FILTRO PENDENTES */}
+                {/* FILTRO POR STATUS */}
                 <div className="bg-white rounded-lg shadow p-6 mb-8">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Filtrar por Status
-                  </label>
-                  <div className="flex gap-2">
-                    {['Todos', 'Pendente', 'Aprovado', 'Rejeitado'].map(status => (
+                  <div className="flex gap-3">
+                    {['Pendente', 'Aprovado', 'Rejeitado'].map((status) => (
                       <button
                         key={status}
-                        onClick={() => {
-                          setFiltroStatusPendente(status);
-                          loadEquipamentosPendentes();
-                        }}
+                        onClick={() => setFiltroStatusPendentes(status)}
                         className={`px-4 py-2 rounded font-semibold transition ${
-                          filtroStatusPendente === status
+                          filtroStatusPendentes === status
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         }`}
@@ -838,115 +762,98 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                {/* TABELA EQUIPAMENTOS PENDENTES */}
+                {/* TABELA DE EQUIPAMENTOS PENDENTES */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900">Equipamentos para Análise ({equipamentosPendentes.length})</h3>
+                  <div className="px-6 py-4 bg-gray-900 border-b-4 border-gray-800">
+                    <h3 className="text-lg font-bold text-white">Equipamentos para Análise</h3>
                   </div>
-
-                  {equipamentosPendentes.length === 0 ? (
-                    <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Nenhum equipamento encontrado</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Usuário</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Ação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {equipamentosPendentes.map(equipamento => (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Série</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Usuário</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Cliente</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Contrato</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Data</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {equipamentosPendentes
+                          .filter(e => e.status === filtroStatusPendentes)
+                          .map((equipamento) => (
                             <tr key={equipamento.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
                               <td className="px-6 py-4 text-sm text-gray-600">{equipamento.usuario_email || 'N/A'}</td>
                               <td className="px-6 py-4 text-sm text-gray-600">{equipamento.cliente_nome || 'N/A'}</td>
                               <td className="px-6 py-4 text-sm text-gray-600">{equipamento.numero_contrato || 'N/A'}</td>
                               <td className="px-6 py-4 text-sm">
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                  equipamento.status === 'Pendente'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : equipamento.status === 'Aprovado'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                  equipamento.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' :
+                                  equipamento.status === 'Aprovado' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
                                 }`}>
                                   {equipamento.status}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">
-                                {new Date(equipamento.created_at).toLocaleDateString('pt-BR')}
-                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{new Date(equipamento.created_at).toLocaleDateString('pt-BR')}</td>
                               <td className="px-6 py-4 text-sm">
-                                {equipamento.status === 'Pendente' ? (
+                                {equipamento.status === 'Pendente' && (
                                   <div className="flex gap-2">
                                     <button
-                                      onClick={() => abrirModalAprovacao(equipamento)}
-                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition"
+                                      onClick={() => {
+                                        setEquipamentoSelecionado(equipamento);
+                                        setModoAprovacao('aprovar');
+                                      }}
+                                      className="px-3 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700 transition"
                                     >
                                       Aprovar
                                     </button>
                                     <button
-                                      onClick={() => abrirModalRejeicao(equipamento)}
-                                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition"
+                                      onClick={() => {
+                                        setEquipamentoSelecionado(equipamento);
+                                        setModoAprovacao('rejeitar');
+                                      }}
+                                      className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700 transition"
                                     >
                                       Rejeitar
                                     </button>
                                   </div>
-                                ) : (
-                                  <span className="text-gray-500 text-xs">Processado</span>
                                 )}
                               </td>
                             </tr>
                           ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </>
             )}
           </div>
         </div>
-
-        {/* FOOTER */}
-        <div className="bg-gray-900 text-gray-400 text-xs py-4 px-8 border-t border-gray-800">
-          <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
-        </div>
       </div>
 
-      {/* MODAL DE DECISÃO */}
+      {/* MODAL DE APROVAÇÃO */}
       {equipamentoSelecionado && modoAprovacao === 'aprovar' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-screen overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">Aprovar Equipamento</h3>
 
-            {/* INFO DO EQUIPAMENTO */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Série</p>
-                  <p className="text-lg font-bold text-gray-900">{equipamentoSelecionado.numero_serie}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Usuário</p>
-                  <p className="text-sm text-gray-900">{equipamentoSelecionado.usuario_email || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Cliente</p>
-                  <p className="text-sm text-gray-900">{equipamentoSelecionado.cliente_nome || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Data</p>
-                  <p className="text-sm text-gray-900">{new Date(equipamentoSelecionado.created_at).toLocaleDateString('pt-BR')}</p>
-                </div>
-              </div>
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <p className="text-sm text-gray-600">
+                <strong>Série:</strong> {equipamentoSelecionado.numero_serie}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Usuário:</strong> {equipamentoSelecionado.usuario_email || 'N/A'}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Cliente:</strong> {equipamentoSelecionado.cliente_nome || 'N/A'}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Data:</strong> {new Date(equipamentoSelecionado.created_at).toLocaleDateString('pt-BR')}
+              </p>
             </div>
 
             {/* CAMPOS DE APROVAÇÃO */}
@@ -964,7 +871,7 @@ export function Dashboard() {
                   <option value="">Selecione um contrato</option>
                   {contratos.map(contrato => (
                     <option key={contrato.id} value={contrato.id}>
-                      {contrato.numero_contrato} - {(contrato as any).nome_cliente || 'Sem cliente'}
+                      {contrato.numero_contrato} - {contrato.nome_cliente || 'Sem cliente'}
                     </option>
                   ))}
                 </select>
