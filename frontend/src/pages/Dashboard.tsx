@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { vistoriaService } from '../services/vistoria.service';
+import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 
@@ -11,8 +12,9 @@ export function Dashboard() {
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('vistorias'); // 'vistorias' ou 'pendentes'
   
-  // FILTROS
+  // FILTROS VISTORIAS
   const [filtroTecnico, setFiltroTecnico] = useState('');
   const [filtroCliente, setFiltroCliente] = useState('');
   const [filtroEquipamento, setFiltroEquipamento] = useState('');
@@ -26,7 +28,7 @@ export function Dashboard() {
   const [equipamentos, setEquipamentos] = useState<string[]>([]);
   const [tecnicos, setTecnicos] = useState<string[]>([]);
   
-  // ESTATÍSTICAS
+  // ESTATÍSTICAS VISTORIAS
   const [stats, setStats] = useState({
     total: 0,
     comAvaria: 0,
@@ -37,9 +39,17 @@ export function Dashboard() {
     tecladoAusente: 0,
   });
 
+  // EQUIPAMENTOS PENDENTES
+  const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
+  const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
+  const [equipamentoSelecionado, setEquipamentoSelecionado] = useState<any>(null);
+  const [notas, setNotas] = useState('');
+  const [atualizando, setAtualizando] = useState(false);
+
   // CARREGAR DADOS INICIAIS
   useEffect(() => {
     loadVistorias();
+    loadEquipamentosPendentes();
   }, []);
 
   // ATUALIZAR QUANDO FILTROS MUDAM
@@ -65,6 +75,30 @@ export function Dashboard() {
       console.error('Erro ao carregar vistorias:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEquipamentosPendentes = async () => {
+    try {
+      let query = supabase
+        .from('pendingEquipment')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (filtroStatusPendente !== 'Todos') {
+        query = query.eq('status', filtroStatusPendente);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Erro ao buscar equipamentos pendentes:', error);
+        return;
+      }
+
+      setEquipamentosPendentes(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar equipamentos pendentes:', error);
     }
   };
 
@@ -114,8 +148,37 @@ export function Dashboard() {
     setStats(newStats);
   };
 
+  const salvarDecisao = async (novoStatus: 'Aprovado' | 'Rejeitado') => {
+    if (!equipamentoSelecionado) return;
+
+    setAtualizando(true);
+    try {
+      const { error } = await supabase
+        .from('pendingEquipment')
+        .update({
+          status: novoStatus,
+          analyst_notes: notas,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', equipamentoSelecionado.id);
+
+      if (error) {
+        console.error('Erro ao atualizar equipamento:', error);
+        throw error;
+      }
+
+      // Recarregar lista
+      await loadEquipamentosPendentes();
+      setEquipamentoSelecionado(null);
+      setNotas('');
+    } catch (error) {
+      console.error('Erro ao salvar decisão:', error);
+    } finally {
+      setAtualizando(false);
+    }
+  };
+
   const formatarData = (data: string) => {
-    // Extrai apenas a parte da data (YYYY-MM-DD) sem a hora
     const dataParte = data.split('T')[0];
     const [ano, mes, dia] = dataParte.split('-');
     return `${dia}/${mes}/${ano}`;
@@ -141,7 +204,6 @@ export function Dashboard() {
   };
 
   const exportarRelatorio = () => {
-    // Filtrar vistorias conforme os filtros aplicados
     const vistoriasExportacao = vistorias.filter((v: any) => {
       if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
       if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
@@ -157,10 +219,8 @@ export function Dashboard() {
       return;
     }
 
-    // Criar cabeçalho do CSV
     const headers = ['Data', 'Série', 'Equipamento', 'Cliente', 'Técnico', 'Estado', 'Laudo', 'Avaria', 'Teclado', 'Mouse'];
     
-    // Criar linhas do CSV
     const rows = vistoriasExportacao.map((v: any) => [
       formatarData(v.data_vistoria),
       v.numero_serie,
@@ -174,13 +234,11 @@ export function Dashboard() {
       v.mouse_status || '—',
     ]);
 
-    // Montar CSV
     let csvContent = headers.join(',') + '\n';
     rows.forEach((row: any[]) => {
       csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
     });
 
-    // Criar blob e download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -198,7 +256,6 @@ export function Dashboard() {
     navigate('/fotos');
   };
 
-  // NOVO: Funções de navegação
   const handleGoToContratos = () => {
     navigate('/contratos');
   };
@@ -213,6 +270,12 @@ export function Dashboard() {
 
   const handleGoToConfirmacoes = () => {
     navigate('/confirmacoes');
+  };
+
+  const statsPendentes = {
+    pendentes: equipamentosPendentes.filter(e => e.status === 'Pendente').length,
+    aprovados: equipamentosPendentes.filter(e => e.status === 'Aprovado').length,
+    rejeitados: equipamentosPendentes.filter(e => e.status === 'Rejeitado').length,
   };
 
   return (
@@ -235,7 +298,6 @@ export function Dashboard() {
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
-          {/* NOVO: Botão Clientes */}
           <button
             onClick={handleGoToClientes}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
@@ -243,7 +305,6 @@ export function Dashboard() {
             {sidebarOpen && <span>Clientes</span>}
           </button>
 
-          {/* NOVO: Botão Contratos */}
           <button
             onClick={handleGoToContratos}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
@@ -251,9 +312,6 @@ export function Dashboard() {
             {sidebarOpen && <span>Contratos</span>}
           </button>
 
-          
-
-          {/* NOVO: Botão Equipamentos */}
           <button
             onClick={handleGoToEquipamentos}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
@@ -261,7 +319,6 @@ export function Dashboard() {
             {sidebarOpen && <span>Equipamentos</span>}
           </button>
 
-          {/* NOVO: Botão Confirmações */}
           <button
             onClick={handleGoToConfirmacoes}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
@@ -290,8 +347,6 @@ export function Dashboard() {
             {sidebarOpen && <span>Sair</span>}
           </button>
         </nav>
-
-
       </div>
 
       {/* MAIN CONTENT */}
@@ -313,213 +368,368 @@ export function Dashboard() {
           </div>
         </div>
 
+        {/* ABAS */}
+        <div className="bg-white border-b border-gray-200 px-8">
+          <div className="flex gap-8">
+            <button
+              onClick={() => setActiveTab('vistorias')}
+              className={`px-4 py-3 font-semibold border-b-2 transition ${
+                activeTab === 'vistorias'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Vistorias
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('pendentes');
+                loadEquipamentosPendentes();
+              }}
+              className={`px-4 py-3 font-semibold border-b-2 transition relative ${
+                activeTab === 'pendentes'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Equipamentos Pendentes
+              {statsPendentes.pendentes > 0 && (
+                <span className="absolute top-2 right-0 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {statsPendentes.pendentes}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
           <div className="p-8">
-            {/* CARDS DE ESTATÍSTICAS - CORPORATIVO */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {/* Card Total */}
-              <div className="bg-blue-100 rounded-lg shadow p-6">
-                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
-                <p className="text-5xl font-bold text-blue-900 mt-3">{stats.total}</p>
-              </div>
+            {activeTab === 'vistorias' ? (
+              <>
+                {/* CARDS DE ESTATÍSTICAS - VISTORIAS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-blue-100 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
+                    <p className="text-5xl font-bold text-blue-900 mt-3">{stats.total}</p>
+                  </div>
 
-              {/* Card Avaria */}
-              <div className="bg-gray-200 rounded-lg shadow p-6">
-                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
-                <p className="text-5xl font-bold text-gray-800 mt-3">{stats.comAvaria}</p>
-              </div>
+                  <div className="bg-gray-200 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
+                    <p className="text-5xl font-bold text-gray-800 mt-3">{stats.comAvaria}</p>
+                  </div>
 
-              {/* Card OK */}
-              <div className="bg-gray-150 rounded-lg shadow p-6">
-                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
-                <p className="text-5xl font-bold text-gray-700 mt-3">{stats.semAvaria}</p>
-              </div>
-            </div>
-
-            {/* FILTROS */}
-            <div className="bg-white rounded-lg shadow p-6 mb-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-gray-900">Filtros Avançados</h3>
-                <div className="flex gap-3">
-                  <button
-                    onClick={exportarRelatorio}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded hover:bg-green-700 transition"
-                  >
-                    Exportar Relatório
-                  </button>
-                  <button
-                    onClick={limparFiltros}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
-                  >
-                    Limpar Filtros
-                  </button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Técnico</label>
-                  <select
-                    value={filtroTecnico}
-                    onChange={(e) => setFiltroTecnico(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todos os Técnicos</option>
-                    {tecnicos.map((tecnico) => (
-                      <option key={tecnico} value={tecnico}>
-                        {tecnico}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="bg-gray-150 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
+                    <p className="text-5xl font-bold text-gray-700 mt-3">{stats.semAvaria}</p>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Cliente</label>
-                  <select
-                    value={filtroCliente}
-                    onChange={(e) => setFiltroCliente(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todos os Clientes</option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente} value={cliente}>
-                        {cliente}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Equipamento</label>
-                  <select
-                    value={filtroEquipamento}
-                    onChange={(e) => setFiltroEquipamento(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todos os Equipamentos</option>
-                    {equipamentos.map((equipamento) => (
-                      <option key={equipamento} value={equipamento}>
-                        {equipamento}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
-                  <select
-                    value={filtroEstado}
-                    onChange={(e) => setFiltroEstado(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todos os Estados</option>
-                    <option value="Equipamento OK">Equipamento OK</option>
-                    <option value="Equip. com AVARIA">Com Avaria</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mouse</label>
-                  <select
-                    value={filtroMouse}
-                    onChange={(e) => setFiltroMouse(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todos os Mouses</option>
-                    <option value="Mouse, OK">Mouse OK</option>
-                    <option value="Mouse, AUSENTE">Mouse Ausente</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Teclado</label>
-                  <select
-                    value={filtroTeclado}
-                    onChange={(e) => setFiltroTeclado(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todos os Teclados</option>
-                    <option value="Teclado, OK">Teclado OK</option>
-                    <option value="Teclado, AUSENTE">Teclado Ausente</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* TABELA DE VISTORIAS */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900">Vistorias Recentes ({stats.total})</h3>
-              </div>
-
-              {loading ? (
-                <div className="px-6 py-12 text-center">
-                  <p className="text-gray-600 font-semibold">Carregando dados...</p>
-                </div>
-              ) : stats.total === 0 ? (
-                <div className="px-6 py-12 text-center">
-                  <p className="text-gray-600 font-semibold">Nenhuma vistoria encontrada com esses filtros</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Estado</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Laudo</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {vistorias
-                        .filter((v: any) => {
-                          if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
-                          if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
-                          if (filtroEquipamento && !v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())) return false;
-                          if (filtroEstado && v.estado !== filtroEstado) return false;
-                          if (filtroMouse && v.mouse_status !== filtroMouse) return false;
-                          if (filtroTeclado && v.teclado_status !== filtroTeclado) return false;
-                          return true;
-                        })
-                        .map((vistoria: any) => (
-                          <tr key={vistoria.id} className="hover:bg-gray-50 transition">
-                            <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
-                            <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
-                            <td className="px-6 py-4 text-sm">
-                              <span className={`${getCorEstado(vistoria.estado)}`}>
-                                {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.laudo || '—'}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.avaria || '—'}</td>
-                            <td className="px-6 py-4 text-sm">
-                              <span className={`${getCorComponente(vistoria.teclado_status)}`}>
-                                {vistoria.teclado_status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm">
-                              <span className={`${getCorComponente(vistoria.mouse_status)}`}>
-                                {vistoria.mouse_status}
-                              </span>
-                            </td>
-                          </tr>
+                {/* FILTROS */}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">Filtros Avançados</h3>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={exportarRelatorio}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded hover:bg-green-700 transition"
+                      >
+                        Exportar Relatório
+                      </button>
+                      <button
+                        onClick={limparFiltros}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+                      >
+                        Limpar Filtros
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Técnico</label>
+                      <select
+                        value={filtroTecnico}
+                        onChange={(e) => setFiltroTecnico(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Técnicos</option>
+                        {tecnicos.map((tecnico) => (
+                          <option key={tecnico} value={tecnico}>
+                            {tecnico}
+                          </option>
                         ))}
-                    </tbody>
-                  </table>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Cliente</label>
+                      <select
+                        value={filtroCliente}
+                        onChange={(e) => setFiltroCliente(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Clientes</option>
+                        {clientes.map((cliente) => (
+                          <option key={cliente} value={cliente}>
+                            {cliente}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Equipamento</label>
+                      <select
+                        value={filtroEquipamento}
+                        onChange={(e) => setFiltroEquipamento(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Equipamentos</option>
+                        {equipamentos.map((equipamento) => (
+                          <option key={equipamento} value={equipamento}>
+                            {equipamento}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
+                      <select
+                        value={filtroEstado}
+                        onChange={(e) => setFiltroEstado(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Estados</option>
+                        <option value="Equipamento OK">Equipamento OK</option>
+                        <option value="Equip. com AVARIA">Com Avaria</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Mouse</label>
+                      <select
+                        value={filtroMouse}
+                        onChange={(e) => setFiltroMouse(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Mouses</option>
+                        <option value="Mouse, OK">Mouse OK</option>
+                        <option value="Mouse, AUSENTE">Mouse Ausente</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Teclado</label>
+                      <select
+                        value={filtroTeclado}
+                        onChange={(e) => setFiltroTeclado(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Teclados</option>
+                        <option value="Teclado, OK">Teclado OK</option>
+                        <option value="Teclado, AUSENTE">Teclado Ausente</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* TABELA DE VISTORIAS */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900">Vistorias Recentes ({stats.total})</h3>
+                  </div>
+
+                  {loading ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Carregando dados...</p>
+                    </div>
+                  ) : stats.total === 0 ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Nenhuma vistoria encontrada com esses filtros</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Estado</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Laudo</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {vistorias
+                            .filter((v: any) => {
+                              if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
+                              if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
+                              if (filtroEquipamento && !v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())) return false;
+                              if (filtroEstado && v.estado !== filtroEstado) return false;
+                              if (filtroMouse && v.mouse_status !== filtroMouse) return false;
+                              if (filtroTeclado && v.teclado_status !== filtroTeclado) return false;
+                              return true;
+                            })
+                            .map((vistoria: any) => (
+                              <tr key={vistoria.id} className="hover:bg-gray-50 transition">
+                                <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
+                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
+                                <td className="px-6 py-4 text-sm">
+                                  <span className={`${getCorEstado(vistoria.estado)}`}>
+                                    {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.laudo || '—'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.avaria || '—'}</td>
+                                <td className="px-6 py-4 text-sm">
+                                  <span className={`${getCorComponente(vistoria.teclado_status)}`}>
+                                    {vistoria.teclado_status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm">
+                                  <span className={`${getCorComponente(vistoria.mouse_status)}`}>
+                                    {vistoria.mouse_status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* CARDS DE ESTATÍSTICAS - PENDENTES */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-yellow-100 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Pendentes</p>
+                    <p className="text-5xl font-bold text-yellow-900 mt-3">{statsPendentes.pendentes}</p>
+                  </div>
+
+                  <div className="bg-green-100 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Aprovados</p>
+                    <p className="text-5xl font-bold text-green-900 mt-3">{statsPendentes.aprovados}</p>
+                  </div>
+
+                  <div className="bg-red-100 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Rejeitados</p>
+                    <p className="text-5xl font-bold text-red-900 mt-3">{statsPendentes.rejeitados}</p>
+                  </div>
+                </div>
+
+                {/* FILTRO PENDENTES */}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Filtrar por Status
+                  </label>
+                  <div className="flex gap-2">
+                    {['Todos', 'Pendente', 'Aprovado', 'Rejeitado'].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          setFiltroStatusPendente(status);
+                          loadEquipamentosPendentes();
+                        }}
+                        className={`px-4 py-2 rounded font-semibold transition ${
+                          filtroStatusPendente === status
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* TABELA EQUIPAMENTOS PENDENTES */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900">Equipamentos para Análise ({equipamentosPendentes.length})</h3>
+                  </div>
+
+                  {equipamentosPendentes.length === 0 ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Nenhum equipamento encontrado</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Usuário ID</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {equipamentosPendentes.map(equipamento => (
+                            <tr key={equipamento.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.user_id.substring(0, 8)}...</td>
+                              <td className="px-6 py-4 text-sm">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                  equipamento.status === 'Pendente'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : equipamento.status === 'Aprovado'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {equipamento.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {new Date(equipamento.created_at).toLocaleDateString('pt-BR')}
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                {equipamento.status === 'Pendente' ? (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setEquipamentoSelecionado(equipamento);
+                                        setNotas('');
+                                      }}
+                                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition"
+                                    >
+                                      Aprovar
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEquipamentoSelecionado(equipamento);
+                                        setNotas('');
+                                      }}
+                                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition"
+                                    >
+                                      Rejeitar
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-500 text-xs">Processado</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -528,6 +738,70 @@ export function Dashboard() {
           <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
         </div>
       </div>
+
+      {/* MODAL DE DECISÃO */}
+      {equipamentoSelecionado && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold mb-4">
+              {equipamentoSelecionado.status === 'Pendente' ? 'Tomar Decisão' : 'Editar Notas'}
+            </h3>
+
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <p className="text-sm text-gray-600">
+                <strong>Série:</strong> {equipamentoSelecionado.numero_serie}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Status:</strong> {equipamentoSelecionado.status}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Notas da Análise
+              </label>
+              <textarea
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                disabled={atualizando}
+                placeholder="Digite suas notas aqui..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-24"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setEquipamentoSelecionado(null);
+                  setNotas('');
+                }}
+                disabled={atualizando}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              {equipamentoSelecionado.status === 'Pendente' && (
+                <>
+                  <button
+                    onClick={() => salvarDecisao('Rejeitado')}
+                    disabled={atualizando}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                  >
+                    {atualizando ? 'Processando...' : 'Rejeitar'}
+                  </button>
+                  <button
+                    onClick={() => salvarDecisao('Aprovado')}
+                    disabled={atualizando}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {atualizando ? 'Processando...' : 'Aprovar'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE ALTERAR SENHA */}
       <ChangePasswordModal
