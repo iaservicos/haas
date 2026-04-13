@@ -97,11 +97,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // ⚡ FIX: Limpar estado IMEDIATAMENTE para evitar loop
+    setToken(null);
+    setUsuario(null);
+    
+    // Depois limpar localStorage
     authService.removeToken();
     localStorage.removeItem('usuario');
     localStorage.removeItem(SESSION_STORAGE_KEY);
-    setToken(null);
-    setUsuario(null);
     
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);

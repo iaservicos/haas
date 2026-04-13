@@ -7,21 +7,26 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, usuario } = useAuth();
+  const { login, usuario, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // ⚡ NOVO: Redirecionar baseado em user_type após login
+  // ⚡ FIX: Redirecionar APENAS se está autenticado E tem usuário
   useEffect(() => {
-    if (usuario) {
-      if (usuario.user_type === 'analyst') {
-        navigate('/');
-      } else if (usuario.user_type === 'client') {
-        navigate('/dashboard-cliente');
-      } else {
-        navigate('/');
-      }
+    if (isAuthenticated && usuario) {
+      // Pequeno delay para garantir que o estado foi atualizado
+      const timer = setTimeout(() => {
+        if (usuario.user_type === 'analyst') {
+          navigate('/', { replace: true });
+        } else if (usuario.user_type === 'client') {
+          navigate('/dashboard-cliente', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
-  }, [usuario, navigate]);
+  }, [isAuthenticated, usuario, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
