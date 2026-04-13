@@ -50,6 +50,7 @@ export function Dashboard() {
   const [contratos, setContratos] = useState<any[]>([]);
   const [atualizando, setAtualizando] = useState(false);
   const [modoAprovacao, setModoAprovacao] = useState<'visualizar' | 'aprovar' | 'rejeitar'>('visualizar');
+  const [tipoMaterial, setTipoMaterial] = useState('');
 
   // CARREGAR DADOS INICIAIS
   useEffect(() => {
@@ -150,6 +151,7 @@ export function Dashboard() {
     setNotas('');
     setModelo('');
     setSku('');
+    setTipoMaterial('');
     setContratoSelecionado('');
     await buscarContratosDoUsuario(equipamento);
   };
@@ -163,7 +165,7 @@ export function Dashboard() {
   const salvarDecisao = async (novoStatus: 'Aprovado' | 'Rejeitado') => {
     if (!equipamentoSelecionado) return;
 
-    if (novoStatus === 'Aprovado' && (!contratoSelecionado || !modelo || !sku)) {
+    if (novoStatus === 'Aprovado' && (!contratoSelecionado || !modelo || !sku || !tipoMaterial)) {
       alert('Por favor, preencha todos os campos obrigatórios');
       return;
     }
@@ -194,6 +196,7 @@ export function Dashboard() {
             numero_serie: equipamentoSelecionado.numero_serie,
             modelo: modelo,
             sku: sku,
+            tipo_material: tipoMaterial,
             contrato_id: parseInt(contratoSelecionado),
           });
 
@@ -209,6 +212,7 @@ export function Dashboard() {
       setNotas('');
       setModelo('');
       setSku('');
+      setTipoMaterial('');
       setContratoSelecionado('');
     } catch (error) {
       console.error('Erro ao salvar decisão:', error);
@@ -902,6 +906,27 @@ export function Dashboard() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Tipo de Equipamento *
+                </label>
+                <select
+                  value={tipoMaterial}
+                  onChange={(e) => setTipoMaterial(e.target.value)}
+                  disabled={atualizando}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                >
+                  <option value="">Selecione um tipo</option>
+                  <option value="Armário de Recarga">Armário de Recarga</option>
+                  <option value="Notebook">Notebook</option>
+                  <option value="Smartphone">Smartphone</option>
+                  <option value="Nobreak">Nobreak</option>
+                  <option value="All-in-One">All-in-One</option>
+                  <option value="Desktop">Desktop</option>
+                  <option value="Tablet">Tablet</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Notas da Análise
                 </label>
                 <textarea
@@ -921,6 +946,7 @@ export function Dashboard() {
                   setNotas('');
                   setModelo('');
                   setSku('');
+                  setTipoMaterial('');
                   setContratoSelecionado('');
                 }}
                 disabled={atualizando}
