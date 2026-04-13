@@ -885,7 +885,7 @@ export function Dashboard() {
                   value={modelo}
                   onChange={(e) => setModelo(e.target.value)}
                   disabled={atualizando}
-                  placeholder="Ex: Notebook Dell"
+                  placeholder="Ex: POSITIVO MASTER D610 SS81T0ANEB150VCN-1"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
               </div>
@@ -899,7 +899,7 @@ export function Dashboard() {
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
                   disabled={atualizando}
-                  placeholder="Ex: SKU-12345"
+                  placeholder="Ex: 1304788"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
               </div>
