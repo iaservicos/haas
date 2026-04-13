@@ -915,13 +915,17 @@ export function Dashboard() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
                   <option value="">Selecione um tipo</option>
-                  <option value="Armário de Recarga">Armário de Recarga</option>
-                  <option value="Notebook">Notebook</option>
-                  <option value="Smartphone">Smartphone</option>
-                  <option value="Nobreak">Nobreak</option>
-                  <option value="All-in-One">All-in-One</option>
                   <option value="Desktop">Desktop</option>
+                  <option value="Monitor">Monitor</option>
+                  <option value="Notebook">Notebook</option>
+                  <option value="MiniPro">MiniPro</option>
+                  <option value="All in One">All in One</option>
+                  <option value="Duo">Duo</option>
                   <option value="Tablet">Tablet</option>
+                  <option value="Chromebook">Chromebook</option>
+                  <option value="Máquina de pagamento">Máquina de pagamento</option>
+                  <option value="Diversos">Diversos</option>
+                  <option value="Celular">Celular</option>
                 </select>
               </div>
 
