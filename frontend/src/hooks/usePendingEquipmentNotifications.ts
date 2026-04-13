@@ -39,7 +39,7 @@ export function usePendingEquipmentNotifications(userId: string | undefined) {
 
         // Criar mensagem baseada no status
         let message = '';
-        let type: 'sucesso' | 'erro' | 'aviso' = 'info';
+        let type: 'sucesso' | 'erro' | 'aviso' = 'aviso';
 
         if (equipment.status === 'Aprovado') {
           message = `✅ Equipamento ${equipment.numero_serie} foi APROVADO! Ele será adicionado ao seu contrato em breve.`;
