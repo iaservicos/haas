@@ -15,6 +15,7 @@ interface Equipamento {
   numero_serie: string;
   modelo: string;
   tipo: string;
+  tipo_material?: string;
   destino?: string;
   nota_fiscal?: string;
   status: string;
@@ -477,7 +478,7 @@ export function DashboardCliente() {
                           <tr key={equipamento.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{equipamento.modelo}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{equipamento.tipo}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{equipamento.tipo_material || equipamento.tipo || '—'}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{equipamento.destino || '—'}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{equipamento.nota_fiscal || '—'}</td>
                             <td className="px-6 py-4 text-sm">

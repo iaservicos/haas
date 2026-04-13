@@ -36,6 +36,32 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // FUNÇÕES
 // ============================================
 
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  
+  const str = String(dateStr).trim();
+  
+  // Se for numero (serial date do Excel)
+  if (!isNaN(str)) {
+    const num = parseInt(str);
+    // Excel serial date: dias desde 01/01/1900
+    const date = new Date((num - 25569) * 86400 * 1000);
+    return date;
+  }
+  
+  // Se for texto com formato DD/MM/YYYY
+  const parts = str.split('/');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0]);
+    const month = parseInt(parts[1]);
+    const year = parseInt(parts[2]);
+    return new Date(year, month - 1, day);
+  }
+  
+  // Fallback para new Date
+  return new Date(str);
+}
+
 async function readExcelFile(filePath) {
   console.log(`📖 Lendo arquivo: ${filePath}`);
   
@@ -63,6 +89,7 @@ async function importContratos(data) {
         numero_contrato: String(row.Contrato),
         nome_cliente: row['Nome cliente'] || null,
         cliente: row.Cliente ? String(row.Cliente) : null,
+        data_encerramento: row.Encerramento ? parseDate(row.Encerramento) : null,
       });
     }
   });
@@ -200,6 +227,7 @@ async function importEquipamentos(data) {
         numero_serie: numeroSerie,
         modelo: String(row.Modelo),
         sku: row.SKU ? String(row.SKU) : null,
+        tipo_material: row['tipo material'] ? String(row['tipo material']) : null,
       });
       
       // Marcar como inserido para evitar duplicatas no mesmo batch
