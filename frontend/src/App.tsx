@@ -10,9 +10,15 @@ import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
 import { VerConfirmacoes } from './pages/VerConfirmacoes';
 import { DashboardCliente } from './pages/DashboardCliente';
 
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+// ⚡ NOVO: Componente para rotas protegidas com verificação de role
+function ProtectedRoute({ 
+  children, 
+  allowedRoles 
+}: { 
+  children: React.ReactNode;
+  allowedRoles: string[];
+}) {
+  const { isAuthenticated, loading, usuario } = useAuth();
 
   if (loading) {
     return (
@@ -25,17 +31,36 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  // ⚡ NOVO: Se não está autenticado, redireciona para login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  // ⚡ NOVO: Se está autenticado mas não tem permissão, redireciona para página inicial
+  if (usuario && !allowedRoles.includes(usuario.user_type)) {
+    console.warn(`❌ Acesso negado para ${usuario.user_type} em rota que requer: ${allowedRoles.join(', ')}`);
+    
+    // Redireciona para a página padrão do seu tipo de usuário
+    if (usuario.user_type === 'client') {
+      return <Navigate to="/dashboard-cliente" />;
+    } else {
+      return <Navigate to="/" />;
+    }
+  }
+
+  return <>{children}</>;
 }
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      
+      {/* ⚡ ROTAS PARA ANALISTAS */}
       <Route
         path="/"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['analyst']}>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -43,7 +68,7 @@ function AppRoutes() {
       <Route
         path="/fotos"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['analyst']}>
             <Fotos />
           </ProtectedRoute>
         }
@@ -51,7 +76,7 @@ function AppRoutes() {
       <Route
         path="/contratos"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['analyst']}>
             <GerenciarContratos />
           </ProtectedRoute>
         }
@@ -59,7 +84,7 @@ function AppRoutes() {
       <Route
         path="/clientes"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['analyst']}>
             <GerenciarClientes />
           </ProtectedRoute>
         }
@@ -67,7 +92,7 @@ function AppRoutes() {
       <Route
         path="/equipamentos"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['analyst']}>
             <GerenciarEquipamentos />
           </ProtectedRoute>
         }
@@ -75,21 +100,24 @@ function AppRoutes() {
       <Route
         path="/confirmacoes"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['analyst']}>
             <VerConfirmacoes />
           </ProtectedRoute>
         }
       />
-      {/* NOVO: Dashboard do Cliente */}
+
+      {/* ⚡ ROTAS PARA CLIENTES */}
       <Route
         path="/dashboard-cliente"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['client']}>
             <DashboardCliente />
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" />} />
+
+      {/* ⚡ ROTA PADRÃO: Redireciona para login */}
+      <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );
 }
