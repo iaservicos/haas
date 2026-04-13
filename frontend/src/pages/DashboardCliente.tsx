@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
+import { NotificationToast } from '../components/NotificationToast';
+import { usePendingEquipmentNotifications } from '../hooks/usePendingEquipmentNotifications';
 
 interface Contrato {
   id: number;
@@ -42,6 +44,9 @@ export function DashboardCliente() {
   const [verificando, setVerificando] = useState(false);
   const [mensagemEquipamento, setMensagemEquipamento] = useState('');
   const [tipoMensagem, setTipoMensagem] = useState<'sucesso' | 'erro' | 'aviso'>('sucesso');
+
+  // NOTIFICAÇÕES DE EQUIPAMENTOS PENDENTES
+  const { notification, clearNotification } = usePendingEquipmentNotifications(usuario?.id);
 
   // Filtrar equipamentos em tempo real
   const equipamentosFiltrados = useMemo(() => {
@@ -268,6 +273,16 @@ export function DashboardCliente() {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* NOTIFICAÇÃO DE EQUIPAMENTO PENDENTE */}
+      {notification && (
+        <NotificationToast
+          message={notification.message}
+          type={notification.type}
+          onClose={clearNotification}
+          autoClose={6000}
+        />
+      )}
+
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
         <div className="p-4 border-b border-gray-700">
