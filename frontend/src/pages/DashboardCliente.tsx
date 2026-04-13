@@ -244,7 +244,7 @@ export function DashboardCliente() {
       console.log('✅ Equipamento salvo com sucesso!');
 
       setMensagemEquipamento(
-        `✅ Equipamento ${novoSerial} será enviado para análise da equipe. Você receberá uma confirmação em breve.`
+        `Equipamento ${novoSerial} será enviado para análise da equipe. Você receberá uma confirmação em breve.`
       );
       setTipoMensagem('sucesso');
 
@@ -277,9 +277,7 @@ export function DashboardCliente() {
       {notification && (
         <NotificationToast
           message={notification.message}
-          type={notification.type}
           onClose={clearNotification}
-          autoClose={6000}
         />
       )}
 
