@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express from 'express';
 import { corsOptions } from './config/cors.js';
 import { env } from './config/env.js';
@@ -13,7 +12,6 @@ import gptmakerRoutes from './routes/gptmakerRoutes.js';
 import clientesRoutes from './routes/clientesroutes.js';
 import confirmacoeRoutes from './routes/confirmacoes.js';
 import inspecaoRoutes from './routes/inspecao.js';
-
 
 const app = express();
 
