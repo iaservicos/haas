@@ -262,9 +262,10 @@ export function DashboardCliente() {
     }
   };
 
-  const handleIniciarChecklist = (equipamentoId: number) => {
-    navigate(`/checklist/${equipamentoId}`);
-  };
+  const handleIniciarChecklist = (equipamento: Equipamento) => {
+  navigate(`/vistoria?numero_serie=${equipamento.numero_serie}&equipamento_id=${equipamento.id}`);
+};
+
 
   const handleLogout = () => {
     logout();
@@ -507,7 +508,7 @@ export function DashboardCliente() {
                             </td>
                             <td className="px-6 py-4 text-sm">
                               <button
-                                onClick={() => handleIniciarChecklist(equipamento.id)}
+                                onClick={() => handleIniciarChecklist(equipamento)}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition"
                               >
                                 Iniciar Vistoria
