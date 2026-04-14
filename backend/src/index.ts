@@ -15,6 +15,7 @@ import confirmacoeRoutes from './routes/confirmacoes.js';
 
 const app = express();
 
+
 app.use(corsOptions);
 app.use(express.json());
 
@@ -33,11 +34,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+
 app.use(errorHandler);
+
 
 testConnection().then(() => {
   app.listen(env.PORT, () => {
-    console.log(`✓ Servidor rodando em http://localhost:${env.PORT}` );
+    console.log(`✓ Servidor rodando em http://localhost:${env.PORT}`);
     console.log(`✓ Ambiente: ${env.NODE_ENV}`);
   });
 });
