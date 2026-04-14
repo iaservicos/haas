@@ -42,3 +42,4 @@ testConnection().then(() => {
     console.log(`✓ Ambiente: ${env.NODE_ENV}`);
   });
 });
+
