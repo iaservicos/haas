@@ -1,53 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+interface Question {
+  id: string;
+  text: string;
+  type: 'yes_no' | 'text' | 'select';
+  options?: string[];
+}
 
 interface ChecklistVistoriaProps {
   confirmacaoId: string;
+  equipmentType?: string;
   onChecklistSave?: (checklist: any) => void;
 }
 
-export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({ confirmacaoId, onChecklistSave }) => {
-  const [fontePresenteValue, setFontePresenteValue] = useState<boolean | null>(null);
-  const [tecladoPresenteValue, setTecladoPresenteValue] = useState<boolean | null>(null);
-  const [mousePresenteValue, setMousePresenteValue] = useState<boolean | null>(null);
-  const [tipoMaterial, setTipoMaterial] = useState('genérico');
+export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({ 
+  confirmacaoId, 
+  equipmentType = 'Desktop',
+  onChecklistSave 
+}) => {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
 
-  const handleSalvar = async () => {
-    if (fontePresenteValue === null) {
-      setErro('Fonte é obrigatória');
-      return;
-    }
+  // Carregar perguntas dinâmicas baseadas no tipo de equipamento
+  useEffect(() => {
+    const loadQuestions = async () => {
+      try {
+        const response = await fetch(`/api/inspecao/perguntas/${equipmentType}`);
+        if (!response.ok) {
+          throw new Error('Erro ao carregar perguntas');
+        }
+        const data = await response.json();
+        setQuestions(data.questions);
+        
+        // Inicializar respostas vazias
+        const initialAnswers: Record<string, string | boolean> = {};
+        data.questions.forEach((q: Question) => {
+          initialAnswers[q.id] = '';
+        });
+        setAnswers(initialAnswers);
+      } catch (err) {
+        setErro(err instanceof Error ? err.message : 'Erro ao carregar perguntas');
+      }
+    };
 
+    loadQuestions();
+  }, [equipmentType]);
+
+  const handleAnswerChange = (questionId: string, value: string | boolean) => {
+    setAnswers(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
+  };
+
+  const handleSalvar = async () => {
     setLoading(true);
     setErro('');
     setSucesso(false);
 
     try {
-      const response = await fetch(`/api/vistorias/confirmacao/${confirmacaoId}`, {
-        method: 'PUT',
+      const response = await fetch(`/api/inspecao/salvar`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          fonte_presente: fontePresenteValue,
-          teclado_presente: tecladoPresenteValue || false,
-          mouse_presente: mousePresenteValue || false,
-          tipo_material: tipoMaterial,
+          vistoriaId: confirmacaoId,
+          equipmentType,
+          answers,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao salvar checklist');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao salvar checklist');
       }
 
       const data = await response.json();
       setSucesso(true);
 
       if (onChecklistSave) {
-        onChecklistSave(data.confirmacao);
+        onChecklistSave(data);
       }
+
+      // Limpar após 2 segundos
+      setTimeout(() => {
+        setSucesso(false);
+      }, 2000);
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -57,148 +99,108 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({ confirmaca
 
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', marginTop: '20px' }}>
-      <h3>Checklist de Vistoria</h3>
+      <h3>Checklist de Vistoria - {equipmentType}</h3>
 
-      <div style={{ marginBottom: '15px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Fonte Presente (Obrigatório)
-        </label>
-        <div>
+      {questions.length === 0 ? (
+        <p style={{ color: '#666', marginTop: '10px' }}>Carregando perguntas...</p>
+      ) : (
+        <>
+          {questions.map((question) => (
+            <div key={question.id} style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                {question.text}
+              </label>
+
+              {question.type === 'yes_no' && (
+                <div>
+                  <button
+                    onClick={() => handleAnswerChange(question.id, true)}
+                    style={{
+                      padding: '8px 16px',
+                      marginRight: '10px',
+                      backgroundColor: answers[question.id] === true ? '#4CAF50' : '#ddd',
+                      color: answers[question.id] === true ? 'white' : 'black',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Sim
+                  </button>
+                  <button
+                    onClick={() => handleAnswerChange(question.id, false)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: answers[question.id] === false ? '#f44336' : '#ddd',
+                      color: answers[question.id] === false ? 'white' : 'black',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Não
+                  </button>
+                </div>
+              )}
+
+              {question.type === 'text' && (
+                <textarea
+                  value={answers[question.id]?.toString() || ''}
+                  onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                  placeholder="Digite suas observações..."
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: '1px solid #ccc',
+                    minHeight: '80px',
+                    fontFamily: 'Arial, sans-serif',
+                  }}
+                />
+              )}
+
+              {question.type === 'select' && question.options && (
+                <select
+                  value={answers[question.id]?.toString() || ''}
+                  onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                  style={{
+                    padding: '8px',
+                    width: '100%',
+                    borderRadius: '4px',
+                    border: '1px solid #ccc',
+                  }}
+                >
+                  <option value="">Selecione uma opção</option>
+                  {question.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ))}
+
           <button
-            onClick={() => setFontePresenteValue(true)}
+            onClick={handleSalvar}
+            disabled={loading}
             style={{
-              padding: '8px 16px',
-              marginRight: '10px',
-              backgroundColor: fontePresenteValue === true ? '#4CAF50' : '#ddd',
-              color: fontePresenteValue === true ? 'white' : 'black',
+              padding: '10px 20px',
+              backgroundColor: '#2196F3',
+              color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
             }}
           >
-            Sim
+            {loading ? 'Salvando...' : 'Salvar Checklist'}
           </button>
-          <button
-            onClick={() => setFontePresenteValue(false)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: fontePresenteValue === false ? '#f44336' : '#ddd',
-              color: fontePresenteValue === false ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Não
-          </button>
-        </div>
-      </div>
 
-      <div style={{ marginBottom: '15px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Teclado Presente (Opcional)
-        </label>
-        <div>
-          <button
-            onClick={() => setTecladoPresenteValue(true)}
-            style={{
-              padding: '8px 16px',
-              marginRight: '10px',
-              backgroundColor: tecladoPresenteValue === true ? '#4CAF50' : '#ddd',
-              color: tecladoPresenteValue === true ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Sim
-          </button>
-          <button
-            onClick={() => setTecladoPresenteValue(false)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: tecladoPresenteValue === false ? '#f44336' : '#ddd',
-              color: tecladoPresenteValue === false ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Não
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '15px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Mouse Presente (Opcional)
-        </label>
-        <div>
-          <button
-            onClick={() => setMousePresenteValue(true)}
-            style={{
-              padding: '8px 16px',
-              marginRight: '10px',
-              backgroundColor: mousePresenteValue === true ? '#4CAF50' : '#ddd',
-              color: mousePresenteValue === true ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Sim
-          </button>
-          <button
-            onClick={() => setMousePresenteValue(false)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: mousePresenteValue === false ? '#f44336' : '#ddd',
-              color: mousePresenteValue === false ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Não
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '15px' }}>
-        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-          Tipo de Material
-        </label>
-        <select
-          value={tipoMaterial}
-          onChange={(e) => setTipoMaterial(e.target.value)}
-          style={{ padding: '8px', width: '100%', borderRadius: '4px', border: '1px solid #ccc' }}
-        >
-          <option value="genérico">Genérico</option>
-          <option value="notebook">Notebook</option>
-          <option value="desktop">Desktop</option>
-          <option value="monitor">Monitor</option>
-          <option value="impressora">Impressora</option>
-        </select>
-      </div>
-
-      <button
-        onClick={handleSalvar}
-        disabled={loading}
-        style={{
-          padding: '10px 20px',
-          backgroundColor: '#2196F3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.6 : 1,
-        }}
-      >
-        {loading ? 'Salvando...' : 'Salvar Checklist'}
-      </button>
-
-      {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
-      {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>Checklist salvo com sucesso!</p>}
+          {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
+          {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>Checklist salvo com sucesso!</p>}
+        </>
+      )}
     </div>
   );
 };
