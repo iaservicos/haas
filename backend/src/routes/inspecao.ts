@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express.js';
+import express, { Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType, EquipmentType } from '../config/equipmentQuestions.js';
 
