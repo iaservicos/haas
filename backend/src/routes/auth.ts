@@ -27,9 +27,10 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // Validar senha (usar bcrypt em produção)
-    const senhaValida = usuario.senha_hash === password;
+    // Validar senha - comparação direta pois senhas estão em texto puro
+    const senhaValida = usuario.senha_hash && usuario.senha_hash.trim() === password.trim();
     if (!senhaValida) {
+      console.error(`Senha inválida para ${email}. Esperado: "${usuario.senha_hash}", Recebido: "${password}"`);
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
