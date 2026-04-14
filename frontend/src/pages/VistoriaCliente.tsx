@@ -18,6 +18,7 @@ export const VistoriaCliente: React.FC = () => {
   const [analiseResultado, setAnaliseResultado] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
+  const [equipmentType, setEquipmentType] = useState<string>('Desktop');
 
   useEffect(() => {
     if (numeroSerie && equipamentoId) {
@@ -165,6 +166,7 @@ export const VistoriaCliente: React.FC = () => {
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Checklist de Vistoria</h2>
                 <ChecklistVistoria
                   confirmacaoId={confirmacaoId}
+                  equipmentType={equipmentType}
                   onChecklistSave={handleChecklistSave}
                 />
               </div>
