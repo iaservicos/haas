@@ -1,89 +1,108 @@
-import axios from 'axios';
-import { env } from '../config/env';
+import { supabase } from '../config/database.js';
+import multer from 'multer';
 
-interface AnaliseGPTMaker {
-  status: 'pendente' | 'analisando' | 'concluido' | 'erro';
-  resultado: 'ok' | 'problema' | null;
-  descricao: string;
-  timestamp: string;
+interface FotoData {
+  confirmacao_id: string;
+  foto_data: string; // base64
+  foto_nome: string;
+  foto_tipo: string;
+  tamanho_bytes: number;
 }
 
+// Configurar multer para upload em memória
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+});
+
 /**
- * Enviar foto para análise do GPTMaker
+ * Salvar foto no banco de dados
  */
-export async function analisarFotoGPTMaker(
-  fotoBase64: string,
-  fotoNome: string,
-  confirmacaoId: string
-): Promise<AnaliseGPTMaker> {
+export async function salvarFoto(fotoData: FotoData): Promise<{ id: string }> {
   try {
-    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome}`);
-
-    // Preparar payload para GPTMaker
-    const payload = {
-      agentId: env.GPTMAKER_AGENT_ID,
-      message: `Analise esta foto de equipamento: ${fotoNome}. Verifique se há danos visíveis, se o equipamento está funcionando e descreva o estado geral.`,
-      image: fotoBase64,
-      confirmacaoId: confirmacaoId,
-    };
-
-    // Enviar para GPTMaker
-    const response = await axios.post(
-      `${env.GPTMAKER_API_URL}/chat/analyze`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
-          'Content-Type': 'application/json',
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .insert([
+        {
+          confirmacao_id: fotoData.confirmacao_id,
+          foto_data: fotoData.foto_data,
+          foto_nome: fotoData.foto_nome,
+          foto_tipo: fotoData.foto_tipo,
+          tamanho_bytes: fotoData.tamanho_bytes,
+          data_upload: new Date().toISOString(),
         },
-        timeout: 30000,
-      }
-    );
+      ])
+      .select('id')
+      .single();
 
-    console.log(`[GPTMaker] Resposta recebida para ${fotoNome}`);
+    if (error) throw error;
 
-    // Processar resposta
-    const analise: AnaliseGPTMaker = {
-      status: 'concluido',
-      resultado: response.data.hasDamage ? 'problema' : 'ok',
-      descricao: response.data.analysis || 'Análise concluída',
-      timestamp: new Date().toISOString(),
-    };
-
-    return analise;
+    return { id: data.id };
   } catch (error) {
-    console.error('[GPTMaker] Erro na análise:', error);
-
-    return {
-      status: 'erro',
-      resultado: null,
-      descricao: `Erro ao analisar foto: ${error instanceof Error ? error.message : 'Desconhecido'}`,
-      timestamp: new Date().toISOString(),
-    };
+    console.error('Erro ao salvar foto:', error);
+    throw error;
   }
 }
 
 /**
- * Validar credenciais do GPTMaker
+ * Recuperar foto do banco de dados
  */
-export async function validarCredenciaisGPTMaker(): Promise<boolean> {
+export async function recuperarFoto(fotoId: string): Promise<FotoData | null> {
   try {
-    console.log('[GPTMaker] Validando credenciais...');
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .select('*')
+      .eq('id', fotoId)
+      .single();
 
-    const response = await axios.get(
-      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}`,
-      {
-        headers: {
-          Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
-        },
-        timeout: 10000,
-      }
-    );
+    if (error) throw error;
 
-    console.log('[GPTMaker] ✅ Credenciais válidas');
+    return data as FotoData;
+  } catch (error) {
+    console.error('Erro ao recuperar foto:', error);
+    return null;
+  }
+}
+
+/**
+ * Listar fotos de uma confirmação
+ */
+export async function listarFotosPorConfirmacao(confirmacaoId: string): Promise<FotoData[]> {
+  try {
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .select('*')
+      .eq('confirmacao_id', confirmacaoId)
+      .order('data_upload', { ascending: false });
+
+    if (error) throw error;
+
+    return data as FotoData[];
+  } catch (error) {
+    console.error('Erro ao listar fotos:', error);
+    return [];
+  }
+}
+
+/**
+ * Deletar foto
+ */
+export async function deletarFoto(fotoId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('fotos_vistoria')
+      .delete()
+      .eq('id', fotoId);
+
+    if (error) throw error;
+
     return true;
   } catch (error) {
-    console.error('[GPTMaker] ❌ Credenciais inválidas:', error);
+    console.error('Erro ao deletar foto:', error);
     return false;
   }
 }
+
+export { upload };

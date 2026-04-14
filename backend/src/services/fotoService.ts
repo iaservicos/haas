@@ -1,4 +1,4 @@
-import { supabase } from '../config/database';
+import { supabase } from '../config/database.js';
 import multer from 'multer';
 
 interface FotoData {
