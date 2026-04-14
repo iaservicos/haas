@@ -9,6 +9,7 @@ import { GerenciarClientes } from './pages/GerenciarClientes';
 import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
 import { VerConfirmacoes } from './pages/VerConfirmacoes';
 import { DashboardCliente } from './pages/DashboardCliente';
+import { VistoriaCliente } from './pages/VistoriaCliente';
 
 // ⚡ NOVO: Componente para rotas protegidas com verificação de role
 function ProtectedRoute({ 
@@ -112,6 +113,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['client']}>
             <DashboardCliente />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vistoria"
+        element={
+          <ProtectedRoute allowedRoles={['client']}>
+            <VistoriaCliente />
           </ProtectedRoute>
         }
       />
