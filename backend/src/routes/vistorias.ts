@@ -7,7 +7,6 @@ import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
 
 const router = Router( );
 
-router.use(authMiddleware);
 
 router.get('/', async (req: Request, res: Response) => {
   try {
