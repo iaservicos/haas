@@ -1,122 +1,89 @@
-/**
- * Serviço para integração com GPTMaker
- * Responsável por enviar fotos para análise de IA
- */
-
 import axios from 'axios';
-import { env } from '../config/env.js';
+import { env } from '../config/env';
 
-interface AnaliseFoto {
-  fonte_presente: boolean;
-  adaptador_presente: boolean;
-  teclado_presente: boolean;
-  mouse_presente: boolean;
-  condicao_visual: string;
-  itens_identificados: string[];
-  descricao_geral: string;
+interface AnaliseGPTMaker {
+  status: 'pendente' | 'analisando' | 'concluido' | 'erro';
+  resultado: 'ok' | 'problema' | null;
+  descricao: string;
+  timestamp: string;
 }
 
-export const gptmakerService = {
-  /**
-   * Enviar foto para análise com GPTMaker
-   */
-  async analisarFoto(
-    fotoBase64: string,
-    tipoEquipamento: string
-  ): Promise<AnaliseFoto> {
-    try {
-      console.log(`🤖 Enviando foto para análise GPTMaker - Tipo: ${tipoEquipamento}`);
+/**
+ * Enviar foto para análise do GPTMaker
+ */
+export async function analisarFotoGPTMaker(
+  fotoBase64: string,
+  fotoNome: string,
+  confirmacaoId: string
+): Promise<AnaliseGPTMaker> {
+  try {
+    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome}`);
 
-      const prompt = `
-        Você é um especialista em análise de equipamentos eletrônicos.
-        
-        Analise esta foto de um equipamento do tipo: ${tipoEquipamento}
-        
-        Identifique e responda em JSON:
-        {
-          "fonte_presente": true/false,
-          "adaptador_presente": true/false,
-          "teclado_presente": true/false,
-          "mouse_presente": true/false,
-          "condicao_visual": "descrição breve do estado visual",
-          "itens_identificados": ["lista", "de", "itens", "vistos"],
-          "descricao_geral": "descrição geral do equipamento"
-        }
-        
-        Seja preciso e objetivo. Retorne APENAS o JSON válido.
-      `;
-
-      const response = await axios.post(
-        `${env.GPTMAKER_API_URL}/chat`,
-        {
-          message: prompt,
-          image: fotoBase64,
-          model: 'gpt-4-vision',
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${env.GPTMAKER_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000, // 30 segundos de timeout
-        }
-      );
-
-      console.log('✅ Análise recebida do GPTMaker');
-
-      // Extrair JSON da resposta
-      const conteudo = response.data.choices?.[0]?.message?.content || response.data.content;
-      const jsonMatch = conteudo.match(/\{[\s\S]*\}/);
-      
-      if (!jsonMatch) {
-        throw new Error('Resposta do GPTMaker não contém JSON válido');
-      }
-
-      const analise: AnaliseFoto = JSON.parse(jsonMatch[0]);
-      return analise;
-    } catch (error) {
-      console.error('❌ Erro ao analisar foto com GPTMaker:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Validar se a análise tem todos os campos obrigatórios
-   */
-  validarAnalise(analise: any): { valido: boolean; erro?: string } {
-    const camposObrigatorios = [
-      'fonte_presente',
-      'adaptador_presente',
-      'teclado_presente',
-      'mouse_presente',
-      'condicao_visual',
-      'itens_identificados',
-    ];
-
-    for (const campo of camposObrigatorios) {
-      if (!(campo in analise)) {
-        return {
-          valido: false,
-          erro: `Campo obrigatório faltando: ${campo}`,
-        };
-      }
-    }
-
-    return { valido: true };
-  },
-
-  /**
-   * Processar resultado da análise para salvar no banco
-   */
-  processarResultado(analiseGPT: AnaliseFoto) {
-    return {
-      fonte_presente: analiseGPT.fonte_presente,
-      teclado_presente: analiseGPT.teclado_presente,
-      mouse_presente: analiseGPT.mouse_presente,
-      adaptador_presente: analiseGPT.adaptador_presente,
-      condicao_visual: analiseGPT.condicao_visual,
-      itens_identificados: analiseGPT.itens_identificados,
-      descricao_geral: analiseGPT.descricao_geral,
+    // Preparar payload para GPTMaker
+    const payload = {
+      agentId: env.GPTMAKER_AGENT_ID,
+      message: `Analise esta foto de equipamento: ${fotoNome}. Verifique se há danos visíveis, se o equipamento está funcionando e descreva o estado geral.`,
+      image: fotoBase64,
+      confirmacaoId: confirmacaoId,
     };
-  },
-};
+
+    // Enviar para GPTMaker
+    const response = await axios.post(
+      `${env.GPTMAKER_API_URL}/chat/analyze`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      }
+    );
+
+    console.log(`[GPTMaker] Resposta recebida para ${fotoNome}`);
+
+    // Processar resposta
+    const analise: AnaliseGPTMaker = {
+      status: 'concluido',
+      resultado: response.data.hasDamage ? 'problema' : 'ok',
+      descricao: response.data.analysis || 'Análise concluída',
+      timestamp: new Date().toISOString(),
+    };
+
+    return analise;
+  } catch (error) {
+    console.error('[GPTMaker] Erro na análise:', error);
+
+    return {
+      status: 'erro',
+      resultado: null,
+      descricao: `Erro ao analisar foto: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Validar credenciais do GPTMaker
+ */
+export async function validarCredenciaisGPTMaker(): Promise<boolean> {
+  try {
+    console.log('[GPTMaker] Validando credenciais...');
+
+    const response = await axios.get(
+      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
+        },
+        timeout: 10000,
+      }
+    );
+
+    console.log('[GPTMaker] ✅ Credenciais válidas');
+    return true;
+  } catch (error) {
+    console.error('[GPTMaker] ❌ Credenciais inválidas:', error);
+    return false;
+  }
+}
