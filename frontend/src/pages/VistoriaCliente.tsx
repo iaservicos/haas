@@ -1,46 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { UploadFoto } from '../components/UploadFoto';
 import { ChecklistVistoria } from '../components/ChecklistVistoria';
 
 export const VistoriaCliente: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const numeroSerie = searchParams.get('numero_serie');
+  const equipamentoId = searchParams.get('equipamento_id');
+
   const [confirmacaoId, setConfirmacaoId] = useState<string>('');
-  const [confirmacaoIdInput, setConfirmacaoIdInput] = useState<string>('');
   const [confirmacaoData, setConfirmacaoData] = useState<any>(null);
   const [fotos, setFotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
 
-  const handleBuscarConfirmacao = async () => {
-    if (!confirmacaoIdInput.trim()) {
-      setErro('Digite um ID de confirmação');
-      return;
+  // Carregar confirmação quando a página abrir
+  useEffect(() => {
+    if (numeroSerie && equipamentoId) {
+      buscarOuCriarConfirmacao();
     }
+  }, [numeroSerie, equipamentoId]);
 
+  const buscarOuCriarConfirmacao = async () => {
     setLoading(true);
     setErro('');
 
     try {
-      const response = await fetch(`/api/vistorias/confirmacao/${confirmacaoIdInput}`);
+      // Primeiro, tenta buscar uma confirmação existente para este equipamento
+      const response = await fetch(`/api/vistorias/confirmacao/${equipamentoId}`);
 
-      if (!response.ok) {
-        throw new Error('Confirmação não encontrada');
+      if (response.ok) {
+        const data = await response.json();
+        setConfirmacaoId(equipamentoId!);
+        setConfirmacaoData(data.confirmacao);
+        setFotos(data.fotos || []);
+      } else {
+        // Se não encontrar, cria uma nova confirmação
+        criarNovaConfirmacao();
       }
-
-      const data = await response.json();
-      setConfirmacaoId(confirmacaoIdInput);
-      setConfirmacaoData(data.confirmacao);
-      setFotos(data.fotos || []);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      console.error('Erro ao buscar confirmação:', err);
+      criarNovaConfirmacao();
     } finally {
       setLoading(false);
     }
   };
 
+  const criarNovaConfirmacao = () => {
+    // Criar um objeto de confirmação temporário
+    setConfirmacaoId(equipamentoId!);
+    setConfirmacaoData({
+      id: equipamentoId,
+      numero_serie: numeroSerie,
+      equipamento_id: equipamentoId,
+      status_analise: 'Pendente',
+      resultado_analise: null,
+    });
+    setFotos([]);
+  };
+
   const handleUploadSuccess = (fotoId: string, analise: any) => {
     alert(`Foto enviada com sucesso! ID: ${fotoId}`);
     // Recarregar fotos
-    handleBuscarConfirmacao();
+    buscarOuCriarConfirmacao();
   };
 
   const handleChecklistSave = (confirmacao: any) => {
@@ -49,43 +71,19 @@ export const VistoriaCliente: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
       <h1>Vistoria de Equipamento</h1>
 
-      <div style={{ marginBottom: '30px', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-        <h3>Buscar Confirmação</h3>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <input
-            type="text"
-            placeholder="Digite o ID da confirmação"
-            value={confirmacaoIdInput}
-            onChange={(e) => setConfirmacaoIdInput(e.target.value)}
-            style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
-          />
-          <button
-            onClick={handleBuscarConfirmacao}
-            disabled={loading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? 'Buscando...' : 'Buscar'}
-          </button>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div style={{ fontSize: '24px', marginBottom: '10px' }}>Carregando...</div>
         </div>
-        {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
-      </div>
-
-      {confirmacaoData && (
+      ) : confirmacaoData ? (
         <>
           <div style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-            <h3>Dados da Confirmação</h3>
-            <p><strong>ID:</strong> {confirmacaoData.id}</p>
-            <p><strong>Equipamento:</strong> {confirmacaoData.equipamento_id}</p>
+            <h3>Dados do Equipamento</h3>
+            <p><strong>Número de Série:</strong> {confirmacaoData.numero_serie || numeroSerie}</p>
+            <p><strong>ID do Equipamento:</strong> {confirmacaoData.id || equipamentoId}</p>
             <p><strong>Status:</strong> {confirmacaoData.status_analise || 'Pendente'}</p>
             <p><strong>Resultado:</strong> {confirmacaoData.resultado_analise || 'Não analisado'}</p>
           </div>
@@ -116,6 +114,10 @@ export const VistoriaCliente: React.FC = () => {
             onChecklistSave={handleChecklistSave}
           />
         </>
+      ) : (
+        <div style={{ padding: '20px', color: 'red' }}>
+          {erro || 'Nenhum equipamento selecionado'}
+        </div>
       )}
     </div>
   );
