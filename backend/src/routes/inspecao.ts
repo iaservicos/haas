@@ -1,8 +1,6 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { supabase } from '../config/database.js';
-import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
-
 
 const router = express.Router();
 
@@ -10,7 +8,7 @@ const router = express.Router();
  * GET /api/inspecao/perguntas/:equipmentType
  * Retorna as perguntas para um tipo de equipamento específico
  */
-router.get('/perguntas/:equipmentType', async (req: Request, res: Response) => {
+router.get('/perguntas/:equipmentType', async (req, res) => {
   try {
     const { equipmentType } = req.params;
     
@@ -27,9 +25,8 @@ router.get('/perguntas/:equipmentType', async (req: Request, res: Response) => {
       });
     }
 
-    const questions = getQuestionsByEquipmentType(equipmentType as EquipmentType);
+    const questions = getQuestionsByEquipmentType(equipmentType);
 
-    
     res.json({
       equipmentType,
       questions,
@@ -45,7 +42,7 @@ router.get('/perguntas/:equipmentType', async (req: Request, res: Response) => {
  * POST /api/inspecao/salvar
  * Salva as respostas da inspeção
  */
-router.post('/salvar', async (req: Request, res: Response) => {
+router.post('/salvar', async (req, res) => {
   try {
     const { vistoriaId, equipmentType, answers, observacoes } = req.body;
 
@@ -99,7 +96,7 @@ router.post('/salvar', async (req: Request, res: Response) => {
  * GET /api/inspecao/:vistoriaId
  * Retorna as respostas de uma inspeção específica
  */
-router.get('/:vistoriaId', async (req: Request, res: Response) => {
+router.get('/:vistoriaId', async (req, res) => {
   try {
     const { vistoriaId } = req.params;
 
