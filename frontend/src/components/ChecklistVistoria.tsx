@@ -24,12 +24,13 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
 
-  // Carregar perguntas dinâmicas baseadas no tipo de equipamento
   useEffect(() => {
     const loadQuestions = async () => {
       try {
-        console.log('[ChecklistVistoria] Carregando perguntas para:', equipmentType);
-        const url = `/api/inspecao/perguntas/${equipmentType}`;
+        const type = equipmentType || 'Desktop';
+        console.log('[ChecklistVistoria] Carregando perguntas para:', type);
+        
+        const url = `/api/inspecao/perguntas/${type}`;
         console.log('[ChecklistVistoria] URL da requisição:', url);
         
         const response = await fetch(url);
@@ -46,7 +47,6 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
         
         setQuestions(data.questions || []);
         
-        // Inicializar respostas vazias
         const initialAnswers: Record<string, string | boolean> = {};
         (data.questions || []).forEach((q: Question) => {
           initialAnswers[q.id] = '';
@@ -56,16 +56,11 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
         const errorMsg = err instanceof Error ? err.message : 'Erro ao carregar perguntas';
         console.error('[ChecklistVistoria] Erro:', errorMsg);
         setErro(errorMsg);
-        // Mostrar mensagem de erro mas não travar
         setQuestions([]);
       }
     };
 
-    if (equipmentType) {
-      loadQuestions();
-    } else {
-      console.warn('[ChecklistVistoria] equipmentType não foi passado');
-    }
+    loadQuestions();
   }, [equipmentType]);
 
   const handleAnswerChange = (questionId: string, value: string | boolean) => {
@@ -105,7 +100,6 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
         onChecklistSave(data);
       }
 
-      // Limpar após 2 segundos
       setTimeout(() => {
         setSucesso(false);
       }, 2000);
