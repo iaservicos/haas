@@ -28,25 +28,44 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   useEffect(() => {
     const loadQuestions = async () => {
       try {
-        const response = await fetch(`/api/inspecao/perguntas/${equipmentType}`);
+        console.log('[ChecklistVistoria] Carregando perguntas para:', equipmentType);
+        const url = `/api/inspecao/perguntas/${equipmentType}`;
+        console.log('[ChecklistVistoria] URL da requisição:', url);
+        
+        const response = await fetch(url);
+        console.log('[ChecklistVistoria] Status da resposta:', response.status);
+        
         if (!response.ok) {
-          throw new Error('Erro ao carregar perguntas');
+          const errorText = await response.text();
+          console.error('[ChecklistVistoria] Erro na resposta:', errorText);
+          throw new Error(`Erro ao carregar perguntas (${response.status})`);
         }
+        
         const data = await response.json();
-        setQuestions(data.questions);
+        console.log('[ChecklistVistoria] Perguntas recebidas:', data);
+        
+        setQuestions(data.questions || []);
         
         // Inicializar respostas vazias
         const initialAnswers: Record<string, string | boolean> = {};
-        data.questions.forEach((q: Question) => {
+        (data.questions || []).forEach((q: Question) => {
           initialAnswers[q.id] = '';
         });
         setAnswers(initialAnswers);
       } catch (err) {
-        setErro(err instanceof Error ? err.message : 'Erro ao carregar perguntas');
+        const errorMsg = err instanceof Error ? err.message : 'Erro ao carregar perguntas';
+        console.error('[ChecklistVistoria] Erro:', errorMsg);
+        setErro(errorMsg);
+        // Mostrar mensagem de erro mas não travar
+        setQuestions([]);
       }
     };
 
-    loadQuestions();
+    if (equipmentType) {
+      loadQuestions();
+    } else {
+      console.warn('[ChecklistVistoria] equipmentType não foi passado');
+    }
   }, [equipmentType]);
 
   const handleAnswerChange = (questionId: string, value: string | boolean) => {
