@@ -6,6 +6,15 @@ import { ChecklistVistoria } from '../components/ChecklistVistoria';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Função para gerar UUID v4
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export const VistoriaCliente: React.FC = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -14,7 +23,7 @@ export const VistoriaCliente: React.FC = () => {
   const equipamentoId = searchParams.get('equipamento_id');
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [confirmacaoId, setConfirmacaoId] = useState<string>('');
+  const [vistoriaId, setVistoriaId] = useState<string>('');
   const [confirmacaoData, setConfirmacaoData] = useState<any>(null);
   const [fotos, setFotos] = useState<any[]>([]);
   const [analiseResultado, setAnaliseResultado] = useState<any>(null);
@@ -59,7 +68,10 @@ export const VistoriaCliente: React.FC = () => {
   };
 
   const criarConfirmacao = () => {
-    setConfirmacaoId(equipamentoId!);
+    // Gerar um UUID único para esta vistoria
+    const novoVistoriaId = generateUUID();
+    setVistoriaId(novoVistoriaId);
+    
     setConfirmacaoData({
       id: equipamentoId,
       numero_serie: numeroSerie,
@@ -135,7 +147,7 @@ export const VistoriaCliente: React.FC = () => {
 
         {/* CONTENT */}
         <div className="flex-1 overflow-auto p-8">
-          {confirmacaoData && equipmentType ? (
+          {confirmacaoData && equipmentType && vistoriaId ? (
             <div className="max-w-4xl mx-auto space-y-6">
               {/* CARD: UPLOAD DE FOTO */}
               <div className="bg-white rounded-lg shadow-md p-6">
@@ -143,7 +155,7 @@ export const VistoriaCliente: React.FC = () => {
                 <p className="text-sm text-gray-600 mb-4">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
                 
                 <UploadFoto
-                  confirmacaoId={confirmacaoId}
+                  confirmacaoId={vistoriaId}
                   onUploadSuccess={handleUploadSuccess}
                 />
               </div>
@@ -197,7 +209,7 @@ export const VistoriaCliente: React.FC = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Checklist de Vistoria</h2>
                 <ChecklistVistoria
-                  confirmacaoId={confirmacaoId}
+                  confirmacaoId={vistoriaId}
                   equipmentType={equipmentType}
                   onChecklistSave={handleChecklistSave}
                 />
