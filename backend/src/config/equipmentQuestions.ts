@@ -31,8 +31,7 @@ export interface EquipmentQuestions {
 
 /**
  * Perguntas genéricas para cada tipo de equipamento
- * Baseado em conhecimento de RPA e inspeção técnica
- */
+  */
 export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Desktop': [
     {
