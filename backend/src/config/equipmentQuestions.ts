@@ -4,12 +4,12 @@
  */
 
 export type EquipmentType = 
-  | 'Armário de Recarga'
-  | 'Notebook'
-  | 'Smartphone'
-  | 'Nobreak'
-  | 'All in One'
   | 'Desktop'
+  | 'Monitor'
+  | 'Notebook'
+  | 'MiniPro'
+  | 'All in One'
+  | 'Duo'
   | 'Tablet'
   | 'Chromebook'
   | 'Máquina de pagamento'
@@ -34,33 +34,59 @@ export interface EquipmentQuestions {
  * Baseado em conhecimento de RPA e inspeção técnica
  */
 export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
-  'Armário de Recarga': [
+  'Desktop': [
     {
-      id: 'recarga_portas',
-      text: 'Portas e Trincas',
+      id: 'desktop_lacres',
+      text: 'Lacres de Garantia',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'recarga_rodizios',
-      text: 'Rodízios/Pés',
+      id: 'desktop_cabos',
+      text: 'Cabos (Vídeo/Energia)',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'recarga_cabos',
-      text: 'Cabos de energia internos',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'recarga_danos',
+      id: 'desktop_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'recarga_observacoes',
+      id: 'desktop_observacoes',
+      text: 'Observações',
+      type: 'text',
+      required: false,
+    },
+  ],
+  'Monitor': [
+    {
+      id: 'monitor_tela',
+      text: 'Tela/Display',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'monitor_cabos',
+      text: 'Cabos de Conexão',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'monitor_suporte',
+      text: 'Suporte/Base',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'monitor_danos',
+      text: 'Existem danos físicos visíveis?',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'monitor_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
@@ -98,65 +124,33 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
       required: false,
     },
   ],
-  'Smartphone': [
+  'MiniPro': [
     {
-      id: 'smartphone_tela',
-      text: 'Tela/Display',
+      id: 'minipro_painel',
+      text: 'Painel Traseiro (Portas)',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'smartphone_bateria',
-      text: 'Saúde da Bateria',
+      id: 'minipro_perifericos',
+      text: 'Periféricos (Mouse/Teclado)',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'smartphone_acessorios',
-      text: 'Acessórios',
+      id: 'minipro_suporte',
+      text: 'Suporte/Base',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'smartphone_danos',
+      id: 'minipro_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'smartphone_observacoes',
-      text: 'Observações',
-      type: 'text',
-      required: false,
-    },
-  ],
-  'Nobreak': [
-    {
-      id: 'nobreak_cabo',
-      text: 'Cabo de Força',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'nobreak_bateria',
-      text: 'Teste de Autonomia (Bateria)',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'nobreak_ruido',
-      text: 'Ruído Excessivo',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'nobreak_danos',
-      text: 'Existem danos físicos visíveis?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'nobreak_observacoes',
+      id: 'minipro_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
@@ -194,27 +188,33 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
       required: false,
     },
   ],
-  'Desktop': [
+  'Duo': [
     {
-      id: 'desktop_lacres',
-      text: 'Lacres de Garantia',
+      id: 'duo_tela',
+      text: 'Telas/Displays',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_cabos',
-      text: 'Cabos (Vídeo/Energia)',
+      id: 'duo_articulacao',
+      text: 'Articulação/Dobradiça',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_danos',
+      id: 'duo_carregador',
+      text: 'Carregador Original',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'duo_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_observacoes',
+      id: 'duo_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
