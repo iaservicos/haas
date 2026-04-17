@@ -14,7 +14,7 @@ export function Dashboard() {
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('vistorias');
+  const [activeTab, setActiveTab] = useState('vistoria');
   
   // FILTROS VISTORIAS
   const [filtroTecnico, setFiltroTecnico] = useState('');
@@ -41,6 +41,21 @@ export function Dashboard() {
     tecladoAusente: 0,
   });
 
+  // VISTORIAS DO PORTAL
+  const [vistoriasPortal, setVistoriasPortal] = useState<any[]>([]);
+  const [loadingPortal, setLoadingPortal] = useState(false);
+  const [filtroEquipamentoPortal, setFiltroEquipamentoPortal] = useState('');
+  const [filtroContratoPortal, setFiltroContratoPortal] = useState('');
+  const [filtroTipoPortal, setFiltroTipoPortal] = useState('');
+  const [filtroStatusPortal, setFiltroStatusPortal] = useState('');
+  
+  // ESTATÍSTICAS PORTAL
+  const [statsPortal, setStatsPortal] = useState({
+    total: 0,
+    comAvaria: 0,
+    equipamentoOk: 0,
+  });
+
   // EQUIPAMENTOS PENDENTES
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
   const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
@@ -54,14 +69,9 @@ export function Dashboard() {
   const [modoAprovacao, setModoAprovacao] = useState<'visualizar' | 'aprovar' | 'rejeitar'>('visualizar');
   const [tipoMaterial, setTipoMaterial] = useState('');
 
-  // VISTORIAS DO PORTAL
-  const [vistoriasPortal, setVistoriasPortal] = useState<any[]>([]);
-  const [loadingPortal, setLoadingPortal] = useState(false);
-  const [filtroEquipamentoPortal, setFiltroEquipamentoPortal] = useState('');
-  const [filtroContratoPortal, setFiltroContratoPortal] = useState('');
-
   // CARREGAR DADOS INICIAIS
   useEffect(() => {
+    loadVistoriasPortal();
     loadVistorias();
     loadEquipamentosPendentes();
   }, []);
@@ -71,12 +81,10 @@ export function Dashboard() {
     aplicarFiltros();
   }, [filtroTecnico, filtroCliente, filtroEquipamento, filtroEstado, filtroMouse, filtroTeclado, vistorias]);
 
-  // CARREGAR VISTORIAS DO PORTAL QUANDO ABA MUDA
+  // CALCULAR ESTATÍSTICAS DO PORTAL
   useEffect(() => {
-    if (activeTab === 'vistoria') {
-      loadVistoriasPortal();
-    }
-  }, [activeTab]);
+    calcularEstatisticasPortal();
+  }, [vistoriasPortal, filtroEquipamentoPortal, filtroContratoPortal, filtroTipoPortal, filtroStatusPortal]);
 
   const loadVistorias = async () => {
     try {
@@ -149,9 +157,51 @@ export function Dashboard() {
     }
   };
 
+  const calcularEstatisticasPortal = () => {
+    let filtered = [...vistoriasPortal];
+
+    if (filtroEquipamentoPortal) {
+      filtered = filtered.filter((v: any) =>
+        v.contrato_equipamentos?.numero_serie?.toLowerCase().includes(filtroEquipamentoPortal.toLowerCase())
+      );
+    }
+
+    if (filtroContratoPortal) {
+      filtered = filtered.filter((v: any) =>
+        v.contrato_equipamentos?.contratos?.numero_contrato?.toLowerCase().includes(filtroContratoPortal.toLowerCase())
+      );
+    }
+
+    if (filtroTipoPortal) {
+      filtered = filtered.filter((v: any) =>
+        v.equipment_type?.toLowerCase().includes(filtroTipoPortal.toLowerCase())
+      );
+    }
+
+    if (filtroStatusPortal) {
+      filtered = filtered.filter((v: any) => {
+        const respostas = v.respostas || {};
+        const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+        return filtroStatusPortal === 'com_avaria' ? temAvaria : !temAvaria;
+      });
+    }
+
+    const temAvaria = filtered.filter((v: any) => {
+      const respostas = v.respostas || {};
+      return Object.values(respostas).some((r: any) => r === false || r === 'Não');
+    }).length;
+
+    const newStats = {
+      total: filtered.length,
+      comAvaria: temAvaria,
+      equipamentoOk: filtered.length - temAvaria,
+    };
+    
+    setStatsPortal(newStats);
+  };
+
   const buscarContratosDoUsuario = async (equipamento: any) => {
     try {
-      // Buscar contratos do usuário
       const { data: usuarioContratos, error: ucError } = await supabase
         .from('usuario_contratos')
         .select('contrato_id')
@@ -169,7 +219,6 @@ export function Dashboard() {
 
       const contratoIds = usuarioContratos.map((uc: any) => uc.contrato_id);
 
-      // Buscar dados dos contratos
       const { data: contratosData, error: contratosError } = await supabase
         .from('contratos')
         .select('id, numero_contrato, nome_cliente')
@@ -230,7 +279,6 @@ export function Dashboard() {
         throw error;
       }
 
-      // Se aprovado, criar equipamento na tabela contrato_equipamentos
       if (novoStatus === 'Aprovado') {
         const { error: insertError } = await supabase
           .from('contrato_equipamentos')
@@ -248,7 +296,6 @@ export function Dashboard() {
         }
       }
 
-      // Recarregar lista
       await loadEquipamentosPendentes();
       setEquipamentoSelecionado(null);
       setNotas('');
@@ -338,6 +385,60 @@ export function Dashboard() {
   const limparFiltrosPortal = () => {
     setFiltroEquipamentoPortal('');
     setFiltroContratoPortal('');
+    setFiltroTipoPortal('');
+    setFiltroStatusPortal('');
+  };
+
+  const exportarRelatorioPortal = () => {
+    let vistoriasExportacao = vistoriasPortal.filter((v: any) => {
+      if (filtroEquipamentoPortal && !v.contrato_equipamentos?.numero_serie?.toLowerCase().includes(filtroEquipamentoPortal.toLowerCase())) return false;
+      if (filtroContratoPortal && !v.contrato_equipamentos?.contratos?.numero_contrato?.toLowerCase().includes(filtroContratoPortal.toLowerCase())) return false;
+      if (filtroTipoPortal && !v.equipment_type?.toLowerCase().includes(filtroTipoPortal.toLowerCase())) return false;
+      if (filtroStatusPortal) {
+        const respostas = v.respostas || {};
+        const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+        return filtroStatusPortal === 'com_avaria' ? temAvaria : !temAvaria;
+      }
+      return true;
+    });
+
+    if (vistoriasExportacao.length === 0) {
+      alert('Nenhuma vistoria para exportar com os filtros aplicados');
+      return;
+    }
+
+    const headers = ['Data', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Observações'];
+    
+    const rows = vistoriasExportacao.map((v: any) => {
+      const respostas = v.respostas || {};
+      const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+      return [
+        formatarData(v.data_inspecao),
+        v.contrato_equipamentos?.numero_serie || '—',
+        v.contrato_equipamentos?.modelo || '—',
+        v.equipment_type || '—',
+        v.contrato_equipamentos?.contratos?.numero_contrato || '—',
+        temAvaria ? 'Com Avaria' : 'OK',
+        v.observacoes || '—',
+      ];
+    });
+
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach((row: any[]) => {
+      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const exportarRelatorio = () => {
@@ -416,8 +517,14 @@ export function Dashboard() {
   };
 
   const vistoriasPortalFiltradas = vistoriasPortal.filter((v: any) => {
-    if (filtroEquipamentoPortal && !v.contrato_equipamentos?.numero_serie?.includes(filtroEquipamentoPortal)) return false;
-    if (filtroContratoPortal && !v.contrato_equipamentos?.contratos?.numero_contrato?.includes(filtroContratoPortal)) return false;
+    if (filtroEquipamentoPortal && !v.contrato_equipamentos?.numero_serie?.toLowerCase().includes(filtroEquipamentoPortal.toLowerCase())) return false;
+    if (filtroContratoPortal && !v.contrato_equipamentos?.contratos?.numero_contrato?.toLowerCase().includes(filtroContratoPortal.toLowerCase())) return false;
+    if (filtroTipoPortal && !v.equipment_type?.toLowerCase().includes(filtroTipoPortal.toLowerCase())) return false;
+    if (filtroStatusPortal) {
+      const respostas = v.respostas || {};
+      const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+      return filtroStatusPortal === 'com_avaria' ? temAvaria : !temAvaria;
+    }
     return true;
   });
 
@@ -515,16 +622,6 @@ export function Dashboard() {
         <div className="bg-white border-b border-gray-200 px-8">
           <div className="flex gap-8">
             <button
-              onClick={() => setActiveTab('vistorias')}
-              className={`px-4 py-3 font-semibold border-b-2 transition ${
-                activeTab === 'vistorias'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Vistorias
-            </button>
-            <button
               onClick={() => {
                 setActiveTab('vistoria');
                 loadVistoriasPortal();
@@ -536,6 +633,16 @@ export function Dashboard() {
               }`}
             >
               Vistorias do Portal
+            </button>
+            <button
+              onClick={() => setActiveTab('vistorias')}
+              className={`px-4 py-3 font-semibold border-b-2 transition ${
+                activeTab === 'vistorias'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Vistorias
             </button>
             <button
               onClick={() => {
@@ -561,7 +668,177 @@ export function Dashboard() {
         {/* SCROLL CONTENT */}
         <div className="flex-1 overflow-auto">
           <div className="p-8">
-            {activeTab === 'vistorias' ? (
+            {activeTab === 'vistoria' ? (
+              <>
+                {/* CARDS DE ESTATÍSTICAS - PORTAL */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+                    <p className="text-blue-100 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
+                    <p className="text-5xl font-bold mt-3">{statsPortal.total}</p>
+                    <p className="text-blue-100 text-xs mt-2">Portal do Cliente</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-red-400 to-red-600 rounded-lg shadow-lg p-6 text-white">
+                    <p className="text-red-100 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
+                    <p className="text-5xl font-bold mt-3">{statsPortal.comAvaria}</p>
+                    <p className="text-red-100 text-xs mt-2">Equipamentos com problemas</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-lg shadow-lg p-6 text-white">
+                    <p className="text-green-100 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
+                    <p className="text-5xl font-bold mt-3">{statsPortal.equipamentoOk}</p>
+                    <p className="text-green-100 text-xs mt-2">Equipamentos funcionando</p>
+                  </div>
+                </div>
+
+                {/* FILTROS AVANÇADOS */}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">Filtros Avançados</h3>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={exportarRelatorioPortal}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-green-600 rounded hover:bg-green-700 transition"
+                      >
+                        Exportar Relatório
+                      </button>
+                      <button
+                        onClick={limparFiltrosPortal}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+                      >
+                        Limpar Filtros
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Número de Série</label>
+                      <input
+                        type="text"
+                        value={filtroEquipamentoPortal}
+                        onChange={(e) => setFiltroEquipamentoPortal(e.target.value)}
+                        placeholder="Filtrar por série..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Contrato</label>
+                      <input
+                        type="text"
+                        value={filtroContratoPortal}
+                        onChange={(e) => setFiltroContratoPortal(e.target.value)}
+                        placeholder="Filtrar por contrato..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Equipamento</label>
+                      <select
+                        value={filtroTipoPortal}
+                        onChange={(e) => setFiltroTipoPortal(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Tipos</option>
+                        <option value="Desktop">Desktop</option>
+                        <option value="Monitor">Monitor</option>
+                        <option value="Notebook">Notebook</option>
+                        <option value="MiniPro">MiniPro</option>
+                        <option value="All in One">All in One</option>
+                        <option value="Duo">Duo</option>
+                        <option value="Tablet">Tablet</option>
+                        <option value="Chromebook">Chromebook</option>
+                        <option value="Máquina de pagamento">Máquina de pagamento</option>
+                        <option value="Diversos">Diversos</option>
+                        <option value="Celular">Celular</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                      <select
+                        value={filtroStatusPortal}
+                        onChange={(e) => setFiltroStatusPortal(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Status</option>
+                        <option value="ok">Equipamento OK</option>
+                        <option value="com_avaria">Com Avaria</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TABELA DE VISTORIAS DO PORTAL */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900">Vistorias do Portal ({vistoriasPortalFiltradas.length})</h3>
+                  </div>
+
+                  {loadingPortal ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Carregando vistorias do portal...</p>
+                    </div>
+                  ) : vistoriasPortalFiltradas.length === 0 ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Nenhuma vistoria do portal encontrada</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Modelo</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tipo</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Respostas</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {vistoriasPortalFiltradas.map((vistoria: any) => {
+                            const respostas = vistoria.respostas || {};
+                            const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+                            return (
+                              <tr key={vistoria.id} className="hover:bg-gray-50 transition">
+                                <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_inspecao)}</td>
+                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.contrato_equipamentos?.numero_serie || '—'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.modelo || '—'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipment_type}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.contratos?.numero_contrato || '—'}</td>
+                                <td className="px-6 py-4 text-sm">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    temAvaria
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {temAvaria ? 'Com Avaria' : 'OK'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  <button
+                                    onClick={() => alert(JSON.stringify(vistoria.respostas, null, 2))}
+                                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                                  >
+                                    Ver Respostas
+                                  </button>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.observacoes || '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : activeTab === 'vistorias' ? (
               <>
                 {/* CARDS DE ESTATÍSTICAS - VISTORIAS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -759,98 +1036,6 @@ export function Dashboard() {
                                 </td>
                               </tr>
                             ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : activeTab === 'vistoria' ? (
-              <>
-                {/* ABA: VISTORIAS DO PORTAL */}
-                <div className="bg-white rounded-lg shadow p-6 mb-8">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Filtros</h3>
-                    <button
-                      onClick={limparFiltrosPortal}
-                      className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
-                    >
-                      Limpar Filtros
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Número de Série</label>
-                      <input
-                        type="text"
-                        value={filtroEquipamentoPortal}
-                        onChange={(e) => setFiltroEquipamentoPortal(e.target.value)}
-                        placeholder="Filtrar por série..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Contrato</label>
-                      <input
-                        type="text"
-                        value={filtroContratoPortal}
-                        onChange={(e) => setFiltroContratoPortal(e.target.value)}
-                        placeholder="Filtrar por contrato..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* TABELA DE VISTORIAS DO PORTAL */}
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900">Vistorias do Portal ({vistoriasPortalFiltradas.length})</h3>
-                  </div>
-
-                  {loadingPortal ? (
-                    <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Carregando vistorias do portal...</p>
-                    </div>
-                  ) : vistoriasPortalFiltradas.length === 0 ? (
-                    <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Nenhuma vistoria do portal encontrada</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Modelo</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tipo</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Respostas</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observações</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {vistoriasPortalFiltradas.map((vistoria: any) => (
-                            <tr key={vistoria.id} className="hover:bg-gray-50 transition">
-                              <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_inspecao)}</td>
-                              <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.contrato_equipamentos?.numero_serie || '—'}</td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.modelo || '—'}</td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipment_type}</td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.contratos?.numero_contrato || '—'}</td>
-                              <td className="px-6 py-4 text-sm text-gray-900">
-                                <button
-                                  onClick={() => alert(JSON.stringify(vistoria.respostas, null, 2))}
-                                  className="text-blue-600 hover:text-blue-800 font-semibold"
-                                >
-                                  Ver Respostas
-                                </button>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.observacoes || '—'}</td>
-                            </tr>
-                          ))}
                         </tbody>
                       </table>
                     </div>
