@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { UploadFoto } from '../components/UploadFoto';
 import { ChecklistVistoria } from '../components/ChecklistVistoria';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 export const VistoriaCliente: React.FC = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -23,8 +25,36 @@ export const VistoriaCliente: React.FC = () => {
   useEffect(() => {
     if (numeroSerie && equipamentoId) {
       criarConfirmacao();
+      buscarTipoEquipamento();
     }
   }, [numeroSerie, equipamentoId]);
+
+  const buscarTipoEquipamento = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/confirmacoes/${equipamentoId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const tipoEquipamento = result.data?.equipamento?.tipo_equipamento;
+        
+        console.log('[VistoriaCliente] Tipo de equipamento encontrado:', tipoEquipamento);
+        
+        if (tipoEquipamento) {
+          setEquipmentType(tipoEquipamento);
+        }
+      } else {
+        console.error('[VistoriaCliente] Erro ao buscar tipo de equipamento:', response.status);
+      }
+    } catch (error) {
+      console.error('[VistoriaCliente] Erro ao buscar tipo de equipamento:', error);
+    }
+  };
 
   const criarConfirmacao = () => {
     setConfirmacaoId(equipamentoId!);
