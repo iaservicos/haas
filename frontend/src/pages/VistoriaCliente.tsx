@@ -20,7 +20,7 @@ export const VistoriaCliente: React.FC = () => {
   const [analiseResultado, setAnaliseResultado] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
-  const [equipmentType, setEquipmentType] = useState<string>('Desktop');
+  const [equipmentType, setEquipmentType] = useState<string>('');
 
   useEffect(() => {
     if (numeroSerie && equipamentoId) {
@@ -135,7 +135,7 @@ export const VistoriaCliente: React.FC = () => {
 
         {/* CONTENT */}
         <div className="flex-1 overflow-auto p-8">
-          {confirmacaoData ? (
+          {confirmacaoData && equipmentType ? (
             <div className="max-w-4xl mx-auto space-y-6">
               {/* CARD: UPLOAD DE FOTO */}
               <div className="bg-white rounded-lg shadow-md p-6">
@@ -217,7 +217,7 @@ export const VistoriaCliente: React.FC = () => {
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">Carregando...</p>
+                <p className="mt-4 text-gray-600">Carregando informações do equipamento...</p>
               </div>
             </div>
           )}
