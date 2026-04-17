@@ -44,10 +44,14 @@ export function Dashboard() {
   // VISTORIAS DO PORTAL
   const [vistoriasPortal, setVistoriasPortal] = useState<any[]>([]);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [filtroClientePortal, setFiltroClientePortal] = useState('');
   const [filtroEquipamentoPortal, setFiltroEquipamentoPortal] = useState('');
   const [filtroContratoPortal, setFiltroContratoPortal] = useState('');
   const [filtroTipoPortal, setFiltroTipoPortal] = useState('');
   const [filtroStatusPortal, setFiltroStatusPortal] = useState('');
+  
+  // LISTAS PARA DROPDOWNS PORTAL
+  const [clientesPortal, setClientesPortal] = useState<string[]>([]);
   
   // ESTATÍSTICAS PORTAL
   const [statsPortal, setStatsPortal] = useState({
@@ -84,7 +88,7 @@ export function Dashboard() {
   // CALCULAR ESTATÍSTICAS DO PORTAL
   useEffect(() => {
     calcularEstatisticasPortal();
-  }, [vistoriasPortal, filtroEquipamentoPortal, filtroContratoPortal, filtroTipoPortal, filtroStatusPortal]);
+  }, [vistoriasPortal, filtroClientePortal, filtroEquipamentoPortal, filtroContratoPortal, filtroTipoPortal, filtroStatusPortal]);
 
   const loadVistorias = async () => {
     try {
@@ -149,6 +153,12 @@ export function Dashboard() {
       console.log('[Dashboard] Vistorias do portal carregadas:', result.data);
       
       setVistoriasPortal(result.data || []);
+
+      // Extrair clientes únicos
+      const clientesUnicos = [...new Set(
+        (result.data || []).map((v: any) => v.contrato_equipamentos?.contratos?.nome_cliente)
+      )].filter(Boolean).sort();
+      setClientesPortal(clientesUnicos as string[]);
     } catch (error) {
       console.error('[Dashboard] Erro ao carregar vistorias do portal:', error);
       setVistoriasPortal([]);
@@ -159,6 +169,12 @@ export function Dashboard() {
 
   const calcularEstatisticasPortal = () => {
     let filtered = [...vistoriasPortal];
+
+    if (filtroClientePortal) {
+      filtered = filtered.filter((v: any) =>
+        v.contrato_equipamentos?.contratos?.nome_cliente?.toLowerCase().includes(filtroClientePortal.toLowerCase())
+      );
+    }
 
     if (filtroEquipamentoPortal) {
       filtered = filtered.filter((v: any) =>
@@ -383,6 +399,7 @@ export function Dashboard() {
   };
 
   const limparFiltrosPortal = () => {
+    setFiltroClientePortal('');
     setFiltroEquipamentoPortal('');
     setFiltroContratoPortal('');
     setFiltroTipoPortal('');
@@ -391,6 +408,7 @@ export function Dashboard() {
 
   const exportarRelatorioPortal = () => {
     let vistoriasExportacao = vistoriasPortal.filter((v: any) => {
+      if (filtroClientePortal && !v.contrato_equipamentos?.contratos?.nome_cliente?.toLowerCase().includes(filtroClientePortal.toLowerCase())) return false;
       if (filtroEquipamentoPortal && !v.contrato_equipamentos?.numero_serie?.toLowerCase().includes(filtroEquipamentoPortal.toLowerCase())) return false;
       if (filtroContratoPortal && !v.contrato_equipamentos?.contratos?.numero_contrato?.toLowerCase().includes(filtroContratoPortal.toLowerCase())) return false;
       if (filtroTipoPortal && !v.equipment_type?.toLowerCase().includes(filtroTipoPortal.toLowerCase())) return false;
@@ -407,13 +425,14 @@ export function Dashboard() {
       return;
     }
 
-    const headers = ['Data', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Observações'];
+    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Observações'];
     
     const rows = vistoriasExportacao.map((v: any) => {
       const respostas = v.respostas || {};
       const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
       return [
         formatarData(v.data_inspecao),
+        v.contrato_equipamentos?.contratos?.nome_cliente || '—',
         v.contrato_equipamentos?.numero_serie || '—',
         v.contrato_equipamentos?.modelo || '—',
         v.equipment_type || '—',
@@ -517,6 +536,7 @@ export function Dashboard() {
   };
 
   const vistoriasPortalFiltradas = vistoriasPortal.filter((v: any) => {
+    if (filtroClientePortal && !v.contrato_equipamentos?.contratos?.nome_cliente?.toLowerCase().includes(filtroClientePortal.toLowerCase())) return false;
     if (filtroEquipamentoPortal && !v.contrato_equipamentos?.numero_serie?.toLowerCase().includes(filtroEquipamentoPortal.toLowerCase())) return false;
     if (filtroContratoPortal && !v.contrato_equipamentos?.contratos?.numero_contrato?.toLowerCase().includes(filtroContratoPortal.toLowerCase())) return false;
     if (filtroTipoPortal && !v.equipment_type?.toLowerCase().includes(filtroTipoPortal.toLowerCase())) return false;
@@ -672,22 +692,19 @@ export function Dashboard() {
               <>
                 {/* CARDS DE ESTATÍSTICAS - PORTAL */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg shadow-lg p-6 text-white">
-                    <p className="text-blue-100 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
-                    <p className="text-5xl font-bold mt-3">{statsPortal.total}</p>
-                    <p className="text-blue-100 text-xs mt-2">Portal do Cliente</p>
+                  <div className="bg-blue-100 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Total de Vistorias</p>
+                    <p className="text-5xl font-bold text-blue-900 mt-3">{statsPortal.total}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-red-400 to-red-600 rounded-lg shadow-lg p-6 text-white">
-                    <p className="text-red-100 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
-                    <p className="text-5xl font-bold mt-3">{statsPortal.comAvaria}</p>
-                    <p className="text-red-100 text-xs mt-2">Equipamentos com problemas</p>
+                  <div className="bg-gray-200 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Com Avaria</p>
+                    <p className="text-5xl font-bold text-gray-800 mt-3">{statsPortal.comAvaria}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-lg shadow-lg p-6 text-white">
-                    <p className="text-green-100 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
-                    <p className="text-5xl font-bold mt-3">{statsPortal.equipamentoOk}</p>
-                    <p className="text-green-100 text-xs mt-2">Equipamentos funcionando</p>
+                  <div className="bg-gray-150 rounded-lg shadow p-6">
+                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Equipamento OK</p>
+                    <p className="text-5xl font-bold text-gray-700 mt-3">{statsPortal.equipamentoOk}</p>
                   </div>
                 </div>
 
@@ -711,7 +728,23 @@ export function Dashboard() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Cliente</label>
+                      <select
+                        value={filtroClientePortal}
+                        onChange={(e) => setFiltroClientePortal(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Todos os Clientes</option>
+                        {clientesPortal.map((cliente) => (
+                          <option key={cliente} value={cliente}>
+                            {cliente}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">Número de Série</label>
                       <input
@@ -791,6 +824,7 @@ export function Dashboard() {
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Modelo</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tipo</th>
@@ -807,6 +841,7 @@ export function Dashboard() {
                             return (
                               <tr key={vistoria.id} className="hover:bg-gray-50 transition">
                                 <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_inspecao)}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{vistoria.contrato_equipamentos?.contratos?.nome_cliente || '—'}</td>
                                 <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.contrato_equipamentos?.numero_serie || '—'}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.modelo || '—'}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipment_type}</td>
@@ -814,8 +849,8 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm">
                                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                                     temAvaria
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-green-100 text-green-800'
+                                      ? 'bg-gray-200 text-gray-800'
+                                      : 'bg-gray-200 text-gray-800'
                                   }`}>
                                     {temAvaria ? 'Com Avaria' : 'OK'}
                                   </span>
