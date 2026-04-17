@@ -48,9 +48,10 @@ router.get('/perguntas/:equipmentType', async (req, res) => {
     
     // Validar tipo de equipamento
     const validTypes = [
-      'Desktop', 'Monitor', 'Notebook', 'MiniPro', 'All in One',
-      'Duo', 'Tablet', 'Chromebook', 'Máquina de pagamento', 'Diversos', 'Celular'
-    ];
+  'Armário de Recarga', 'Notebook', 'Smartphone', 'Nobreak', 'All in One',
+  'Desktop', 'Tablet', 'Chromebook', 'Máquina de pagamento', 'Diversos', 'Celular'
+];
+
     
     if (!validTypes.includes(equipmentType)) {
       return res.status(400).json({ 
