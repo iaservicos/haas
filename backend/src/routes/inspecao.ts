@@ -1,6 +1,8 @@
 import express from 'express';
 import { supabase } from '../config/database.js';
+import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
+
 
 const router = express.Router();
 
@@ -25,7 +27,9 @@ router.get('/perguntas/:equipmentType', async (req, res) => {
       });
     }
 
-    const questions = getQuestionsByEquipmentType(equipmentType);
+    const questions = getQuestionsByEquipmentType(equipmentType as EquipmentType);
+
+
 
     res.json({
       equipmentType,
