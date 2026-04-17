@@ -227,7 +227,7 @@ router.get('/portal/listar', async (req, res) => {
           // Buscar dados do contrato
           const { data: contrato, error: contratoError } = await supabase
             .from('contratos')
-            .select('id, numero_contrato, nome_client')
+            .select('id, numero_contrato, nome_cliente')
             .eq('id', equipamento.contrato_id)
             .single();
 
@@ -323,7 +323,7 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
           // Buscar dados do contrato
           const { data: contrato, error: contratoError } = await supabase
             .from('contratos')
-            .select('id, numero_contrato, nome_client')
+            .select('id, numero_contrato, nome_cliente')
             .eq('id', equipamento.contrato_id)
             .single();
 
