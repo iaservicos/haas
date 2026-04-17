@@ -37,27 +37,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Armário de Recarga': [
     {
       id: 'recarga_portas',
-      text: 'Portas e Trincas - Sim/Não',
+      text: 'Portas e Trincas',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'recarga_rodizios',
-      text: 'Rodízios/Pés - Sim/Não',
+      text: 'Rodízios/Pés',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'recarga_cabos',
-      text: 'Cabos de energia internos - Sim/Não',
+      text: 'Cabos de energia internos',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'recarga_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -76,27 +69,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Notebook': [
     {
       id: 'notebook_tela',
-      text: 'Tela (Manchas/Trincas) - Sim/Não + Foto',
+      text: 'Tela',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'notebook_teclado',
-      text: 'Teclado (Teclas faltando) - Sim/Não + Foto',
+      text: 'Teclado',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'notebook_carregador',
-      text: 'Carregador Original - Sim/Não + Foto',
+      text: 'Carregador Original',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'notebook_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -115,27 +101,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Smartphone': [
     {
       id: 'smartphone_tela',
-      text: 'Tela/Display - Sim/Não + Foto',
+      text: 'Tela/Display',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'smartphone_bateria',
-      text: 'Saúde da Bateria (%) - Não',
+      text: 'Saúde da Bateria',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'smartphone_acessorios',
-      text: 'Acessórios (Capa/Película) - Sim/Não',
+      text: 'Acessórios',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'smartphone_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -154,27 +133,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Nobreak': [
     {
       id: 'nobreak_cabo',
-      text: 'Cabo de Força - Sim/Não + Foto',
+      text: 'Cabo de Força',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'nobreak_bateria',
-      text: 'Teste de Autonomia (Bateria) - Sim/Não',
+      text: 'Teste de Autonomia (Bateria)',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'nobreak_ruido',
-      text: 'Ruído Excessivo - Sim/Não',
+      text: 'Ruído Excessivo',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'nobreak_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -193,27 +165,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'All in One': [
     {
       id: 'allinone_painel',
-      text: 'Painel Traseiro (Portas) - Sim/Não + Foto',
+      text: 'Painel Traseiro (Portas)',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'allinone_perifericos',
-      text: 'Periféricos (Mouse/Teclado) - Sim/Não',
+      text: 'Periféricos (Mouse/Teclado)',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'allinone_suporte',
-      text: 'Suporte/Base - Sim/Não + Foto',
+      text: 'Suporte/Base',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'allinone_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -232,21 +197,14 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Desktop': [
     {
       id: 'desktop_lacres',
-      text: 'Lacres de Garantia - Foto',
+      text: 'Lacres de Garantia',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'desktop_cabos',
-      text: 'Cabos (Vídeo/Energia) - Sim/Não',
+      text: 'Cabos (Vídeo/Energia)',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'desktop_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -265,13 +223,13 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Tablet': [
     {
       id: 'tablet_sensibilidade',
-      text: 'Sensibilidade do Touch - Sim/Não + Foto',
+      text: 'Sensibilidade do Touch',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'tablet_adaptador',
-      text: 'Adaptador energia - Sim',
+      text: 'Adaptador energia',
       type: 'yes_no',
       required: true,
     },
@@ -298,27 +256,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Chromebook': [
     {
       id: 'chromebook_tela',
-      text: 'Tela (Manchas/Trincas) - Sim/Não + Foto',
+      text: 'Tela',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'chromebook_teclado',
-      text: 'Teclado (Teclas faltando) - Sim/Não + Foto',
+      text: 'Teclado',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'chromebook_carregador',
-      text: 'Carregador Original - Sim/Não + Foto',
+      text: 'Carregador Original',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'chromebook_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -337,27 +288,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Máquina de pagamento': [
     {
       id: 'pagamento_tela',
-      text: 'Tela - Sim/Não + Foto',
+      text: 'Tela',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'pagamento_botoes',
-      text: 'Botões - Sim/Não',
+      text: 'Botões',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'pagamento_leitor',
-      text: 'Leitor de Cartão - Sim/Não',
+      text: 'Leitor de Cartão',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'pagamento_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
@@ -387,13 +331,6 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
       required: true,
     },
     {
-      id: 'diversos_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
-      required: true,
-    },
-    {
       id: 'diversos_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
@@ -409,27 +346,20 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Celular': [
     {
       id: 'celular_tela',
-      text: 'Tela/Display - Sim/Não + Foto',
+      text: 'Tela/Display',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'celular_bateria',
-      text: 'Saúde da Bateria (%) - Não',
+      text: 'Saúde da Bateria',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'celular_acessorios',
-      text: 'Acessórios (Capa/Película) - Sim/Não',
+      text: 'Acessórios',
       type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'celular_capa',
-      text: 'Capa/Película',
-      type: 'select',
-      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
