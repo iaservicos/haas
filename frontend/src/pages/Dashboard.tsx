@@ -6,6 +6,8 @@ import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 export function Dashboard() {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
@@ -52,6 +54,12 @@ export function Dashboard() {
   const [modoAprovacao, setModoAprovacao] = useState<'visualizar' | 'aprovar' | 'rejeitar'>('visualizar');
   const [tipoMaterial, setTipoMaterial] = useState('');
 
+  // VISTORIAS DO PORTAL
+  const [vistoriasPortal, setVistoriasPortal] = useState<any[]>([]);
+  const [loadingPortal, setLoadingPortal] = useState(false);
+  const [filtroEquipamentoPortal, setFiltroEquipamentoPortal] = useState('');
+  const [filtroContratoPortal, setFiltroContratoPortal] = useState('');
+
   // CARREGAR DADOS INICIAIS
   useEffect(() => {
     loadVistorias();
@@ -62,6 +70,13 @@ export function Dashboard() {
   useEffect(() => {
     aplicarFiltros();
   }, [filtroTecnico, filtroCliente, filtroEquipamento, filtroEstado, filtroMouse, filtroTeclado, vistorias]);
+
+  // CARREGAR VISTORIAS DO PORTAL QUANDO ABA MUDA
+  useEffect(() => {
+    if (activeTab === 'vistoria') {
+      loadVistoriasPortal();
+    }
+  }, [activeTab]);
 
   const loadVistorias = async () => {
     try {
@@ -104,6 +119,33 @@ export function Dashboard() {
       setEquipamentosPendentes(data || []);
     } catch (error) {
       console.error('Erro ao carregar equipamentos pendentes:', error);
+    }
+  };
+
+  const loadVistoriasPortal = async () => {
+    try {
+      setLoadingPortal(true);
+      console.log('[Dashboard] Carregando vistorias do portal...');
+      
+      const response = await fetch(`${API_BASE_URL}/inspecao/portal/listar`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ao carregar vistorias do portal: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('[Dashboard] Vistorias do portal carregadas:', result.data);
+      
+      setVistoriasPortal(result.data || []);
+    } catch (error) {
+      console.error('[Dashboard] Erro ao carregar vistorias do portal:', error);
+      setVistoriasPortal([]);
+    } finally {
+      setLoadingPortal(false);
     }
   };
 
@@ -293,6 +335,11 @@ export function Dashboard() {
     setFiltroTeclado('');
   };
 
+  const limparFiltrosPortal = () => {
+    setFiltroEquipamentoPortal('');
+    setFiltroContratoPortal('');
+  };
+
   const exportarRelatorio = () => {
     const vistoriasExportacao = vistorias.filter((v: any) => {
       if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
@@ -367,6 +414,12 @@ export function Dashboard() {
     aprovados: equipamentosPendentes.filter(e => e.status === 'Aprovado').length,
     rejeitados: equipamentosPendentes.filter(e => e.status === 'Rejeitado').length,
   };
+
+  const vistoriasPortalFiltradas = vistoriasPortal.filter((v: any) => {
+    if (filtroEquipamentoPortal && !v.contrato_equipamentos?.numero_serie?.includes(filtroEquipamentoPortal)) return false;
+    if (filtroContratoPortal && !v.contrato_equipamentos?.contratos?.numero_contrato?.includes(filtroContratoPortal)) return false;
+    return true;
+  });
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -470,6 +523,19 @@ export function Dashboard() {
               }`}
             >
               Vistorias
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('vistoria');
+                loadVistoriasPortal();
+              }}
+              className={`px-4 py-3 font-semibold border-b-2 transition ${
+                activeTab === 'vistoria'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Vistorias do Portal
             </button>
             <button
               onClick={() => {
@@ -674,7 +740,7 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
-                                <td className="px-6 py-4 text-sm">
+                                <td className={`px-6 py-4 text-sm ${getCorEstado(vistoria.estado)}`}>
                                   <span className={`${getCorEstado(vistoria.estado)}`}>
                                     {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
                                   </span>
@@ -693,6 +759,98 @@ export function Dashboard() {
                                 </td>
                               </tr>
                             ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : activeTab === 'vistoria' ? (
+              <>
+                {/* ABA: VISTORIAS DO PORTAL */}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">Filtros</h3>
+                    <button
+                      onClick={limparFiltrosPortal}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition"
+                    >
+                      Limpar Filtros
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Número de Série</label>
+                      <input
+                        type="text"
+                        value={filtroEquipamentoPortal}
+                        onChange={(e) => setFiltroEquipamentoPortal(e.target.value)}
+                        placeholder="Filtrar por série..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Contrato</label>
+                      <input
+                        type="text"
+                        value={filtroContratoPortal}
+                        onChange={(e) => setFiltroContratoPortal(e.target.value)}
+                        placeholder="Filtrar por contrato..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* TABELA DE VISTORIAS DO PORTAL */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-900">Vistorias do Portal ({vistoriasPortalFiltradas.length})</h3>
+                  </div>
+
+                  {loadingPortal ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Carregando vistorias do portal...</p>
+                    </div>
+                  ) : vistoriasPortalFiltradas.length === 0 ? (
+                    <div className="px-6 py-12 text-center">
+                      <p className="text-gray-600 font-semibold">Nenhuma vistoria do portal encontrada</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Modelo</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tipo</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Respostas</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {vistoriasPortalFiltradas.map((vistoria: any) => (
+                            <tr key={vistoria.id} className="hover:bg-gray-50 transition">
+                              <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_inspecao)}</td>
+                              <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.contrato_equipamentos?.numero_serie || '—'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.modelo || '—'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipment_type}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.contratos?.numero_contrato || '—'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                <button
+                                  onClick={() => alert(JSON.stringify(vistoria.respostas, null, 2))}
+                                  className="text-blue-600 hover:text-blue-800 font-semibold"
+                                >
+                                  Ver Respostas
+                                </button>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.observacoes || '—'}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>

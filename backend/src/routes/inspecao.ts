@@ -74,11 +74,11 @@ router.get('/perguntas/:equipmentType', async (req, res) => {
 
 /**
  * POST /api/inspecao/salvar
- * Salva as respostas da inspeção
+ * Salva as respostas da inspeção com equipamento_id
  */
 router.post('/salvar', async (req, res) => {
   try {
-    const { vistoriaId, equipmentType, answers, observacoes } = req.body;
+    const { vistoriaId, equipmentType, answers, observacoes, equipamento_id } = req.body;
 
     if (!vistoriaId || !equipmentType || !answers) {
       return res.status(400).json({ 
@@ -86,16 +86,25 @@ router.post('/salvar', async (req, res) => {
       });
     }
 
+    // Construir objeto de inserção
+    const insertData: any = {
+      vistoria_id: vistoriaId,
+      equipment_type: equipmentType,
+      respostas: answers,
+      observacoes: observacoes || null,
+      data_inspecao: new Date().toISOString(),
+    };
+
+    // Adicionar equipamento_id se fornecido
+    if (equipamento_id) {
+      insertData.equipamento_id = equipamento_id;
+      console.log(`[inspecao.ts] Salvando inspeção com equipamento_id: ${equipamento_id}`);
+    }
+
     // Salvar respostas no banco de dados
     const { data, error } = await supabase
       .from('inspecao_respostas')
-      .insert({
-        vistoria_id: vistoriaId,
-        equipment_type: equipmentType,
-        respostas: answers,
-        observacoes: observacoes || null,
-        data_inspecao: new Date().toISOString(),
-      })
+      .insert(insertData)
       .select();
 
     if (error) {
@@ -106,11 +115,18 @@ router.post('/salvar', async (req, res) => {
       });
     }
 
-    // Atualizar status da vistoria
-    await supabase
-      .from('vistorias')
-      .update({ status: 'inspecionada' })
-      .eq('id', vistoriaId);
+    console.log('[inspecao.ts] Inspeção salva com sucesso:', data[0]);
+
+    // Atualizar status da vistoria (se existir)
+    try {
+      await supabase
+        .from('vistorias')
+        .update({ status: 'inspecionada' })
+        .eq('id', vistoriaId);
+    } catch (updateError) {
+      // Não falhar se a vistoria não existir (pode ser uma inspeção do portal)
+      console.log('[inspecao.ts] Aviso: Não foi possível atualizar status da vistoria', updateError);
+    }
 
     res.json({
       success: true,
@@ -149,6 +165,115 @@ router.get('/:vistoriaId', async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar inspeção:', error);
     res.status(500).json({ error: 'Erro ao buscar inspeção' });
+  }
+});
+
+/**
+ * GET /api/inspecao/portal/listar
+ * Retorna todas as inspeções do portal com dados de equipamento e contrato
+ */
+router.get('/portal/listar', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('inspecao_respostas')
+      .select(`
+        id,
+        vistoria_id,
+        equipamento_id,
+        equipment_type,
+        respostas,
+        observacoes,
+        data_inspecao,
+        contrato_equipamentos:equipamento_id (
+          id,
+          numero_serie,
+          modelo,
+          tipo_material,
+          contrato_id,
+          contratos:contrato_id (
+            id,
+            numero_contrato,
+            cliente_id
+          )
+        )
+      `)
+      .order('data_inspecao', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao listar inspeções do portal:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao listar inspeções',
+        details: error.message 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: data || [],
+      total: data?.length || 0,
+    });
+  } catch (error) {
+    console.error('Erro ao listar inspeções do portal:', error);
+    res.status(500).json({ 
+      error: 'Erro ao listar inspeções',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+/**
+ * GET /api/inspecao/portal/equipamento/:equipamentoId
+ * Retorna todas as inspeções para um equipamento específico
+ */
+router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
+  try {
+    const { equipamentoId } = req.params;
+
+    const { data, error } = await supabase
+      .from('inspecao_respostas')
+      .select(`
+        id,
+        vistoria_id,
+        equipamento_id,
+        equipment_type,
+        respostas,
+        observacoes,
+        data_inspecao,
+        contrato_equipamentos:equipamento_id (
+          id,
+          numero_serie,
+          modelo,
+          tipo_material,
+          contrato_id,
+          contratos:contrato_id (
+            id,
+            numero_contrato,
+            cliente_id
+          )
+        )
+      `)
+      .eq('equipamento_id', equipamentoId)
+      .order('data_inspecao', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar inspeções do equipamento:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao buscar inspeções',
+        details: error.message 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: data || [],
+      total: data?.length || 0,
+    });
+  } catch (error) {
+    console.error('Erro ao buscar inspeções do equipamento:', error);
+    res.status(500).json({ 
+      error: 'Erro ao buscar inspeções',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
   }
 });
 

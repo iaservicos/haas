@@ -211,6 +211,7 @@ export const VistoriaCliente: React.FC = () => {
                 <ChecklistVistoria
                   confirmacaoId={vistoriaId}
                   equipmentType={equipmentType}
+                  equipamentoId={parseInt(equipamentoId || '0')}
                   onChecklistSave={handleChecklistSave}
                 />
               </div>

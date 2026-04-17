@@ -10,12 +10,14 @@ interface Question {
 interface ChecklistVistoriaProps {
   confirmacaoId: string;
   equipmentType?: string;
+  equipamentoId?: number;
   onChecklistSave?: (checklist: any) => void;
 }
 
 export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({ 
   confirmacaoId, 
   equipmentType = 'Desktop',
+  equipamentoId,
   onChecklistSave 
 }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -82,16 +84,22 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     try {
       // Use full URL with API_BASE_URL
       const url = `${API_BASE_URL}/inspecao/salvar`;
+      
+      const payload = {
+        vistoriaId: confirmacaoId,
+        equipmentType,
+        answers,
+        ...(equipamentoId && { equipamento_id: equipamentoId })
+      };
+      
+      console.log('[ChecklistVistoria] Enviando payload:', payload);
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          vistoriaId: confirmacaoId,
-          equipmentType,
-          answers,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -100,6 +108,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       }
 
       const data = await response.json();
+      console.log('[ChecklistVistoria] Resposta do servidor:', data);
       setSucesso(true);
 
       if (onChecklistSave) {
@@ -110,7 +119,9 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
         setSucesso(false);
       }, 2000);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('[ChecklistVistoria] Erro ao salvar:', errorMsg);
+      setErro(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -119,6 +130,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', marginTop: '20px' }}>
       <h3>Checklist de Vistoria - {equipmentType}</h3>
+      {equipamentoId && <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>Equipamento ID: {equipamentoId}</p>}
 
       {questions.length === 0 ? (
         <p style={{ color: '#666', marginTop: '10px' }}>Carregando perguntas...</p>
