@@ -60,6 +60,10 @@ export function Dashboard() {
     equipamentoOk: 0,
   });
 
+  // MODAL DE RESPOSTAS
+  const [showRespostasModal, setShowRespostasModal] = useState(false);
+  const [respostasModal, setRespostasModal] = useState<any>(null);
+
   // EQUIPAMENTOS PENDENTES
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
   const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
@@ -214,6 +218,11 @@ export function Dashboard() {
     };
     
     setStatsPortal(newStats);
+  };
+
+  const abrirModalRespostas = (vistoria: any) => {
+    setRespostasModal(vistoria);
+    setShowRespostasModal(true);
   };
 
   const buscarContratosDoUsuario = async (equipamento: any) => {
@@ -857,10 +866,10 @@ export function Dashboard() {
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
                                   <button
-                                    onClick={() => alert(JSON.stringify(vistoria.respostas, null, 2))}
+                                    onClick={() => abrirModalRespostas(vistoria)}
                                     className="text-blue-600 hover:text-blue-800 font-semibold"
                                   >
-                                    Ver Respostas
+                                    Ver Detalhes
                                   </button>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.observacoes || '—'}</td>
@@ -1204,6 +1213,126 @@ export function Dashboard() {
           <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
         </div>
       </div>
+
+      {/* MODAL DE RESPOSTAS ESTRUTURADO */}
+      {showRespostasModal && respostasModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* HEADER */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Detalhes da Inspeção</h2>
+                <p className="text-blue-100 text-sm mt-1">{formatarData(respostasModal.data_inspecao)}</p>
+              </div>
+              <button
+                onClick={() => setShowRespostasModal(false)}
+                className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* INFORMAÇÕES DO EQUIPAMENTO */}
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Informações do Equipamento</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-3 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Cliente</p>
+                  <p className="text-lg font-bold text-gray-900">{respostasModal.contrato_equipamentos?.contratos?.nome_cliente || '—'}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Contrato</p>
+                  <p className="text-lg font-bold text-gray-900">{respostasModal.contrato_equipamentos?.contratos?.numero_contrato || '—'}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Número de Série</p>
+                  <p className="text-lg font-mono font-bold text-black">{respostasModal.contrato_equipamentos?.numero_serie || '—'}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Modelo</p>
+                  <p className="text-lg font-bold text-gray-900">{respostasModal.contrato_equipamentos?.modelo || '—'}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Tipo</p>
+                  <p className="text-lg font-bold text-gray-900">{respostasModal.equipment_type || '—'}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Status Geral</p>
+                  <p className={`text-lg font-bold ${
+                    Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Não')
+                      ? 'text-red-600'
+                      : 'text-green-600'
+                  }`}>
+                    {Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Não') ? 'Com Avaria' : 'OK'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* RESPOSTAS ESTRUTURADAS */}
+            <div className="px-6 py-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Respostas da Inspeção</h3>
+              <div className="space-y-3">
+                {Object.entries(respostasModal.respostas || {}).map(([pergunta, resposta]: [string, any]) => {
+                  const isOk = resposta === true || resposta === 'Sim';
+                  const isFaltando = resposta === false || resposta === 'Não';
+                  
+                  return (
+                    <div key={pergunta} className={`p-4 rounded-lg border-2 ${
+                      isOk 
+                        ? 'bg-green-50 border-green-200' 
+                        : isFaltando
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-700 capitalize">{pergunta.replace(/_/g, ' ')}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isOk && (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
+                              ✓ OK
+                            </span>
+                          )}
+                          {isFaltando && (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
+                              ✕ Faltando
+                            </span>
+                          )}
+                          {!isOk && !isFaltando && (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
+                              ℹ {resposta}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* OBSERVAÇÕES */}
+            {respostasModal.observacoes && (
+              <div className="px-6 py-4 bg-blue-50 border-t border-blue-200">
+                <h3 className="text-sm font-bold text-blue-900 mb-2">Observações</h3>
+                <p className="text-sm text-blue-800">{respostasModal.observacoes}</p>
+              </div>
+            )}
+
+            {/* FOOTER DO MODAL */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowRespostasModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-semibold"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE DECISÃO */}
       {equipamentoSelecionado && modoAprovacao === 'aprovar' && (
