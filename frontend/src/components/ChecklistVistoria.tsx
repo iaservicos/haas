@@ -24,13 +24,17 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
 
+  // Get API base URL from environment variable
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
   useEffect(() => {
     const loadQuestions = async () => {
       try {
         const type = equipmentType || 'Desktop';
         console.log('[ChecklistVistoria] Carregando perguntas para:', type);
         
-        const url = `/api/inspecao/perguntas/${type}`;
+        // Use full URL with API_BASE_URL
+        const url = `${API_BASE_URL}/inspecao/perguntas/${type}`;
         console.log('[ChecklistVistoria] URL da requisição:', url);
         
         const response = await fetch(url);
@@ -76,7 +80,9 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     setSucesso(false);
 
     try {
-      const response = await fetch(`/api/inspecao/salvar`, {
+      // Use full URL with API_BASE_URL
+      const url = `${API_BASE_URL}/inspecao/salvar`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
