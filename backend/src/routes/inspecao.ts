@@ -1,10 +1,41 @@
 import express from 'express';
 import { supabase } from '../config/database.js';
-import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
 
-
 const router = express.Router();
+
+/**
+ * GET /api/inspecao/equipamento/:equipamentoId
+ * Retorna o tipo de equipamento pelo ID
+ */
+router.get('/equipamento/:equipamentoId', async (req, res) => {
+  try {
+    const { equipamentoId } = req.params;
+
+    const { data, error } = await supabase
+      .from('contrato_equipamentos')
+      .select('tipo_equipamento, numero_serie, modelo')
+      .eq('id', equipamentoId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Equipamento não encontrado' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: equipamentoId,
+        tipo_equipamento: data.tipo_equipamento,
+        numero_serie: data.numero_serie,
+        modelo: data.modelo,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao buscar equipamento:', error);
+    res.status(500).json({ error: 'Erro ao buscar equipamento' });
+  }
+});
 
 /**
  * GET /api/inspecao/perguntas/:equipmentType

@@ -31,17 +31,13 @@ export const VistoriaCliente: React.FC = () => {
 
   const buscarTipoEquipamento = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/confirmacoes/${equipamentoId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      console.log('[VistoriaCliente] Buscando tipo de equipamento para ID:', equipamentoId);
+      
+      const response = await fetch(`${API_BASE_URL}/inspecao/equipamento/${equipamentoId}`);
 
       if (response.ok) {
         const result = await response.json();
-        const tipoEquipamento = result.data?.equipamento?.tipo_equipamento;
+        const tipoEquipamento = result.data?.tipo_equipamento;
         
         console.log('[VistoriaCliente] Tipo de equipamento encontrado:', tipoEquipamento);
         
