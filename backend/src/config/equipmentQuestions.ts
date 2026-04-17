@@ -4,12 +4,12 @@
  */
 
 export type EquipmentType = 
-  | 'Desktop'
-  | 'Monitor'
+  | 'Armário de Recarga'
   | 'Notebook'
-  | 'MiniPro'
+  | 'Smartphone'
+  | 'Nobreak'
   | 'All in One'
-  | 'Duo'
+  | 'Desktop'
   | 'Tablet'
   | 'Chromebook'
   | 'Máquina de pagamento'
@@ -34,441 +34,412 @@ export interface EquipmentQuestions {
  * Baseado em conhecimento de RPA e inspeção técnica
  */
 export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
-  'Desktop': [
+  'Armário de Recarga': [
     {
-      id: 'desktop_monitor',
-      text: 'Monitor presente e funcionando?',
+      id: 'recarga_portas',
+      text: 'Portas e Trincas - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_keyboard',
-      text: 'Teclado presente e funcionando?',
+      id: 'recarga_rodizios',
+      text: 'Rodízios/Pés - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_mouse',
-      text: 'Mouse presente e funcionando?',
+      id: 'recarga_cabos',
+      text: 'Cabos de energia internos - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_cables',
-      text: 'Cabos em bom estado?',
-      type: 'yes_no',
+      id: 'recarga_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'desktop_physical_damage',
+      id: 'recarga_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'desktop_observations',
+      id: 'recarga_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
-  'Monitor': [
-    {
-      id: 'monitor_display',
-      text: 'Tela exibe imagem corretamente?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'monitor_cables',
-      text: 'Cabos em bom estado?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'monitor_stand',
-      text: 'Suporte/Pedestal firme?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'monitor_physical_damage',
-      text: 'Existem danos físicos visíveis?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'monitor_observations',
-      text: 'Observações',
-      type: 'text',
-      required: false,
-    },
-  ],
-
   'Notebook': [
     {
-      id: 'notebook_display',
-      text: 'Tela exibe imagem corretamente?',
+      id: 'notebook_tela',
+      text: 'Tela (Manchas/Trincas) - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'notebook_keyboard',
-      text: 'Teclado funciona?',
+      id: 'notebook_teclado',
+      text: 'Teclado (Teclas faltando) - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'notebook_touchpad',
-      text: 'Touchpad funciona?',
+      id: 'notebook_carregador',
+      text: 'Carregador Original - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'notebook_ports',
-      text: 'Portas e conectores funcionam?',
-      type: 'yes_no',
+      id: 'notebook_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'notebook_screen_damage',
-      text: 'Existem danos físicos visíveis na tela?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'notebook_hinge_damage',
-      text: 'Dobradiça está firme?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'notebook_body_damage',
-      text: 'Existem danos físicos visíveis no corpo?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'notebook_observations',
-      text: 'Observações',
-      type: 'text',
-      required: false,
-    },
-  ],
-
-  'MiniPro': [
-    {
-      id: 'minipro_display',
-      text: 'Tela exibe imagem corretamente?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'minipro_keyboard',
-      text: 'Teclado funciona?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'minipro_ports',
-      text: 'Portas e conectores funcionam?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'minipro_physical_damage',
+      id: 'notebook_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'minipro_observations',
+      id: 'notebook_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
+  'Smartphone': [
+    {
+      id: 'smartphone_tela',
+      text: 'Tela/Display - Sim/Não + Foto',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'smartphone_bateria',
+      text: 'Saúde da Bateria (%) - Não',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'smartphone_acessorios',
+      text: 'Acessórios (Capa/Película) - Sim/Não',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'smartphone_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
+      required: true,
+    },
+    {
+      id: 'smartphone_danos',
+      text: 'Existem danos físicos visíveis?',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'smartphone_observacoes',
+      text: 'Observações',
+      type: 'text',
+      required: false,
+    },
+  ],
+  'Nobreak': [
+    {
+      id: 'nobreak_cabo',
+      text: 'Cabo de Força - Sim/Não + Foto',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'nobreak_bateria',
+      text: 'Teste de Autonomia (Bateria) - Sim/Não',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'nobreak_ruido',
+      text: 'Ruído Excessivo - Sim/Não',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'nobreak_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
+      required: true,
+    },
+    {
+      id: 'nobreak_danos',
+      text: 'Existem danos físicos visíveis?',
+      type: 'yes_no',
+      required: true,
+    },
+    {
+      id: 'nobreak_observacoes',
+      text: 'Observações',
+      type: 'text',
+      required: false,
+    },
+  ],
   'All in One': [
     {
-      id: 'allinone_display',
-      text: 'Tela exibe imagem corretamente?',
+      id: 'allinone_painel',
+      text: 'Painel Traseiro (Portas) - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'allinone_keyboard',
-      text: 'Teclado funciona?',
+      id: 'allinone_perifericos',
+      text: 'Periféricos (Mouse/Teclado) - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'allinone_mouse',
-      text: 'Mouse funciona?',
+      id: 'allinone_suporte',
+      text: 'Suporte/Base - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'allinone_ports',
-      text: 'Portas e conectores funcionam?',
-      type: 'yes_no',
+      id: 'allinone_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'allinone_stand',
-      text: 'Suporte/Pedestal firme?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'allinone_physical_damage',
+      id: 'allinone_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'allinone_observations',
+      id: 'allinone_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
-  'Duo': [
+  'Desktop': [
     {
-      id: 'duo_display',
-      text: 'Telas exibem imagem corretamente?',
+      id: 'desktop_lacres',
+      text: 'Lacres de Garantia - Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'duo_keyboard',
-      text: 'Teclado funciona?',
+      id: 'desktop_cabos',
+      text: 'Cabos (Vídeo/Energia) - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'duo_hinge',
-      text: 'Dobradiça está firme?',
-      type: 'yes_no',
+      id: 'desktop_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'duo_ports',
-      text: 'Portas e conectores funcionam?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'duo_physical_damage',
+      id: 'desktop_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'duo_observations',
+      id: 'desktop_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
   'Tablet': [
     {
-      id: 'tablet_display',
-      text: 'Tela exibe imagem corretamente?',
+      id: 'tablet_sensibilidade',
+      text: 'Sensibilidade do Touch - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'tablet_touch',
-      text: 'Tela sensível ao toque funciona?',
+      id: 'tablet_adaptador',
+      text: 'Adaptador energia - Sim',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'tablet_ports',
-      text: 'Portas e conectores funcionam?',
+      id: 'tablet_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
+      required: true,
+    },
+    {
+      id: 'tablet_danos',
+      text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'tablet_camera',
-      text: 'Câmera funciona?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'tablet_screen_damage',
-      text: 'Existem danos físicos visíveis na tela?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'tablet_body_damage',
-      text: 'Existem danos físicos visíveis no corpo?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'tablet_observations',
+      id: 'tablet_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
   'Chromebook': [
     {
-      id: 'chromebook_display',
-      text: 'Tela exibe imagem corretamente?',
+      id: 'chromebook_tela',
+      text: 'Tela (Manchas/Trincas) - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'chromebook_keyboard',
-      text: 'Teclado funciona?',
+      id: 'chromebook_teclado',
+      text: 'Teclado (Teclas faltando) - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'chromebook_touchpad',
-      text: 'Touchpad funciona?',
+      id: 'chromebook_carregador',
+      text: 'Carregador Original - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'chromebook_ports',
-      text: 'Portas e conectores funcionam?',
-      type: 'yes_no',
+      id: 'chromebook_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'chromebook_physical_damage',
+      id: 'chromebook_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'chromebook_observations',
+      id: 'chromebook_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
   'Máquina de pagamento': [
     {
-      id: 'payment_display',
-      text: 'Tela exibe imagem corretamente?',
+      id: 'pagamento_tela',
+      text: 'Tela - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'payment_card_reader',
-      text: 'Leitor de cartão funciona?',
+      id: 'pagamento_botoes',
+      text: 'Botões - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'payment_keyboard',
-      text: 'Teclado funciona?',
+      id: 'pagamento_leitor',
+      text: 'Leitor de Cartão - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'payment_printer',
-      text: 'Impressora funciona (se aplicável)?',
-      type: 'yes_no',
+      id: 'pagamento_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'payment_physical_damage',
+      id: 'pagamento_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'payment_observations',
+      id: 'pagamento_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
   'Diversos': [
     {
-      id: 'misc_functionality',
-      text: 'Funciona conforme esperado?',
+      id: 'diversos_descricao',
+      text: 'Descrição do Equipamento',
+      type: 'text',
+      required: true,
+    },
+    {
+      id: 'diversos_funcionamento',
+      text: 'Equipamento funcionando?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'misc_display',
-      text: 'Display/Indicadores funcionam?',
-      type: 'yes_no',
+      id: 'diversos_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
       required: true,
     },
     {
-      id: 'misc_physical_damage',
+      id: 'diversos_danos',
       text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'misc_observations',
+      id: 'diversos_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
     },
   ],
-
   'Celular': [
     {
-      id: 'phone_display',
-      text: 'Tela exibe imagem corretamente?',
+      id: 'celular_tela',
+      text: 'Tela/Display - Sim/Não + Foto',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'phone_touch',
-      text: 'Tela sensível ao toque funciona?',
+      id: 'celular_bateria',
+      text: 'Saúde da Bateria (%) - Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'phone_buttons',
-      text: 'Botões (volume, power) funcionam?',
+      id: 'celular_acessorios',
+      text: 'Acessórios (Capa/Película) - Sim/Não',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'phone_camera',
-      text: 'Câmera funciona?',
+      id: 'celular_capa',
+      text: 'Capa/Película',
+      type: 'select',
+      options: ['Sim', 'Não', 'Não possui'],
+      required: true,
+    },
+    {
+      id: 'celular_danos',
+      text: 'Existem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'phone_audio',
-      text: 'Áudio (alto-falante, microfone) funciona?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'phone_screen_damage',
-      text: 'Existem danos físicos visíveis na tela?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'phone_body_damage',
-      text: 'Existem danos físicos visíveis no corpo?',
-      type: 'yes_no',
-      required: true,
-    },
-    {
-      id: 'phone_observations',
+      id: 'celular_observacoes',
       text: 'Observações',
       type: 'text',
       required: false,
@@ -477,7 +448,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
 };
 
 /**
- * Função helper para obter perguntas de um tipo de equipamento
+ * Retorna as perguntas para um tipo de equipamento específico
  */
 export function getQuestionsByEquipmentType(equipmentType: EquipmentType): Question[] {
   return equipmentQuestionsMap[equipmentType] || [];
