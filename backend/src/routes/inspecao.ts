@@ -177,30 +177,35 @@ router.get('/portal/listar', async (req, res) => {
     console.log('[inspecao.ts] Iniciando listagem de inspeções do portal...');
 
     // Buscar todas as inspeções
-    const { data, error } = await supabase
+    const { data: inspecoes, error: inspecoesError } = await supabase
       .from('inspecao_respostas')
       .select('*')
       .order('data_inspecao', { ascending: false });
 
-    if (error) {
-      console.error('[inspecao.ts] Erro ao listar inspeções:', error);
+    if (inspecoesError) {
+      console.error('[inspecao.ts] Erro ao listar inspeções:', inspecoesError);
       return res.status(500).json({ 
         error: 'Erro ao listar inspeções',
-        details: error.message 
+        details: inspecoesError.message 
       });
     }
 
-    console.log(`[inspecao.ts] ${data?.length || 0} inspeções encontradas`);
+    console.log(`[inspecao.ts] ${inspecoes?.length || 0} inspeções encontradas`);
 
     // Enriquecer dados com informações de equipamento e contrato
     const enrichedData = await Promise.all(
-      (data || []).map(async (inspecao) => {
+      (inspecoes || []).map(async (inspecao) => {
         try {
           // Se não tem equipamento_id, retornar como está
           if (!inspecao.equipamento_id) {
             console.log(`[inspecao.ts] Inspeção ${inspecao.id} sem equipamento_id`);
-            return inspecao;
+            return {
+              ...inspecao,
+              contrato_equipamentos: null,
+            };
           }
+
+          console.log(`[inspecao.ts] Buscando equipamento ${inspecao.equipamento_id}...`);
 
           // Buscar dados do equipamento
           const { data: equipamento, error: equipError } = await supabase
@@ -211,13 +216,18 @@ router.get('/portal/listar', async (req, res) => {
 
           if (equipError) {
             console.warn(`[inspecao.ts] Equipamento ${inspecao.equipamento_id} não encontrado:`, equipError);
-            return inspecao;
+            return {
+              ...inspecao,
+              contrato_equipamentos: null,
+            };
           }
+
+          console.log(`[inspecao.ts] Equipamento encontrado:`, equipamento);
 
           // Buscar dados do contrato
           const { data: contrato, error: contratoError } = await supabase
             .from('contratos')
-            .select('id, numero_contrato, nome_cliente, cliente_id')
+            .select('id, numero_contrato, nome_client')
             .eq('id', equipamento.contrato_id)
             .single();
 
@@ -225,9 +235,14 @@ router.get('/portal/listar', async (req, res) => {
             console.warn(`[inspecao.ts] Contrato ${equipamento.contrato_id} não encontrado:`, contratoError);
             return {
               ...inspecao,
-              contrato_equipamentos: equipamento,
+              contrato_equipamentos: {
+                ...equipamento,
+                contratos: null,
+              },
             };
           }
+
+          console.log(`[inspecao.ts] Contrato encontrado:`, contrato);
 
           return {
             ...inspecao,
@@ -238,7 +253,10 @@ router.get('/portal/listar', async (req, res) => {
           };
         } catch (enrichError) {
           console.error(`[inspecao.ts] Erro ao enriquecer inspeção ${inspecao.id}:`, enrichError);
-          return inspecao;
+          return {
+            ...inspecao,
+            contrato_equipamentos: null,
+          };
         }
       })
     );
@@ -269,23 +287,23 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
 
     console.log(`[inspecao.ts] Buscando inspeções para equipamento ${equipamentoId}`);
 
-    const { data, error } = await supabase
+    const { data: inspecoes, error: inspecoesError } = await supabase
       .from('inspecao_respostas')
       .select('*')
       .eq('equipamento_id', equipamentoId)
       .order('data_inspecao', { ascending: false });
 
-    if (error) {
-      console.error('[inspecao.ts] Erro ao buscar inspeções do equipamento:', error);
+    if (inspecoesError) {
+      console.error('[inspecao.ts] Erro ao buscar inspeções do equipamento:', inspecoesError);
       return res.status(500).json({ 
         error: 'Erro ao buscar inspeções',
-        details: error.message 
+        details: inspecoesError.message 
       });
     }
 
     // Enriquecer dados com informações de equipamento e contrato
     const enrichedData = await Promise.all(
-      (data || []).map(async (inspecao) => {
+      (inspecoes || []).map(async (inspecao) => {
         try {
           // Buscar dados do equipamento
           const { data: equipamento, error: equipError } = await supabase
@@ -296,13 +314,16 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
 
           if (equipError) {
             console.warn(`[inspecao.ts] Equipamento ${inspecao.equipamento_id} não encontrado:`, equipError);
-            return inspecao;
+            return {
+              ...inspecao,
+              contrato_equipamentos: null,
+            };
           }
 
           // Buscar dados do contrato
           const { data: contrato, error: contratoError } = await supabase
             .from('contratos')
-            .select('id, numero_contrato, nome_cliente, cliente_id')
+            .select('id, numero_contrato, nome_client')
             .eq('id', equipamento.contrato_id)
             .single();
 
@@ -310,7 +331,10 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
             console.warn(`[inspecao.ts] Contrato ${equipamento.contrato_id} não encontrado:`, contratoError);
             return {
               ...inspecao,
-              contrato_equipamentos: equipamento,
+              contrato_equipamentos: {
+                ...equipamento,
+                contratos: null,
+              },
             };
           }
 
@@ -323,7 +347,10 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
           };
         } catch (enrichError) {
           console.error(`[inspecao.ts] Erro ao enriquecer inspeção ${inspecao.id}:`, enrichError);
-          return inspecao;
+          return {
+            ...inspecao,
+            contrato_equipamentos: null,
+          };
         }
       })
     );
