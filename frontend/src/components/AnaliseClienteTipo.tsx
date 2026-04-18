@@ -80,6 +80,7 @@ export function AnaliseClienteTipo({ vistoriasPortal, clienteSelecionado, tipoSe
       conformidade,
       perguntas: analisePerguntas,
       perguntasCriticas: analisePerguntas.filter((p) => p.percentualFaltando > 30),
+      vistorias: vistoriasFiltradasClienteTipo,
     });
   };
 
@@ -89,83 +90,91 @@ export function AnaliseClienteTipo({ vistoriasPortal, clienteSelecionado, tipoSe
 
   return (
     <div className="bg-white rounded-lg shadow p-6 mb-8 border-l-4 border-blue-600">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Análise: {analise.cliente} - {analise.tipo}</h3>
-          <p className="text-sm text-gray-600 mt-1">Perguntas específicas para este tipo de equipamento</p>
-        </div>
+      <div className="mb-6">
+        <h3 className="text-lg font-bold text-gray-900">Análise: {analise.cliente} - {analise.tipo}</h3>
+        <p className="text-sm text-gray-600 mt-1">Conformidade de itens por número de série</p>
       </div>
 
-      {/* CARDS DE ESTATÍSTICAS DA ANÁLISE */}
+      {/* CARDS DE ESTATÍSTICAS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded border border-blue-200">
           <p className="text-xs text-gray-600 uppercase font-semibold">Total de Inspeções</p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">{analise.totalInspecoes}</p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">{analise.totalInspecoes}</p>
         </div>
         <div className="bg-gray-50 p-4 rounded border border-gray-200">
           <p className="text-xs text-gray-600 uppercase font-semibold">Com Avaria</p>
-          <p className="text-3xl font-bold text-gray-700 mt-2">{analise.comAvaria}</p>
+          <p className="text-2xl font-bold text-gray-700 mt-2">{analise.comAvaria}</p>
         </div>
         <div className="bg-gray-50 p-4 rounded border border-gray-200">
           <p className="text-xs text-gray-600 uppercase font-semibold">Equipamento OK</p>
-          <p className="text-3xl font-bold text-gray-700 mt-2">{analise.equipamentoOk}</p>
+          <p className="text-2xl font-bold text-gray-700 mt-2">{analise.equipamentoOk}</p>
         </div>
         <div className={`p-4 rounded border ${analise.conformidade >= 75 ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
           <p className="text-xs text-gray-600 uppercase font-semibold">Conformidade</p>
-          <p className={`text-3xl font-bold mt-2 ${analise.conformidade >= 75 ? 'text-green-600' : 'text-orange-600'}`}>{analise.conformidade}%</p>
+          <p className={`text-2xl font-bold mt-2 ${analise.conformidade >= 75 ? 'text-green-600' : 'text-orange-600'}`}>{analise.conformidade}%</p>
         </div>
       </div>
 
-      {/* PERGUNTAS CRÍTICAS */}
+      {/* ITENS CRÍTICOS */}
       {analise.perguntasCriticas.length > 0 && (
         <div className="bg-red-50 p-4 rounded border border-red-200 mb-6">
           <h4 className="text-sm font-bold text-red-800 mb-3">⚠️ Itens Críticos (Faltam em &gt;30% das inspeções)</h4>
-          <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
             {analise.perguntasCriticas.slice(0, 5).map((p: any) => (
-              <div key={p.pergunta} className="flex justify-between items-center text-sm">
-                <span className="text-gray-700 capitalize">{p.pergunta.replace(/_/g, ' ')}</span>
-                <span className="text-red-600 font-semibold">{p.percentualFaltando}% faltando</span>
-              </div>
+              <span key={p.pergunta} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                {p.pergunta.replace(/_/g, ' ')}: {p.percentualFaltando}%
+              </span>
             ))}
           </div>
         </div>
       )}
 
-      {/* TABELA DE PERGUNTAS */}
+      {/* TABELA COM COLUNAS POR SÉRIE */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+        <table className="w-full text-sm border-collapse">
+          <thead className="bg-gray-50 border-b-2 border-gray-200 sticky top-0">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Item</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">OK</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Faltando</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">% OK</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">% Faltando</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase bg-gray-50 border-r border-gray-200">Item</th>
+              {analise.vistorias.map((v: any, idx: number) => (
+                <th key={idx} className="px-3 py-3 text-center text-xs font-semibold text-gray-700 uppercase bg-gray-50 border-r border-gray-200 whitespace-nowrap">
+                  <div className="text-xs">{v.contrato_equipamentos?.numero_serie}</div>
+                  <div className="text-xs text-gray-500">{new Date(v.data_inspecao).toLocaleDateString('pt-BR')}</div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {analise.perguntas.map((p: any) => (
-              <tr key={p.pergunta} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-900 capitalize">{p.pergunta.replace(/_/g, ' ')}</td>
-                <td className="px-4 py-3 text-center font-semibold text-green-600">{p.respostasOk}</td>
-                <td className="px-4 py-3 text-center font-semibold text-red-600">{p.respostasFaltando}</td>
-                <td className="px-4 py-3 text-center">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 text-green-800 font-semibold text-xs">
-                    {p.percentualOk}%
-                  </span>
+            {analise.perguntas.map((p: any, idx: number) => (
+              <tr key={idx} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-900 font-medium border-r border-gray-200 bg-gray-50 capitalize sticky left-0 z-10">
+                  {p.pergunta.replace(/_/g, ' ')}
                 </td>
-                <td className="px-4 py-3 text-center">
-                  <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-semibold text-xs ${
-                    p.percentualFaltando > 30 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {p.percentualFaltando}%
-                  </span>
-                </td>
+                {analise.vistorias.map((v: any, vidx: number) => {
+                  const resposta = v.respostas?.[p.pergunta];
+                  const isOk = resposta === true || resposta === 'Sim';
+                  const isFaltando = resposta === false || resposta === 'Não';
+                  
+                  return (
+                    <td key={vidx} className="px-3 py-3 text-center border-r border-gray-200">
+                      {isFaltando && (
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-800 font-bold">✕</span>
+                      )}
+                      {isOk && (
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-800 font-bold">✓</span>
+                      )}
+                      {!isOk && !isFaltando && (
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-800 font-bold">-</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <p className="text-xs text-gray-500 mt-4">✓ = OK | ✕ = Faltando | - = Sem resposta</p>
     </div>
   );
 }
