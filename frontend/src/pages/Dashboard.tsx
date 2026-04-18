@@ -8,6 +8,56 @@ import { ChangePasswordModal } from '../components/ChangePasswordModal';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Mapeamento de perguntas específicas por tipo de equipamento
+const PERGUNTAS_POR_TIPO: Record<string, string[]> = {
+  'Desktop': [
+    'desktop_gabinete',
+    'desktop_fonte',
+    'desktop_monitor',
+    'desktop_teclado',
+    'desktop_mouse',
+    'desktop_cabos',
+    'desktop_ventilacao',
+    'desktop_observacoes'
+  ],
+  'Notebook': [
+    'notebook_tela',
+    'notebook_teclado',
+    'notebook_touchpad',
+    'notebook_bateria',
+    'notebook_portas',
+    'notebook_webcam',
+    'notebook_som',
+    'notebook_observacoes'
+  ],
+  'Monitor': [
+    'monitor_tela',
+    'monitor_cabos',
+    'monitor_suporte',
+    'monitor_contraste',
+    'monitor_brilho',
+    'monitor_observacoes'
+  ],
+  'All in One': [
+    'aio_tela',
+    'aio_teclado',
+    'aio_mouse',
+    'aio_webcam',
+    'aio_som',
+    'aio_portas',
+    'aio_observacoes'
+  ],
+  'Tablet': [
+    'tablet_tela',
+    'tablet_bateria',
+    'tablet_botoes',
+    'tablet_webcam',
+    'tablet_som',
+    'tablet_conectividade',
+    'tablet_observacoes'
+  ],
+};
+
 export function Dashboard() {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
@@ -64,6 +114,10 @@ export function Dashboard() {
   const [showRespostasModal, setShowRespostasModal] = useState(false);
   const [respostasModal, setRespostasModal] = useState<any>(null);
 
+  // ANÁLISE POR TIPO E CLIENTE
+  const [analiseClienteTipo, setAnaliseClienteTipo] = useState<any>(null);
+  const [showAnaliseModal, setShowAnaliseModal] = useState(false);
+
   // EQUIPAMENTOS PENDENTES
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
   const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
@@ -93,6 +147,15 @@ export function Dashboard() {
   useEffect(() => {
     calcularEstatisticasPortal();
   }, [vistoriasPortal, filtroClientePortal, filtroEquipamentoPortal, filtroContratoPortal, filtroTipoPortal, filtroStatusPortal]);
+
+  // GERAR ANÁLISE QUANDO CLIENTE E TIPO MUDAM
+  useEffect(() => {
+    if (filtroClientePortal && filtroTipoPortal) {
+      gerarAnaliseClienteTipo();
+    } else {
+      setAnaliseClienteTipo(null);
+    }
+  }, [filtroClientePortal, filtroTipoPortal, vistoriasPortal]);
 
   const loadVistorias = async () => {
     try {
@@ -169,6 +232,75 @@ export function Dashboard() {
     } finally {
       setLoadingPortal(false);
     }
+  };
+
+  const gerarAnaliseClienteTipo = () => {
+    if (!filtroClientePortal || !filtroTipoPortal) {
+      setAnaliseClienteTipo(null);
+      return;
+    }
+
+    // Filtrar vistorias por cliente e tipo
+    const vistoriasFiltradasClienteTipo = vistoriasPortal.filter((v: any) => {
+      const cliente = v.contrato_equipamentos?.contratos?.nome_cliente;
+      const tipo = v.equipment_type;
+      return cliente === filtroClientePortal && tipo === filtroTipoPortal;
+    });
+
+    if (vistoriasFiltradasClienteTipo.length === 0) {
+      setAnaliseClienteTipo(null);
+      return;
+    }
+
+    // Coletar todas as perguntas
+    const todasAsPerguntas = Array.from(
+      new Set(
+        vistoriasFiltradasClienteTipo.flatMap((v: any) => Object.keys(v.respostas || {}))
+      )
+    ).sort();
+
+    // Analisar cada pergunta
+    const analisePerguntas = todasAsPerguntas.map((pergunta) => {
+      const totalRespostas = vistoriasFiltradasClienteTipo.length;
+      const respostasOk = vistoriasFiltradasClienteTipo.filter((v: any) => {
+        const resposta = v.respostas?.[pergunta];
+        return resposta === true || resposta === 'Sim';
+      }).length;
+      const respostasFaltando = vistoriasFiltradasClienteTipo.filter((v: any) => {
+        const resposta = v.respostas?.[pergunta];
+        return resposta === false || resposta === 'Não';
+      }).length;
+
+      return {
+        pergunta,
+        totalRespostas,
+        respostasOk,
+        respostasFaltando,
+        percentualOk: Math.round((respostasOk / totalRespostas) * 100),
+        percentualFaltando: Math.round((respostasFaltando / totalRespostas) * 100),
+      };
+    });
+
+    // Ordenar por percentual de falta (descendente)
+    analisePerguntas.sort((a, b) => b.percentualFaltando - a.percentualFaltando);
+
+    // Calcular estatísticas gerais
+    const totalInspecoes = vistoriasFiltradasClienteTipo.length;
+    const comAvaria = vistoriasFiltradasClienteTipo.filter((v: any) =>
+      Object.values(v.respostas || {}).some((r: any) => r === false || r === 'Não')
+    ).length;
+    const conformidade = Math.round(((totalInspecoes - comAvaria) / totalInspecoes) * 100);
+
+    setAnaliseClienteTipo({
+      cliente: filtroClientePortal,
+      tipo: filtroTipoPortal,
+      totalInspecoes,
+      comAvaria,
+      equipamentoOk: totalInspecoes - comAvaria,
+      conformidade,
+      perguntas: analisePerguntas,
+      perguntasCriticas: analisePerguntas.filter((p) => p.percentualFaltando > 30),
+    });
   };
 
   const calcularEstatisticasPortal = () => {
@@ -824,6 +956,59 @@ export function Dashboard() {
                   </div>
                 </div>
 
+                {/* ANÁLISE POR CLIENTE E TIPO */}
+                {analiseClienteTipo && (
+                  <div className="bg-white rounded-lg shadow p-6 mb-8 border-l-4 border-blue-600">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Análise: {analiseClienteTipo.cliente} - {analiseClienteTipo.tipo}</h3>
+                        <p className="text-sm text-gray-600 mt-1">Perguntas específicas para este tipo de equipamento</p>
+                      </div>
+                      <button
+                        onClick={() => setShowAnaliseModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-semibold text-sm"
+                      >
+                        Ver Análise Completa
+                      </button>
+                    </div>
+
+                    {/* CARDS DE ESTATÍSTICAS DA ANÁLISE */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                        <p className="text-xs text-gray-600 uppercase font-semibold">Total de Inspeções</p>
+                        <p className="text-3xl font-bold text-blue-600 mt-2">{analiseClienteTipo.totalInspecoes}</p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                        <p className="text-xs text-gray-600 uppercase font-semibold">Com Avaria</p>
+                        <p className="text-3xl font-bold text-gray-700 mt-2">{analiseClienteTipo.comAvaria}</p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                        <p className="text-xs text-gray-600 uppercase font-semibold">Equipamento OK</p>
+                        <p className="text-3xl font-bold text-gray-700 mt-2">{analiseClienteTipo.equipamentoOk}</p>
+                      </div>
+                      <div className={`p-4 rounded border ${analiseClienteTipo.conformidade >= 75 ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+                        <p className="text-xs text-gray-600 uppercase font-semibold">Conformidade</p>
+                        <p className={`text-3xl font-bold mt-2 ${analiseClienteTipo.conformidade >= 75 ? 'text-green-600' : 'text-orange-600'}`}>{analiseClienteTipo.conformidade}%</p>
+                      </div>
+                    </div>
+
+                    {/* PERGUNTAS CRÍTICAS */}
+                    {analiseClienteTipo.perguntasCriticas.length > 0 && (
+                      <div className="bg-red-50 p-4 rounded border border-red-200">
+                        <h4 className="text-sm font-bold text-red-800 mb-3">⚠️ Itens Críticos (Faltam em >30% das inspeções)</h4>
+                        <div className="space-y-2">
+                          {analiseClienteTipo.perguntasCriticas.slice(0, 5).map((p: any) => (
+                            <div key={p.pergunta} className="flex justify-between items-center text-sm">
+                              <span className="text-gray-700 capitalize">{p.pergunta.replace(/_/g, ' ')}</span>
+                              <span className="text-red-600 font-semibold">{p.percentualFaltando}% faltando</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* TABELA DE VISTORIAS DO PORTAL */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                   <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
@@ -1336,6 +1521,97 @@ export function Dashboard() {
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
               <button
                 onClick={() => setShowRespostasModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-semibold"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ANÁLISE POR CLIENTE E TIPO */}
+      {showAnaliseModal && analiseClienteTipo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* HEADER */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Análise Detalhada</h2>
+                <p className="text-blue-100 text-sm mt-1">{analiseClienteTipo.cliente} - {analiseClienteTipo.tipo}</p>
+              </div>
+              <button
+                onClick={() => setShowAnaliseModal(false)}
+                className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* CONTEÚDO */}
+            <div className="px-6 py-4">
+              {/* ESTATÍSTICAS */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Total de Inspeções</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-2">{analiseClienteTipo.totalInspecoes}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Com Avaria</p>
+                  <p className="text-3xl font-bold text-gray-700 mt-2">{analiseClienteTipo.comAvaria}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Equipamento OK</p>
+                  <p className="text-3xl font-bold text-gray-700 mt-2">{analiseClienteTipo.equipamentoOk}</p>
+                </div>
+                <div className={`p-4 rounded border ${analiseClienteTipo.conformidade >= 75 ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+                  <p className="text-xs text-gray-600 uppercase font-semibold">Conformidade</p>
+                  <p className={`text-3xl font-bold mt-2 ${analiseClienteTipo.conformidade >= 75 ? 'text-green-600' : 'text-orange-600'}`}>{analiseClienteTipo.conformidade}%</p>
+                </div>
+              </div>
+
+              {/* TABELA DE PERGUNTAS */}
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Análise por Item</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Item</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">OK</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Faltando</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">% OK</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">% Faltando</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {analiseClienteTipo.perguntas.map((p: any) => (
+                      <tr key={p.pergunta} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900 capitalize">{p.pergunta.replace(/_/g, ' ')}</td>
+                        <td className="px-4 py-3 text-center text-sm font-semibold text-green-600">{p.respostasOk}</td>
+                        <td className="px-4 py-3 text-center text-sm font-semibold text-red-600">{p.respostasFaltando}</td>
+                        <td className="px-4 py-3 text-center text-sm">
+                          <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-800 font-semibold">
+                            {p.percentualOk}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm">
+                          <span className={`inline-flex items-center justify-center w-12 h-12 rounded-full font-semibold ${
+                            p.percentualFaltando > 30 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {p.percentualFaltando}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* FOOTER DO MODAL */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowAnaliseModal(false)}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-semibold"
               >
                 Fechar
