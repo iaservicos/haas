@@ -825,6 +825,16 @@ export function Dashboard() {
                     </div>
                   </div>
                 </div>
+                
+                {/* ANÁLISE POR CLIENTE E TIPO */}
+                {filtroClientePortal && filtroTipoPortal && (
+                  <AnaliseClienteTipo 
+                    vistoriasPortal={vistoriasPortal}
+                    clienteSelecionado={filtroClientePortal}
+                    tipoSelecionado={filtroTipoPortal}
+                    onClose={() => {}}
+                  />
+                )}
 
                 {/* TABELA DE VISTORIAS DO PORTAL */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
