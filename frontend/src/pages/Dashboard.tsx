@@ -1007,6 +1007,7 @@ export function Dashboard() {
                       </div>
                     )}
                   </div>
+                  </div>
                 )}
 
                 {/* TABELA DE VISTORIAS DO PORTAL */}
