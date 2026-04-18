@@ -10,6 +10,7 @@ import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
 import { VerConfirmacoes } from './pages/VerConfirmacoes';
 import { DashboardCliente } from './pages/DashboardCliente';
 import { VistoriaCliente } from './pages/VistoriaCliente';
+import { AnaliseEquipamento } from './pages/AnaliseEquipamento';
 
 // ⚡ NOVO: Componente para rotas protegidas com verificação de role
 function ProtectedRoute({ 
@@ -103,6 +104,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['analyst']}>
             <VerConfirmacoes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analise-equipamentos"
+        element={
+          <ProtectedRoute allowedRoles={['analyst']}>
+            <AnaliseEquipamento />
           </ProtectedRoute>
         }
       />
