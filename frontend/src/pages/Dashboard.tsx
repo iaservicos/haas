@@ -6,6 +6,7 @@ import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { AnaliseClienteTipo } from '../components/AnaliseClienteTipo';
+import XLSX from 'xlsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -452,22 +453,21 @@ export function Dashboard() {
       ];
     });
 
-    let csvContent = headers.join(',') + '\n';
-    rows.forEach((row: any[]) => {
-      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    const ws = XLSX.utils.json_to_sheet(rows.map((row: any[]) => ({
+      'Data': row[0],
+      'Cliente': row[1],
+      'Serie': row[2],
+      'Modelo': row[3],
+      'Tipo': row[4],
+      'Contrato': row[5],
+      'Status': row[6],
+      'Observacoes': row[7],
+    })));
     
-    link.setAttribute('href', url);
-    link.setAttribute('download', `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vistorias');
+    ws['!cols'] = [15, 20, 15, 25, 15, 20, 12, 30].map(w => ({ wch: w }));
+    XLSX.writeFile(wb, `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const exportarRelatorio = () => {
