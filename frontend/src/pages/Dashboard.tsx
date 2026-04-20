@@ -501,22 +501,23 @@ export function Dashboard() {
       v.mouse_status || '—',
     ]);
 
-    let csvContent = headers.join(',') + '\n';
-    rows.forEach((row: any[]) => {
-      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    const ws = XLSX.utils.json_to_sheet(rows.map((row: any[]) => ({
+      'Data': row[0],
+      'Serie': row[1],
+      'Equipamento': row[2],
+      'Cliente': row[3],
+      'Tecnico': row[4],
+      'Estado': row[5],
+      'Laudo': row[6],
+      'Avaria': row[7],
+      'Teclado': row[8],
+      'Mouse': row[9],
+    })));
     
-    link.setAttribute('href', url);
-    link.setAttribute('download', `relatorio_vistorias_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vistorias');
+    ws['!cols'] = [15, 15, 20, 20, 15, 12, 20, 15, 12, 12].map(w => ({ wch: w }));
+    XLSX.writeFile(wb, `relatorio_vistorias_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleGoToPhotos = () => {
