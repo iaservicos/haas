@@ -5,7 +5,8 @@ import { vistoriaService } from '../services/vistoria.service';
 import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
-import * as XLSX from 'xlsx';
+import { AnaliseClienteTipo } from '../components/AnaliseClienteTipo';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -435,26 +436,39 @@ export function Dashboard() {
       return;
     }
 
-    // Criar workbook Excel
-    const ws = XLSX.utils.json_to_sheet(vistoriasExportacao.map((v: any) => ({
-      'Data': formatarData(v.data_inspecao),
-      'Cliente': v.contrato_equipamentos?.contratos?.nome_cliente || '—',
-      'Série': v.contrato_equipamentos?.numero_serie || '—',
-      'Modelo': v.contrato_equipamentos?.modelo || '—',
-      'Tipo': v.equipment_type || '—',
-      'Contrato': v.contrato_equipamentos?.contratos?.numero_contrato || '—',
-      'Status': Object.values(v.respostas || {}).some((r: any) => r === false || r === 'Não') ? 'Com Avaria' : 'OK',
-      'Observações': v.observacoes || '—',
-    })));
+    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Observações'];
     
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Vistorias');
+    const rows = vistoriasExportacao.map((v: any) => {
+      const respostas = v.respostas || {};
+      const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+      return [
+        formatarData(v.data_inspecao),
+        v.contrato_equipamentos?.contratos?.nome_cliente || '—',
+        v.contrato_equipamentos?.numero_serie || '—',
+        v.contrato_equipamentos?.modelo || '—',
+        v.equipment_type || '—',
+        v.contrato_equipamentos?.contratos?.numero_contrato || '—',
+        temAvaria ? 'Com Avaria' : 'OK',
+        v.observacoes || '—',
+      ];
+    });
+
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach((row: any[]) => {
+      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
     
-    // Ajustar largura das colunas
-    ws['!cols'] = [15, 20, 15, 25, 15, 20, 12, 30].map(w => ({ wch: w }));
+    link.setAttribute('href', url);
+    link.setAttribute('download', `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
     
-    // Fazer download
-    XLSX.writeFile(wb, `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const exportarRelatorio = () => {
@@ -811,6 +825,16 @@ export function Dashboard() {
                     </div>
                   </div>
                 </div>
+                
+                {/* ANÁLISE POR CLIENTE E TIPO */}
+                {filtroClientePortal && filtroTipoPortal && (
+                  <AnaliseClienteTipo 
+                    vistoriasPortal={vistoriasPortal}
+                    clienteSelecionado={filtroClientePortal}
+                    tipoSelecionado={filtroTipoPortal}
+                    onClose={() => {}}
+                  />
+                )}
 
                 {/* TABELA DE VISTORIAS DO PORTAL */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
