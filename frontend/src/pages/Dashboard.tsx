@@ -435,28 +435,6 @@ export function Dashboard() {
       return;
     }
 
-    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Observações'];
-    
-    const rows = vistoriasExportacao.map((v: any) => {
-      const respostas = v.respostas || {};
-      const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
-      return [
-        formatarData(v.data_inspecao),
-        v.contrato_equipamentos?.contratos?.nome_cliente || '—',
-        v.contrato_equipamentos?.numero_serie || '—',
-        v.contrato_equipamentos?.modelo || '—',
-        v.equipment_type || '—',
-        v.contrato_equipamentos?.contratos?.numero_contrato || '—',
-        temAvaria ? 'Com Avaria' : 'OK',
-        v.observacoes || '—',
-      ];
-    });
-
-    let csvContent = headers.join(',') + '\n';
-    rows.forEach((row: any[]) => {
-      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-    });
-
     // Criar workbook Excel
     const ws = XLSX.utils.json_to_sheet(vistoriasExportacao.map((v: any) => ({
       'Data': formatarData(v.data_inspecao),
