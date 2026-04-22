@@ -5,7 +5,7 @@ import { vistoriaService } from '../services/vistoria.service';
 import { supabase } from '../services/supabase';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
-import { AnaliseClienteTipo } from '../components/AnaliseClienteTipo';
+
 import * as XLSX from 'xlsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -826,15 +826,82 @@ export function Dashboard() {
                   </div>
                 </div>
                 
-                {/* ANÁLISE POR CLIENTE E TIPO */}
-                {filtroClientePortal && filtroTipoPortal && (
-                  <AnaliseClienteTipo 
-                    vistoriasPortal={vistoriasPortal}
-                    clienteSelecionado={filtroClientePortal}
-                    tipoSelecionado={filtroTipoPortal}
-                    onClose={() => {}}
-                  />
-                )}
+                {/* TABELA MATRIZ - ITENS x SÉRIES */}
+                {vistoriasPortalFiltradas.length > 0 && (() => {
+                  const itensUnicos = Array.from(new Set(
+                    vistoriasPortalFiltradas.flatMap((v: any) => 
+                      Object.keys(v.respostas || {})
+                    )
+                  )).sort();
+
+                  if (itensUnicos.length === 0) return null;
+
+                  const obterStatusResposta = (resposta: any) => {
+                    if (resposta === true || resposta === 'Sim' || resposta === 'OK') return 'OK';
+                    if (resposta === false || resposta === 'Não' || resposta === 'Faltando') return 'Faltando';
+                    return 'Sem resposta';
+                  };
+
+                  const obterCorStatusResposta = (status: string) => {
+                    if (status === 'OK') return 'bg-green-100 text-green-800 font-semibold';
+                    if (status === 'Faltando') return 'bg-red-100 text-red-800 font-semibold';
+                    return 'bg-gray-100 text-gray-800';
+                  };
+
+                  return (
+                    <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
+                      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                        <h3 className="text-lg font-bold text-gray-900">Análise por Série - Itens vs Respostas</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100 border-b-2 border-gray-300">
+                              <th className="px-4 py-3 text-left font-semibold text-gray-900 border-r border-gray-300 sticky left-0 bg-gray-100 min-w-[180px]">
+                                Série / Item
+                              </th>
+                              {itensUnicos.map((item) => (
+                                <th
+                                  key={item}
+                                  className="px-3 py-3 text-center font-semibold text-gray-900 border-r border-gray-300 min-w-[100px] text-xs"
+                                >
+                                  {item.replace(/_/g, ' ')}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vistoriasPortalFiltradas.map((vistoria: any, idx: number) => (
+                              <tr key={vistoria.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="px-4 py-3 font-medium text-gray-900 border-r border-gray-300 sticky left-0 bg-inherit">
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-sm">{vistoria.contrato_equipamentos?.numero_serie || '—'}</span>
+                                    <span className="text-xs text-gray-500">{formatarData(vistoria.data_inspecao)}</span>
+                                  </div>
+                                </td>
+                                {itensUnicos.map((item) => {
+                                  const resposta = vistoria.respostas?.[item];
+                                  const status = obterStatusResposta(resposta);
+                                  const corClasses = obterCorStatusResposta(status);
+                                  const simbolo = status === 'OK' ? '✓' : status === 'Faltando' ? '✕' : '—';
+
+                                  return (
+                                    <td
+                                      key={`${vistoria.id}-${item}`}
+                                      className={`px-3 py-3 text-center border-r border-gray-300 ${corClasses}`}
+                                    >
+                                      {simbolo}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* TABELA DE VISTORIAS DO PORTAL */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
