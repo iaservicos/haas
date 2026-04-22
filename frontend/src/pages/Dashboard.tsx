@@ -436,11 +436,24 @@ export function Dashboard() {
       return;
     }
 
-    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Observações'];
+    const itensUnicos = Array.from(new Set(
+      vistoriasExportacao.flatMap((v: any) => Object.keys(v.respostas || {}))
+    )).sort();
+
+    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', ...itensUnicos, 'Observações'];
     
     const rows = vistoriasExportacao.map((v: any) => {
       const respostas = v.respostas || {};
       const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
+      const statusGeral = temAvaria ? 'NOK' : 'OK';
+      
+      const respostasIndividuais = itensUnicos.map((item) => {
+        const resposta = respostas[item];
+        if (resposta === true || resposta === 'Sim' || resposta === 'OK') return 'OK';
+        if (resposta === false || resposta === 'Não' || resposta === 'Faltando') return 'NOK';
+        return 'Sem resposta';
+      });
+      
       return [
         formatarData(v.data_inspecao),
         v.contrato_equipamentos?.contratos?.nome_cliente || '—',
@@ -448,25 +461,38 @@ export function Dashboard() {
         v.contrato_equipamentos?.modelo || '—',
         v.equipment_type || '—',
         v.contrato_equipamentos?.contratos?.numero_contrato || '—',
-        temAvaria ? 'Com Avaria' : 'OK',
+        statusGeral,
+        ...respostasIndividuais,
         v.observacoes || '—',
       ];
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows.map((row: any[]) => ({
-      'Data': row[0],
-      'Cliente': row[1],
-      'Serie': row[2],
-      'Modelo': row[3],
-      'Tipo': row[4],
-      'Contrato': row[5],
-      'Status': row[6],
-      'Observacoes': row[7],
-    })));
-    
+    const jsonData = rows.map((row: any[]) => {
+      const obj: any = {
+        'Data': row[0],
+        'Cliente': row[1],
+        'Serie': row[2],
+        'Modelo': row[3],
+        'Tipo': row[4],
+        'Contrato': row[5],
+        'Status': row[6],
+      };
+      
+      itensUnicos.forEach((item, idx) => {
+        obj[item] = row[7 + idx];
+      });
+      
+      obj['Observacoes'] = row[7 + itensUnicos.length];
+      return obj;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(jsonData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vistorias');
-    ws['!cols'] = [15, 20, 15, 25, 15, 20, 12, 30].map(w => ({ wch: w }));
+    
+    const colWidths = [15, 20, 15, 25, 15, 20, 12, ...itensUnicos.map(() => 15), 30];
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+    
     XLSX.writeFile(wb, `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -850,6 +876,9 @@ export function Dashboard() {
                               <th className="px-4 py-3 text-left font-semibold text-gray-900 border-r border-gray-300 sticky left-0 bg-gray-100 min-w-[180px]">
                                 Série / Item
                               </th>
+                              <th className="px-4 py-3 text-center font-semibold text-gray-900 border-r border-gray-300 min-w-[80px] text-xs">
+                                STATUS
+                              </th>
                               {itensUnicos.map((item) => (
                                 <th
                                   key={item}
@@ -861,13 +890,21 @@ export function Dashboard() {
                             </tr>
                           </thead>
                           <tbody>
-                            {vistoriasPortalFiltradas.map((vistoria: any, idx: number) => (
+                            {vistoriasPortalFiltradas.map((vistoria: any, idx: number) => {
+                              const temAvaria = Object.values(vistoria.respostas || {}).some((r: any) => r === false || r === 'Não' || r === 'Faltando');
+                              const statusGeral = temAvaria ? 'NOK' : 'OK';
+                              return (
                               <tr key={vistoria.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                 <td className="px-4 py-3 font-medium text-gray-900 border-r border-gray-300 sticky left-0 bg-inherit">
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-sm">{vistoria.contrato_equipamentos?.numero_serie || '—'}</span>
                                     <span className="text-xs text-gray-500">{formatarData(vistoria.data_inspecao)}</span>
                                   </div>
+                                </td>
+                                <td className={`px-4 py-3 text-center font-semibold border-r border-gray-300 ${
+                                  temAvaria ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {statusGeral}
                                 </td>
                                 {itensUnicos.map((item) => {
                                   const resposta = vistoria.respostas?.[item];
@@ -885,7 +922,8 @@ export function Dashboard() {
                                   );
                                 })}
                               </tr>
-                            ))}
+                            );
+                            })}
                           </tbody>
                         </table>
                       </div>
