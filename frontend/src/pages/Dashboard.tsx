@@ -540,10 +540,6 @@ export function Dashboard() {
     navigate('/confirmacoes');
   };
 
-  const handleGoToAnaliseEquipamentos = () => {
-    navigate('/analise-equipamentos');
-  };
-
   const statsPendentes = {
     pendentes: equipamentosPendentes.filter(e => e.status === 'Pendente').length,
     aprovados: equipamentosPendentes.filter(e => e.status === 'Aprovado').length,
@@ -611,12 +607,6 @@ export function Dashboard() {
             {sidebarOpen && <span>Confirmações</span>}
           </button>
 
-          <button
-            onClick={handleGoToAnaliseEquipamentos}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
-          >
-            {sidebarOpen && <span>Análise de Equipamentos</span>}
-          </button>
           
           <button
             onClick={handleGoToPhotos}
@@ -827,7 +817,7 @@ export function Dashboard() {
                 </div>
                 
                 {/* TABELA MATRIZ - ITENS x SÉRIES */}
-                {vistoriasPortalFiltradas.length > 0 && (() => {
+                {filtroClientePortal && filtroTipoPortal && vistoriasPortalFiltradas.length > 0 && (() => {
                   const itensUnicos = Array.from(new Set(
                     vistoriasPortalFiltradas.flatMap((v: any) => 
                       Object.keys(v.respostas || {})
