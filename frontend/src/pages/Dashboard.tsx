@@ -1151,6 +1151,7 @@ export function Dashboard() {
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Análise da Foto</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
@@ -1176,6 +1177,17 @@ export function Dashboard() {
                               <tr key={vistoria.id} className="hover:bg-gray-50 transition">
                                 <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
                                 <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
+                                <td className="px-6 py-4 text-sm">
+                                  {vistoria.status_analise === 'concluido' ? (
+                                    <p className="text-sm text-gray-900 max-w-xs">{vistoria.analise_gptmaker || '—'}</p>
+                                  ) : vistoria.status_analise === 'analisando' ? (
+                                    <span className="text-xs text-yellow-600 font-semibold">Analisando...</span>
+                                  ) : vistoria.status_analise === 'erro' ? (
+                                    <span className="text-xs text-red-600 font-semibold">Erro na análise</span>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">—</span>
+                                  )}
+                                </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
