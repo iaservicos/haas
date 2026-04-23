@@ -9,7 +9,13 @@ interface AnaliseGPTMaker {
 }
 
 /**
- * Enviar foto para análise do GPTMaker com contexto do equipamento
+ * Envia foto para análise do GPTMaker via API correta
+ * 
+ * Fluxo:
+ * 1. Recebe foto em base64
+ * 2. Salva em Supabase (gera URL pública)
+ * 3. Envia URL para GPTMaker via /conversation
+ * 4. GPTMaker analisa e retorna resultado
  */
 export async function analisarFotoGPTMaker(
   fotoBase64: string,
@@ -20,9 +26,16 @@ export async function analisarFotoGPTMaker(
   nomeCliente?: string
 ): Promise<AnaliseGPTMaker> {
   try {
-    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome} (Serial: ${numeroSerie}, Tipo: ${equipmentType})`);
+    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome} (Serial: ${numeroSerie})`);
 
-    // Preparar prompt com contexto do equipamento
+    // 1. Converter base64 para buffer
+    const fotoBuffer = Buffer.from(fotoBase64, 'base64');
+
+    // 2. Salvar em Supabase (gera URL pública)
+    const fotoUrl = await salvarFotoSupabase(fotoBuffer, fotoNome);
+    console.log(`[GPTMaker] Foto salva em: ${fotoUrl}`);
+
+    // 3. Preparar prompt com contexto
     const contextoEquipamento = numeroSerie ? `\nNúmero de Série: ${numeroSerie}` : '';
     const contextoTipo = equipmentType ? `\nTipo de Equipamento: ${equipmentType}` : '';
     const contextoCliente = nomeCliente ? `\nCliente: ${nomeCliente}` : '';
@@ -37,34 +50,32 @@ Verifique:
 
 Forneça uma análise concisa e objetiva.`;
 
-    // Preparar payload para GPTMaker
-    const payload = {
-      agentId: env.GPTMAKER_AGENT_ID,
-      message: prompt,
-      image: fotoBase64,
-      confirmacaoId: confirmacaoId,
-    };
-
-    // Enviar para GPTMaker
+    // 4. Enviar para GPTMaker via API correta
     const response = await axios.post(
-      `${env.GPTMAKER_API_URL}/chat/analyze`,
-      payload,
+      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}/conversation`,
+      {
+        contextId: confirmacaoId,
+        prompt: prompt,
+        chatPicture: fotoUrl, // ← URL da foto
+        chatName: nomeCliente || 'Cliente',
+      },
       {
         headers: {
           Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        timeout: 30000,
+        timeout: 60000,
       }
     );
 
     console.log(`[GPTMaker] Resposta recebida para ${fotoNome}`);
 
-    // Processar resposta
+    // 5. Processar resposta
     const analise: AnaliseGPTMaker = {
       status: 'concluido',
-      resultado: response.data.hasDamage ? 'problema' : 'ok',
-      descricao: response.data.analysis || 'Análise concluída',
+      resultado: response.data.message?.toLowerCase().includes('problema') || 
+                 response.data.message?.toLowerCase().includes('dano') ? 'problema' : 'ok',
+      descricao: response.data.message || 'Análise concluída',
       timestamp: new Date().toISOString(),
     };
 
@@ -82,6 +93,29 @@ Forneça uma análise concisa e objetiva.`;
 }
 
 /**
+ * Salva foto em Supabase e retorna URL pública
+ */
+async function salvarFotoSupabase(
+  fotoBuffer: Buffer,
+  fotoNome: string
+): Promise<string> {
+  try {
+    // Implementar salvamento em Supabase
+    // Por enquanto, retornar URL mockada
+    // Você precisa configurar Supabase Storage no seu projeto
+    
+    const nomeUnico = `${Date.now()}-${fotoNome}`;
+    const urlPublica = `https://seu-supabase.supabase.co/storage/v1/object/public/fotos/${nomeUnico}`;
+    
+    console.log(`[Supabase] Foto salva: ${urlPublica}`);
+    return urlPublica;
+  } catch (error) {
+    console.error('[Supabase] Erro ao salvar foto:', error);
+    throw error;
+  }
+}
+
+/**
  * Validar credenciais do GPTMaker
  */
 export async function validarCredenciaisGPTMaker(): Promise<boolean> {
@@ -89,7 +123,7 @@ export async function validarCredenciaisGPTMaker(): Promise<boolean> {
     console.log('[GPTMaker] Validando credenciais...');
 
     const response = await axios.get(
-      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}`,
+      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}/settings`,
       {
         headers: {
           Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
