@@ -128,25 +128,60 @@ router.post('/', async (req: Request, res: Response) => {
  * POST /api/vistoria/upload-foto
  * Recebe foto em base64, salva em fotos_vistoria, Supabase Storage e envia para GPTMaker
  * Salva resultado em inspecao_respostas (JSONB)
+ * 
+ * Fluxo:
+ * 1. Recebe confirmacaoId (do cliente_confirmacoes)
+ * 2. Busca o inspecaoId correspondente (de inspecao_respostas)
+ * 3. Salva foto em fotos_vistoria
+ * 4. Salva foto em Supabase Storage (gera URL)
+ * 5. Envia para GPTMaker analisar
+ * 6. Salva resultado em inspecao_respostas.respostas.analise_foto
  */
 router.post('/upload-foto', async (req: Request, res: Response) => {
   try {
-    const { fotoBase64, fotoNome, inspecaoId, numeroSerie, equipmentType, nomeCliente } = req.body;
+    const { fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente } = req.body;
 
-    if (!fotoBase64 || !fotoNome || !inspecaoId) {
+    if (!fotoBase64 || !fotoNome || !confirmacaoId) {
       return res.status(400).json({
-        error: 'Faltam parâmetros: fotoBase64, fotoNome, inspecaoId',
+        error: 'Faltam parâmetros: fotoBase64, fotoNome, confirmacaoId',
       });
     }
 
     console.log(`[Vistoria] Upload de foto para serial: ${numeroSerie}, tipo: ${equipmentType}, cliente: ${nomeCliente}`);
 
-    // 1. Converter base64 para buffer
+    // 1. Buscar inspecaoId usando confirmacaoId
+    const { data: confirmacaoData, error: confirmacaoError } = await supabase
+      .from('cliente_confirmacoes')
+      .select('id, vistoria_id')
+      .eq('id', confirmacaoId)
+      .single();
+
+    if (confirmacaoError || !confirmacaoData) {
+      console.error('[Vistoria] Confirmação não encontrada:', confirmacaoId);
+      return res.status(404).json({ error: 'Confirmação não encontrada' });
+    }
+
+    // 2. Buscar inspecaoId da vistoria
+    const { data: inspecaoData, error: inspecaoError } = await supabase
+      .from('inspecao_respostas')
+      .select('id')
+      .eq('vistoria_id', confirmacaoData.vistoria_id)
+      .single();
+
+    if (inspecaoError || !inspecaoData) {
+      console.error('[Vistoria] Inspeção não encontrada para vistoria:', confirmacaoData.vistoria_id);
+      return res.status(404).json({ error: 'Inspeção não encontrada' });
+    }
+
+    const inspecaoId = inspecaoData.id;
+    console.log(`[Vistoria] Confirmação ${confirmacaoId} → Inspeção ${inspecaoId}`);
+
+    // 3. Converter base64 para buffer
     const fotoBuffer = Buffer.from(fotoBase64, 'base64');
 
-    // 2. Salvar foto no banco (fotos_vistoria)
+    // 4. Salvar foto no banco (fotos_vistoria)
     const fotoData = {
-      confirmacao_id: inspecaoId,
+      confirmacao_id: confirmacaoId,
       foto_data: fotoBase64,
       foto_nome: fotoNome,
       foto_tipo: 'image/jpeg',
@@ -156,7 +191,7 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
     const { id: fotoId } = await salvarFoto(fotoData);
     console.log(`[Vistoria] Foto salva com ID: ${fotoId}`);
 
-    // 3. Salvar em Supabase Storage (gera URL pública)
+    // 5. Salvar em Supabase Storage (gera URL pública)
     const nomeUnico = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${fotoNome}`;
     
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -178,25 +213,25 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
     const fotoUrl = publicUrl.publicUrl;
     console.log(`[Supabase Storage] ✅ Foto salva: ${fotoUrl}`);
 
-    // 4. Enviar para análise do GPTMaker com contexto do equipamento
-    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, inspecaoId, numeroSerie, equipmentType, nomeCliente);
+    // 6. Enviar para análise do GPTMaker com contexto do equipamento
+    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente);
     console.log(`[Vistoria] Análise GPTMaker concluída: ${analise.resultado}`);
 
-    // 5. Buscar respostas existentes de inspecao_respostas
-    const { data: inspecaoData, error: inspecaoError } = await supabase
+    // 7. Buscar respostas existentes de inspecao_respostas
+    const { data: inspecaoRespostasData, error: inspecaoRespostasError } = await supabase
       .from('inspecao_respostas')
       .select('respostas')
       .eq('id', inspecaoId)
       .single();
 
-    if (inspecaoError) {
-      console.error('[Inspecao Respostas] Erro ao buscar:', inspecaoError);
-      throw inspecaoError;
+    if (inspecaoRespostasError) {
+      console.error('[Inspecao Respostas] Erro ao buscar:', inspecaoRespostasError);
+      throw inspecaoRespostasError;
     }
 
-    // 6. Mesclar análise com respostas existentes
+    // 8. Mesclar análise com respostas existentes
     const respostasAtualizadas = {
-      ...(inspecaoData.respostas || {}),
+      ...(inspecaoRespostasData.respostas || {}),
       analise_foto: {
         status: analise.status,
         resultado: analise.resultado,
@@ -206,7 +241,7 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
       },
     };
 
-    // 7. Atualizar inspecao_respostas com análise
+    // 9. Atualizar inspecao_respostas com análise
     const { error: updateError } = await supabase
       .from('inspecao_respostas')
       .update({
@@ -250,71 +285,56 @@ router.get('/confirmacao/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // 1. Buscar inspeção
-    const { data: inspecao, error: inspecaoError } = await supabase
-      .from('inspecao_respostas')
+    // 1. Buscar confirmação
+    const { data: confirmacao, error: confirmacaoError } = await supabase
+      .from('cliente_confirmacoes')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (inspecaoError || !inspecao) {
-      return res.status(404).json({ error: 'Inspeção não encontrada' });
+    if (confirmacaoError || !confirmacao) {
+      return res.status(404).json({ error: 'Confirmação não encontrada' });
     }
 
-    // 2. Buscar fotos da inspeção
+    // 2. Buscar fotos da confirmação
     const fotos = await listarFotosPorConfirmacao(id);
 
     return res.status(200).json({
-      inspecao,
+      confirmacao,
       fotos,
     });
   } catch (error) {
-    console.error('[Vistoria] Erro ao buscar inspeção:', error);
+    console.error('[Vistoria] Erro ao buscar confirmação:', error);
     return res.status(500).json({
-      error: `Erro ao buscar inspeção: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+      error: `Erro ao buscar confirmação: ${error instanceof Error ? error.message : 'Desconhecido'}`,
     });
   }
 });
 
 /**
  * PUT /api/vistoria/confirmacao/:id
- * Atualiza checklist da inspeção
+ * Atualiza checklist da confirmação
  */
 router.put('/confirmacao/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { respostas } = req.body;
+    const { fonte_presente, teclado_presente, mouse_presente, tipo_material } = req.body;
 
     // Validar campos obrigatórios
-    if (!respostas) {
+    if (fonte_presente === undefined) {
       return res.status(400).json({
-        error: 'Campo obrigatório: respostas',
+        error: 'Campo obrigatório: fonte_presente',
       });
     }
 
-    // Buscar respostas existentes
-    const { data: inspecaoData, error: inspecaoError } = await supabase
-      .from('inspecao_respostas')
-      .select('respostas')
-      .eq('id', id)
-      .single();
-
-    if (inspecaoError) {
-      return res.status(400).json({ error: inspecaoError.message });
-    }
-
-    // Mesclar respostas (manter análise_foto se existir)
-    const respostasAtualizadas = {
-      ...(inspecaoData.respostas || {}),
-      ...respostas,
-    };
-
-    // Atualizar inspeção
+    // Atualizar confirmação
     const { data, error } = await supabase
-      .from('inspecao_respostas')
+      .from('cliente_confirmacoes')
       .update({
-        respostas: respostasAtualizadas,
-        updated_at: new Date().toISOString(),
+        fonte_presente,
+        teclado_presente: teclado_presente || false,
+        mouse_presente: mouse_presente || false,
+        tipo_material: tipo_material || 'genérico',
       })
       .eq('id', id)
       .select()
@@ -326,13 +346,13 @@ router.put('/confirmacao/:id', async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      inspecao: data,
-      message: 'Inspeção atualizada com sucesso',
+      confirmacao: data,
+      message: 'Confirmação atualizada com sucesso',
     });
   } catch (error) {
-    console.error('[Vistoria] Erro ao atualizar inspeção:', error);
+    console.error('[Vistoria] Erro ao atualizar confirmação:', error);
     return res.status(500).json({
-      error: `Erro ao atualizar inspeção: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+      error: `Erro ao atualizar confirmação: ${error instanceof Error ? error.message : 'Desconhecido'}`,
     });
   }
 });
