@@ -82,14 +82,15 @@ Responda APENAS em JSON com a seguinte estrutura (sem texto adicional):
       throw new Error(`GPTMaker API error: ${response.statusText}`);
     }
 
-    const result = await response.json();
+    const result = await response.json() as any;
     console.log(`[gptmakerService] Resposta recebida do GPTMaker`);
 
     // Tentar parsear JSON da resposta
     let analise: AnaliseResultado;
     try {
       // Procurar por JSON na resposta
-      const jsonMatch = result.message?.match(/\{[\s\S]*\}/);
+      const message = result?.message || '';
+      const jsonMatch = message.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         analise = JSON.parse(jsonMatch[0]);
         console.log(`[gptmakerService] JSON parseado com sucesso`);
@@ -99,16 +100,17 @@ Responda APENAS em JSON com a seguinte estrutura (sem texto adicional):
         analise = {
           status: 'OK',
           resultado: 'ok',
-          descricao: result.message || 'Análise concluída',
+          descricao: message || 'Análise concluída',
           timestamp: new Date().toISOString(),
         };
       }
     } catch (parseError) {
       console.warn(`[gptmakerService] Erro ao parsear JSON, usando resposta padrão`);
+      const message = result?.message || '';
       analise = {
         status: 'OK',
         resultado: 'ok',
-        descricao: result.message || 'Análise concluída',
+        descricao: message || 'Análise concluída',
         timestamp: new Date().toISOString(),
       };
     }
