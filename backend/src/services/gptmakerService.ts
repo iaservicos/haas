@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { env } from '../config/env.js';
+import { createClient } from '@supabase/supabase-js';
 
 interface AnaliseGPTMaker {
   status: 'pendente' | 'analisando' | 'concluido' | 'erro';
@@ -7,6 +7,16 @@ interface AnaliseGPTMaker {
   descricao: string;
   timestamp: string;
 }
+
+// Configurações
+const GPTMAKER_API_URL = 'https://api.gptmaker.ai';
+const GPTMAKER_AGENT_ID = '3F2148420AFE70123E86F2A655C371D2';
+const GPTMAKER_API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJncHRtYWtlciIsImlkIjoiM0REQjMyN0E5RkM5RDFFMjk3M0FGQTUyOTE1RDk2RDQiLCJ0ZW5hbnQiOiIzRERCMzI3QTlGQzlEMUUyOTczQUZBNTI5MTVEOTZENCIsInV1aWQiOiJjZTZjOGIyNi01ZThlLTQyNTctYjE3MS0yOWRhZjAyYmY4ODYifQ.bXuxgEwTQnkdQHNCW7MQnpToq4VMj1Kjhnq_kZz2krc';
+
+// Supabase (configure com suas credenciais)
+const supabaseUrl = process.env.SUPABASE_URL || 'https://seu-projeto.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'sua-chave-publica';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Envia foto para análise do GPTMaker via API correta
@@ -51,8 +61,10 @@ Verifique:
 Forneça uma análise concisa e objetiva.`;
 
     // 4. Enviar para GPTMaker via API correta
+    console.log(`[GPTMaker] Enviando para agente: ${GPTMAKER_AGENT_ID}`);
+    
     const response = await axios.post(
-      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}/conversation`,
+      `${GPTMAKER_API_URL}/v2/agent/${GPTMAKER_AGENT_ID}/conversation`,
       {
         contextId: confirmacaoId,
         prompt: prompt,
@@ -61,7 +73,7 @@ Forneça uma análise concisa e objetiva.`;
       },
       {
         headers: {
-          Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
+          Authorization: `Bearer ${GPTMAKER_API_TOKEN}`,
           'Content-Type': 'application/json',
         },
         timeout: 60000,
@@ -69,13 +81,22 @@ Forneça uma análise concisa e objetiva.`;
     );
 
     console.log(`[GPTMaker] Resposta recebida para ${fotoNome}`);
+    console.log(`[GPTMaker] Mensagem: ${response.data.message}`);
 
     // 5. Processar resposta
+    const mensagem = response.data.message || '';
+    const temProblema = 
+      mensagem.toLowerCase().includes('problema') ||
+      mensagem.toLowerCase().includes('dano') ||
+      mensagem.toLowerCase().includes('danificado') ||
+      mensagem.toLowerCase().includes('faltando') ||
+      mensagem.toLowerCase().includes('quebrado') ||
+      mensagem.toLowerCase().includes('avaria');
+
     const analise: AnaliseGPTMaker = {
       status: 'concluido',
-      resultado: response.data.message?.toLowerCase().includes('problema') || 
-                 response.data.message?.toLowerCase().includes('dano') ? 'problema' : 'ok',
-      descricao: response.data.message || 'Análise concluída',
+      resultado: temProblema ? 'problema' : 'ok',
+      descricao: mensagem,
       timestamp: new Date().toISOString(),
     };
 
@@ -83,10 +104,12 @@ Forneça uma análise concisa e objetiva.`;
   } catch (error) {
     console.error('[GPTMaker] Erro na análise:', error);
 
+    const errorMessage = error instanceof Error ? error.message : 'Desconhecido';
+    
     return {
       status: 'erro',
       resultado: null,
-      descricao: `Erro ao analisar foto: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+      descricao: `Erro ao analisar foto: ${errorMessage}`,
       timestamp: new Date().toISOString(),
     };
   }
@@ -100,15 +123,30 @@ async function salvarFotoSupabase(
   fotoNome: string
 ): Promise<string> {
   try {
-    // Implementar salvamento em Supabase
-    // Por enquanto, retornar URL mockada
-    // Você precisa configurar Supabase Storage no seu projeto
+    const nomeUnico = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${fotoNome}`;
     
-    const nomeUnico = `${Date.now()}-${fotoNome}`;
-    const urlPublica = `https://seu-supabase.supabase.co/storage/v1/object/public/fotos/${nomeUnico}`;
-    
-    console.log(`[Supabase] Foto salva: ${urlPublica}`);
-    return urlPublica;
+    console.log(`[Supabase] Salvando foto: ${nomeUnico}`);
+
+    // Upload para Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('fotos')
+      .upload(nomeUnico, fotoBuffer, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('[Supabase] Erro ao fazer upload:', error);
+      throw error;
+    }
+
+    // Obter URL pública
+    const { data: publicUrl } = supabase.storage
+      .from('fotos')
+      .getPublicUrl(nomeUnico);
+
+    console.log(`[Supabase] ✅ Foto salva: ${publicUrl.publicUrl}`);
+    return publicUrl.publicUrl;
   } catch (error) {
     console.error('[Supabase] Erro ao salvar foto:', error);
     throw error;
@@ -123,16 +161,17 @@ export async function validarCredenciaisGPTMaker(): Promise<boolean> {
     console.log('[GPTMaker] Validando credenciais...');
 
     const response = await axios.get(
-      `${env.GPTMAKER_API_URL}/agent/${env.GPTMAKER_AGENT_ID}/settings`,
+      `${GPTMAKER_API_URL}/v2/agent/${GPTMAKER_AGENT_ID}/settings`,
       {
         headers: {
-          Authorization: `Bearer ${env.GPTMAKER_API_TOKEN}`,
+          Authorization: `Bearer ${GPTMAKER_API_TOKEN}`,
         },
         timeout: 10000,
       }
     );
 
     console.log('[GPTMaker] ✅ Credenciais válidas');
+    console.log('[GPTMaker] Configurações do agente:', response.data);
     return true;
   } catch (error) {
     console.error('[GPTMaker] ❌ Credenciais inválidas:', error);
