@@ -1,11 +1,16 @@
 import express from 'express';
+import { Pool } from 'pg';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
-import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
 import { salvarFoto } from '../services/fotoService.js';
 import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
 
 const router = express.Router();
+
+// Conexão com PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
 /**
  * GET /api/inspecao/equipamento/:equipamentoId
@@ -15,16 +20,19 @@ router.get('/equipamento/:equipamentoId', async (req, res) => {
   try {
     const { equipamentoId } = req.params;
 
-    const { data, error } = await supabase
-      .from('contrato_equipamentos')
-      .select('tipo_material, numero_serie, modelo')
-      .eq('id', equipamentoId)
-      .single();
+    const query = `
+      SELECT id, tipo_material, numero_serie, modelo
+      FROM contrato_equipamentos
+      WHERE id = $1;
+    `;
 
-    if (error || !data) {
+    const result = await pool.query(query, [equipamentoId]);
+
+    if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'Equipamento não encontrado' });
     }
 
+    const data = result.rows[0];
     res.json({
       success: true,
       data: {
@@ -88,52 +96,38 @@ router.post('/salvar', async (req, res) => {
       });
     }
 
-    // Construir objeto de inserção
-    const insertData: any = {
-      vistoria_id: vistoriaId,
-      equipment_type: equipmentType,
-      respostas: answers,
-      observacoes: observacoes || null,
-      data_inspecao: new Date().toISOString(),
-    };
+    const query = `
+      INSERT INTO inspecao_respostas (vistoria_id, equipment_type, respostas, observacoes, equipamento_id, data_inspecao)
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      RETURNING *;
+    `;
 
-    // Adicionar equipamento_id se fornecido
-    if (equipamento_id) {
-      insertData.equipamento_id = equipamento_id;
-      console.log(`[inspecao.ts] Salvando inspeção com equipamento_id: ${equipamento_id}`);
+    const result = await pool.query(query, [
+      vistoriaId,
+      equipmentType,
+      JSON.stringify(answers),
+      observacoes || null,
+      equipamento_id || null,
+    ]);
+
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(500).json({ error: 'Erro ao salvar respostas' });
     }
 
-    // Salvar respostas no banco de dados
-    const { data, error } = await supabase
-      .from('inspecao_respostas')
-      .insert(insertData)
-      .select();
-
-    if (error) {
-      console.error('Erro ao salvar respostas:', error);
-      return res.status(500).json({ 
-        error: 'Erro ao salvar respostas',
-        details: error.message 
-      });
-    }
-
-    console.log('[inspecao.ts] Inspeção salva com sucesso:', data[0]);
+    console.log('[inspecao.ts] Inspeção salva com sucesso:', result.rows[0]);
 
     // Atualizar status da vistoria (se existir)
     try {
-      await supabase
-        .from('vistorias')
-        .update({ status: 'inspecionada' })
-        .eq('id', vistoriaId);
+      const updateQuery = `UPDATE vistorias SET status = 'inspecionada' WHERE id = $1;`;
+      await pool.query(updateQuery, [vistoriaId]);
     } catch (updateError) {
-      // Não falhar se a vistoria não existir (pode ser uma inspeção do portal)
       console.log('[inspecao.ts] Aviso: Não foi possível atualizar status da vistoria', updateError);
     }
 
     res.json({
       success: true,
       message: 'Inspeção salva com sucesso',
-      data: data[0],
+      data: result.rows[0],
     });
   } catch (error) {
     console.error('Erro ao salvar inspeção:', error);
@@ -152,18 +146,17 @@ router.get('/:vistoriaId', async (req, res) => {
   try {
     const { vistoriaId } = req.params;
 
-    const { data, error } = await supabase
-      .from('inspecao_respostas')
-      .select('*')
-      .eq('vistoria_id', vistoriaId)
-      .single();
+    const query = `
+      SELECT * FROM inspecao_respostas WHERE vistoria_id = $1;
+    `;
 
-    if (error) {
-      console.error('Erro ao buscar inspeção:', error);
+    const result = await pool.query(query, [vistoriaId]);
+
+    if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: 'Inspeção não encontrada' });
     }
 
-    res.json(data);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao buscar inspeção:', error);
     res.status(500).json({ error: 'Erro ao buscar inspeção' });
@@ -178,27 +171,19 @@ router.get('/portal/listar', async (req, res) => {
   try {
     console.log('[inspecao.ts] Iniciando listagem de inspeções do portal...');
 
-    // Buscar todas as inspeções
-    const { data: inspecoes, error: inspecoesError } = await supabase
-      .from('inspecao_respostas')
-      .select('*')
-      .order('data_inspecao', { ascending: false });
+    const query = `
+      SELECT * FROM inspecao_respostas ORDER BY data_inspecao DESC;
+    `;
 
-    if (inspecoesError) {
-      console.error('[inspecao.ts] Erro ao listar inspeções:', inspecoesError);
-      return res.status(500).json({ 
-        error: 'Erro ao listar inspeções',
-        details: inspecoesError.message 
-      });
-    }
+    const result = await pool.query(query);
+    const inspecoes = result.rows || [];
 
-    console.log(`[inspecao.ts] ${inspecoes?.length || 0} inspeções encontradas`);
+    console.log(`[inspecao.ts] ${inspecoes.length} inspeções encontradas`);
 
     // Enriquecer dados com informações de equipamento e contrato
     const enrichedData = await Promise.all(
-      (inspecoes || []).map(async (inspecao) => {
+      inspecoes.map(async (inspecao) => {
         try {
-          // Se não tem equipamento_id, retornar como está
           if (!inspecao.equipamento_id) {
             console.log(`[inspecao.ts] Inspeção ${inspecao.id} sem equipamento_id`);
             return {
@@ -209,32 +194,35 @@ router.get('/portal/listar', async (req, res) => {
 
           console.log(`[inspecao.ts] Buscando equipamento ${inspecao.equipamento_id}...`);
 
-          // Buscar dados do equipamento
-          const { data: equipamento, error: equipError } = await supabase
-            .from('contrato_equipamentos')
-            .select('id, numero_serie, modelo, tipo_material, contrato_id')
-            .eq('id', inspecao.equipamento_id)
-            .single();
+          const equipQuery = `
+            SELECT id, numero_serie, modelo, tipo_material, contrato_id
+            FROM contrato_equipamentos
+            WHERE id = $1;
+          `;
 
-          if (equipError) {
-            console.warn(`[inspecao.ts] Equipamento ${inspecao.equipamento_id} não encontrado:`, equipError);
+          const equipResult = await pool.query(equipQuery, [inspecao.equipamento_id]);
+
+          if (!equipResult.rows || equipResult.rows.length === 0) {
+            console.warn(`[inspecao.ts] Equipamento ${inspecao.equipamento_id} não encontrado`);
             return {
               ...inspecao,
               contrato_equipamentos: null,
             };
           }
 
+          const equipamento = equipResult.rows[0];
           console.log(`[inspecao.ts] Equipamento encontrado:`, equipamento);
 
-          // Buscar dados do contrato
-          const { data: contrato, error: contratoError } = await supabase
-            .from('contratos')
-            .select('id, numero_contrato, nome_cliente')
-            .eq('id', equipamento.contrato_id)
-            .single();
+          const contratoQuery = `
+            SELECT id, numero_contrato, nome_cliente
+            FROM contratos
+            WHERE id = $1;
+          `;
 
-          if (contratoError) {
-            console.warn(`[inspecao.ts] Contrato ${equipamento.contrato_id} não encontrado:`, contratoError);
+          const contratoResult = await pool.query(contratoQuery, [equipamento.contrato_id]);
+
+          if (!contratoResult.rows || contratoResult.rows.length === 0) {
+            console.warn(`[inspecao.ts] Contrato ${equipamento.contrato_id} não encontrado`);
             return {
               ...inspecao,
               contrato_equipamentos: {
@@ -244,6 +232,7 @@ router.get('/portal/listar', async (req, res) => {
             };
           }
 
+          const contrato = contratoResult.rows[0];
           console.log(`[inspecao.ts] Contrato encontrado:`, contrato);
 
           return {
@@ -280,108 +269,8 @@ router.get('/portal/listar', async (req, res) => {
 });
 
 /**
- * GET /api/inspecao/portal/equipamento/:equipamentoId
- * Retorna todas as inspeções para um equipamento específico
- */
-router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
-  try {
-    const { equipamentoId } = req.params;
-
-    console.log(`[inspecao.ts] Buscando inspeções para equipamento ${equipamentoId}`);
-
-    const { data: inspecoes, error: inspecoesError } = await supabase
-      .from('inspecao_respostas')
-      .select('*')
-      .eq('equipamento_id', equipamentoId)
-      .order('data_inspecao', { ascending: false });
-
-    if (inspecoesError) {
-      console.error('[inspecao.ts] Erro ao buscar inspeções do equipamento:', inspecoesError);
-      return res.status(500).json({ 
-        error: 'Erro ao buscar inspeções',
-        details: inspecoesError.message 
-      });
-    }
-
-    // Enriquecer dados com informações de equipamento e contrato
-    const enrichedData = await Promise.all(
-      (inspecoes || []).map(async (inspecao) => {
-        try {
-          // Buscar dados do equipamento
-          const { data: equipamento, error: equipError } = await supabase
-            .from('contrato_equipamentos')
-            .select('id, numero_serie, modelo, tipo_material, contrato_id')
-            .eq('id', inspecao.equipamento_id)
-            .single();
-
-          if (equipError) {
-            console.warn(`[inspecao.ts] Equipamento ${inspecao.equipamento_id} não encontrado:`, equipError);
-            return {
-              ...inspecao,
-              contrato_equipamentos: null,
-            };
-          }
-
-          // Buscar dados do contrato
-          const { data: contrato, error: contratoError } = await supabase
-            .from('contratos')
-            .select('id, numero_contrato, nome_cliente')
-            .eq('id', equipamento.contrato_id)
-            .single();
-
-          if (contratoError) {
-            console.warn(`[inspecao.ts] Contrato ${equipamento.contrato_id} não encontrado:`, contratoError);
-            return {
-              ...inspecao,
-              contrato_equipamentos: {
-                ...equipamento,
-                contratos: null,
-              },
-            };
-          }
-
-          return {
-            ...inspecao,
-            contrato_equipamentos: {
-              ...equipamento,
-              contratos: contrato,
-            },
-          };
-        } catch (enrichError) {
-          console.error(`[inspecao.ts] Erro ao enriquecer inspeção ${inspecao.id}:`, enrichError);
-          return {
-            ...inspecao,
-            contrato_equipamentos: null,
-          };
-        }
-      })
-    );
-
-    console.log(`[inspecao.ts] ${enrichedData.length} inspeções encontradas para equipamento ${equipamentoId}`);
-
-    res.json({
-      success: true,
-      data: enrichedData || [],
-      total: enrichedData?.length || 0,
-    });
-  } catch (error) {
-    console.error('[inspecao.ts] Erro ao buscar inspeções do equipamento:', error);
-    res.status(500).json({ 
-      error: 'Erro ao buscar inspeções',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
-  }
-});
-
-/**
  * POST /api/inspecao/upload-foto
- * Recebe foto em base64, salva no banco (fotos_vistoria) e envia para GPTMaker analisar
- * 
- * Fluxo:
- * 1. Recebe foto em base64 + confirmacaoId
- * 2. Salva foto em fotos_vistoria (bytea)
- * 3. Envia para GPTMaker analisar
- * 4. Retorna fotoId + análise
+ * Faz upload de foto, salva no banco e analisa com GPTMaker
  */
 router.post('/upload-foto', async (req, res) => {
   try {
@@ -389,42 +278,53 @@ router.post('/upload-foto', async (req, res) => {
 
     if (!fotoBase64 || !fotoNome || !confirmacaoId) {
       return res.status(400).json({
-        error: 'Faltam parâmetros: fotoBase64, fotoNome, confirmacaoId',
+        error: 'Dados incompletos: fotoBase64, fotoNome e confirmacaoId são obrigatórios',
       });
     }
 
-    console.log(`[inspecao.ts] Upload de foto para serial: ${numeroSerie}, tipo: ${equipmentType}, cliente: ${nomeCliente}`);
+    console.log(`[inspecao.ts] Iniciando upload de foto: ${fotoNome}`);
 
-    // 1. Salvar foto no banco (fotos_vistoria)
-    const fotoBuffer = Buffer.from(fotoBase64, 'base64');
-    const fotoData = {
+    // 1. Calcular tamanho da foto em bytes
+    const tamanhoBytes = Buffer.byteLength(fotoBase64, 'base64');
+    console.log(`[inspecao.ts] Tamanho da foto: ${tamanhoBytes} bytes`);
+
+    // 2. Salvar foto no banco de dados
+    console.log(`[inspecao.ts] Salvando foto no banco de dados...`);
+    const fotoSalva = await salvarFoto({
       confirmacao_id: confirmacaoId,
       foto_data: fotoBase64,
       foto_nome: fotoNome,
-      foto_tipo: 'image/jpeg',
-      tamanho_bytes: fotoBuffer.length,
-    };
+      foto_tipo: 'jpeg',
+      tamanho_bytes: tamanhoBytes,
+    });
 
-    const { id: fotoId } = await salvarFoto(fotoData);
-    console.log(`[inspecao.ts] Foto salva com ID: ${fotoId}`);
+    console.log(`[inspecao.ts] Foto salva com sucesso! ID: ${fotoSalva.id}`);
 
-    // 2. Enviar para análise do GPTMaker
-    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente);
-    console.log(`[inspecao.ts] Análise GPTMaker concluída: ${analise.resultado}`);
+    // 3. Analisar foto com GPTMaker
+    console.log(`[inspecao.ts] Enviando foto para análise com GPTMaker...`);
+    const analise = await analisarFotoGPTMaker(
+      fotoBase64,
+      fotoNome,
+      confirmacaoId,
+      numeroSerie,
+      equipmentType,
+      nomeCliente
+    );
 
-    // 3. Retornar resposta esperada pelo frontend
-    return res.status(200).json({
-      fotoId,
-      analise: {
-        status: analise.status,
-        resultado: analise.resultado,
-        descricao: analise.descricao,
-      },
+    console.log(`[inspecao.ts] Análise concluída: ${analise.status}`);
+
+    // 4. Retornar resultado
+    res.json({
+      success: true,
+      message: 'Foto enviada, salva e analisada com sucesso',
+      foto: fotoSalva,
+      analise: analise,
     });
   } catch (error) {
-    console.error('[inspecao.ts] Erro no upload:', error);
-    return res.status(500).json({
-      error: `Erro ao processar foto: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+    console.error('[inspecao.ts] Erro ao fazer upload de foto:', error);
+    res.status(500).json({
+      error: 'Erro ao fazer upload de foto',
+      details: error instanceof Error ? error.message : 'Erro desconhecido',
     });
   }
 });
