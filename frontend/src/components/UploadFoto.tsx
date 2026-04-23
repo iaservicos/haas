@@ -2,10 +2,19 @@ import React, { useState } from 'react';
 
 interface UploadFotoProps {
   confirmacaoId: string;
+  numeroSerie?: string;
+  equipmentType?: string;
+  nomeCliente?: string;
   onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
 
-export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadSuccess }) => {
+export const UploadFoto: React.FC<UploadFotoProps> = ({ 
+  confirmacaoId, 
+  numeroSerie,
+  equipmentType,
+  nomeCliente,
+  onUploadSuccess 
+}) => {
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -49,6 +58,9 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadS
             fotoBase64: base64Data,
             fotoNome: foto.name,
             confirmacaoId,
+            numeroSerie: numeroSerie || 'Desconhecido',
+            equipmentType: equipmentType || 'Desconhecido',
+            nomeCliente: nomeCliente || 'Desconhecido',
           }),
         });
 

@@ -130,13 +130,15 @@ router.post('/', async (req: Request, res: Response) => {
  */
 router.post('/upload-foto', async (req: Request, res: Response) => {
   try {
-    const { fotoBase64, fotoNome, confirmacaoId } = req.body;
+    const { fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente } = req.body;
 
     if (!fotoBase64 || !fotoNome || !confirmacaoId) {
       return res.status(400).json({
         error: 'Faltam parâmetros: fotoBase64, fotoNome, confirmacaoId',
       });
     }
+
+    console.log(`[Vistoria] Upload de foto para serial: ${numeroSerie}, tipo: ${equipmentType}, cliente: ${nomeCliente}`);
 
     // 1. Salvar foto no banco
     const fotoBuffer = Buffer.from(fotoBase64, 'base64');
@@ -151,8 +153,8 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
     const { id: fotoId } = await salvarFoto(fotoData);
     console.log(`[Vistoria] Foto salva com ID: ${fotoId}`);
 
-    // 2. Enviar para análise do GPTMaker
-    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId);
+    // 2. Enviar para análise do GPTMaker com contexto do equipamento
+    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente);
 
     // 3. Atualizar confirmação com resultado da análise
     const { error: updateError } = await supabase

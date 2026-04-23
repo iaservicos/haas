@@ -9,20 +9,38 @@ interface AnaliseGPTMaker {
 }
 
 /**
- * Enviar foto para análise do GPTMaker
+ * Enviar foto para análise do GPTMaker com contexto do equipamento
  */
 export async function analisarFotoGPTMaker(
   fotoBase64: string,
   fotoNome: string,
-  confirmacaoId: string
+  confirmacaoId: string,
+  numeroSerie?: string,
+  equipmentType?: string,
+  nomeCliente?: string
 ): Promise<AnaliseGPTMaker> {
   try {
-    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome}`);
+    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome} (Serial: ${numeroSerie}, Tipo: ${equipmentType})`);
+
+    // Preparar prompt com contexto do equipamento
+    const contextoEquipamento = numeroSerie ? `\nNúmero de Série: ${numeroSerie}` : '';
+    const contextoTipo = equipmentType ? `\nTipo de Equipamento: ${equipmentType}` : '';
+    const contextoCliente = nomeCliente ? `\nCliente: ${nomeCliente}` : '';
+
+    const prompt = `Analise esta foto de equipamento${contextoEquipamento}${contextoTipo}${contextoCliente}.
+
+Verifique:
+1. Estado geral do equipamento
+2. Presença de danos físicos ou avarias
+3. Componentes faltando ou danificados
+4. Condição de funcionamento aparente
+
+Forneça uma análise concisa e objetiva.`;
 
     // Preparar payload para GPTMaker
     const payload = {
       agentId: env.GPTMAKER_AGENT_ID,
-      message: `Analise esta foto de equipamento: ${fotoNome}. Verifique se há danos visíveis, se o equipamento está funcionando e descreva o estado geral.`,
+      message: prompt,
       image: fotoBase64,
       confirmacaoId: confirmacaoId,
     };
