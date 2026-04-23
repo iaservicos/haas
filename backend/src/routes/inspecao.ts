@@ -376,6 +376,12 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
 /**
  * POST /api/inspecao/upload-foto
  * Recebe foto em base64, salva no banco (fotos_vistoria) e envia para GPTMaker analisar
+ * 
+ * Fluxo:
+ * 1. Recebe foto em base64 + confirmacaoId
+ * 2. Salva foto em fotos_vistoria (bytea)
+ * 3. Envia para GPTMaker analisar
+ * 4. Retorna fotoId + análise
  */
 router.post('/upload-foto', async (req, res) => {
   try {
