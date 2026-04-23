@@ -1,108 +1,144 @@
-import { supabase } from '../config/database.js';
-import multer from 'multer';
 
-interface FotoData {
+import { supabase } from '../config/database.js';
+
+/**
+ * Salva foto na tabela fotos_vistoria
+ * @param fotoData - Dados da foto (confirmacao_id, foto_data, foto_nome, foto_tipo, tamanho_bytes)
+ * @returns ID da foto salva
+ */
+export async function salvarFoto(fotoData: {
   confirmacao_id: string;
   foto_data: string; // base64
   foto_nome: string;
   foto_tipo: string;
   tamanho_bytes: number;
-}
-
-// Configurar multer para upload em memória
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-  },
-});
-
-/**
- * Salvar foto no banco de dados
- */
-export async function salvarFoto(fotoData: FotoData): Promise<{ id: string }> {
+}) {
   try {
+    console.log(`[fotoService] Salvando foto: ${fotoData.foto_nome} para confirmacao: ${fotoData.confirmacao_id}`);
+
+    // Converter base64 para buffer
+    const fotoBuffer = Buffer.from(fotoData.foto_data, 'base64');
+
+    // Inserir na tabela fotos_vistoria
     const { data, error } = await supabase
       .from('fotos_vistoria')
       .insert([
         {
           confirmacao_id: fotoData.confirmacao_id,
-          foto_data: fotoData.foto_data,
+          foto_data: fotoBuffer, // Supabase converte automaticamente para bytea
           foto_nome: fotoData.foto_nome,
           foto_tipo: fotoData.foto_tipo,
           tamanho_bytes: fotoData.tamanho_bytes,
           data_upload: new Date().toISOString(),
         },
       ])
-      .select('id')
-      .single();
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[fotoService] Erro ao salvar foto:', error);
+      throw new Error(`Erro ao salvar foto: ${error.message}`);
+    }
 
-    return { id: data.id };
+    if (!data || data.length === 0) {
+      throw new Error('Nenhuma foto foi salva');
+    }
+
+    console.log(`[fotoService] Foto salva com sucesso! ID: ${data[0].id}`);
+
+    return {
+      id: data[0].id,
+      confirmacao_id: data[0].confirmacao_id,
+      foto_nome: data[0].foto_nome,
+      data_upload: data[0].data_upload,
+    };
   } catch (error) {
-    console.error('Erro ao salvar foto:', error);
+    console.error('[fotoService] Erro ao salvar foto:', error);
     throw error;
   }
 }
 
 /**
- * Recuperar foto do banco de dados
+ * Lista fotos de uma confirmação
+ * @param confirmacao_id - ID da confirmação
+ * @returns Array de fotos
  */
-export async function recuperarFoto(fotoId: string): Promise<FotoData | null> {
+export async function listarFotosPorConfirmacao(confirmacao_id: string) {
   try {
+    console.log(`[fotoService] Listando fotos para confirmacao: ${confirmacao_id}`);
+
     const { data, error } = await supabase
       .from('fotos_vistoria')
       .select('*')
-      .eq('id', fotoId)
-      .single();
-
-    if (error) throw error;
-
-    return data as FotoData;
-  } catch (error) {
-    console.error('Erro ao recuperar foto:', error);
-    return null;
-  }
-}
-
-/**
- * Listar fotos de uma confirmação
- */
-export async function listarFotosPorConfirmacao(confirmacaoId: string): Promise<FotoData[]> {
-  try {
-    const { data, error } = await supabase
-      .from('fotos_vistoria')
-      .select('*')
-      .eq('confirmacao_id', confirmacaoId)
+      .eq('confirmacao_id', confirmacao_id)
       .order('data_upload', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[fotoService] Erro ao listar fotos:', error);
+      throw new Error(`Erro ao listar fotos: ${error.message}`);
+    }
 
-    return data as FotoData[];
+    console.log(`[fotoService] ${data?.length || 0} fotos encontradas`);
+
+    return data || [];
   } catch (error) {
-    console.error('Erro ao listar fotos:', error);
-    return [];
+    console.error('[fotoService] Erro ao listar fotos:', error);
+    throw error;
   }
 }
 
 /**
- * Deletar foto
+ * Deleta uma foto
+ * @param foto_id - ID da foto
+ * @returns true se deletada com sucesso
  */
-export async function deletarFoto(fotoId: string): Promise<boolean> {
+export async function deletarFoto(foto_id: number) {
   try {
+    console.log(`[fotoService] Deletando foto: ${foto_id}`);
+
     const { error } = await supabase
       .from('fotos_vistoria')
       .delete()
-      .eq('id', fotoId);
+      .eq('id', foto_id);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[fotoService] Erro ao deletar foto:', error);
+      throw new Error(`Erro ao deletar foto: ${error.message}`);
+    }
+
+    console.log(`[fotoService] Foto deletada com sucesso!`);
 
     return true;
   } catch (error) {
-    console.error('Erro ao deletar foto:', error);
-    return false;
+    console.error('[fotoService] Erro ao deletar foto:', error);
+    throw error;
   }
 }
 
-export { upload };
+/**
+ * Obtém uma foto pelo ID
+ * @param foto_id - ID da foto
+ * @returns Dados da foto
+ */
+export async function obterFoto(foto_id: number) {
+  try {
+    console.log(`[fotoService] Obtendo foto: ${foto_id}`);
+
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .select('*')
+      .eq('id', foto_id)
+      .single();
+
+    if (error) {
+      console.error('[fotoService] Erro ao obter foto:', error);
+      throw new Error(`Erro ao obter foto: ${error.message}`);
+    }
+
+    console.log(`[fotoService] Foto encontrada!`);
+
+    return data;
+  } catch (error) {
+    console.error('[fotoService] Erro ao obter foto:', error);
+    throw error;
+  }
+}

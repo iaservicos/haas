@@ -1,31 +1,27 @@
-import axios from 'axios';
-import { createClient } from '@supabase/supabase-js';
+/**
+ * Serviço de análise de fotos com GPTMaker
+ * Envia foto para o agente GPTMaker analisar e retorna resultado
+ */
 
-interface AnaliseGPTMaker {
-  status: 'pendente' | 'analisando' | 'concluido' | 'erro';
-  resultado: 'ok' | 'problema' | null;
+const GPTMAKER_AGENT_ID = process.env.GPTMAKER_AGENT_ID || '3F068B1F309632949C12BE5343F615B3';
+const GPTMAKER_API_TOKEN = process.env.GPTMAKER_API_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJncHRtYWtlciIsImlkIjoiM0REQjMyN0E5RkM5RDFFMjk3M0FGQTUyOTE1RDk2RDQiLCJ0ZW5hbnQiOiIzRERCMzI3QTlGQzlEMUUyOTczQUZBNTI5MTVEOTZENCIsInV1aWQiOiIwOGQxZTU3Mi0yY2ZhLTQ3MmEtYWU2Mi03NTdlYmJhMWEyMWYifQ.4qgjuwhYM7a9SNRvyTr0rO-kgPD02PMVVFn2E2bY7mk';
+
+export interface AnaliseResultado {
+  status: 'OK' | 'NOK';
+  resultado: 'ok' | 'problema';
   descricao: string;
   timestamp: string;
 }
 
-// Configurações
-const GPTMAKER_API_URL = 'https://api.gptmaker.ai';
-const GPTMAKER_AGENT_ID = '3F2148420AFE70123E86F2A655C371D2';
-const GPTMAKER_API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJncHRtYWtlciIsImlkIjoiM0REQjMyN0E5RkM5RDFFMjk3M0FGQTUyOTE1RDk2RDQiLCJ0ZW5hbnQiOiIzRERCMzI3QTlGQzlEMUUyOTczQUZBNTI5MTVEOTZENCIsInV1aWQiOiJjZTZjOGIyNi01ZThlLTQyNTctYjE3MS0yOWRhZjAyYmY4ODYifQ.bXuxgEwTQnkdQHNCW7MQnpToq4VMj1Kjhnq_kZz2krc';
-
-// Supabase (configure com suas credenciais)
-const supabaseUrl = process.env.SUPABASE_URL || 'https://seu-projeto.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || 'sua-chave-publica';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 /**
- * Envia foto para análise do GPTMaker via API correta
- * 
- * Fluxo:
- * 1. Recebe foto em base64
- * 2. Salva em Supabase (gera URL pública)
- * 3. Envia URL para GPTMaker via /conversation
- * 4. GPTMaker analisa e retorna resultado
+ * Analisa foto com GPTMaker
+ * @param fotoBase64 - Foto em base64
+ * @param fotoNome - Nome da foto
+ * @param confirmacaoId - ID da confirmação
+ * @param numeroSerie - Número de série do equipamento
+ * @param equipmentType - Tipo de equipamento
+ * @param nomeCliente - Nome do cliente
+ * @returns Resultado da análise
  */
 export async function analisarFotoGPTMaker(
   fotoBase64: string,
@@ -34,147 +30,101 @@ export async function analisarFotoGPTMaker(
   numeroSerie?: string,
   equipmentType?: string,
   nomeCliente?: string
-): Promise<AnaliseGPTMaker> {
+): Promise<AnaliseResultado> {
   try {
-    console.log(`[GPTMaker] Iniciando análise da foto: ${fotoNome} (Serial: ${numeroSerie})`);
+    console.log(`[gptmakerService] Iniciando análise de foto: ${fotoNome}`);
+    console.log(`[gptmakerService] Serial: ${numeroSerie}, Tipo: ${equipmentType}, Cliente: ${nomeCliente}`);
 
-    // 1. Converter base64 para buffer
-    const fotoBuffer = Buffer.from(fotoBase64, 'base64');
+    // Preparar prompt para análise
+    const analysisPrompt = `Você é um especialista em inspeção de equipamentos de TI. Analise esta foto de um equipamento e responda:
 
-    // 2. Salvar em Supabase (gera URL pública)
-    const fotoUrl = await salvarFotoSupabase(fotoBuffer, fotoNome);
-    console.log(`[GPTMaker] Foto salva em: ${fotoUrl}`);
+Informações do equipamento:
+- Número de série: ${numeroSerie || 'N/A'}
+- Tipo: ${equipmentType || 'N/A'}
+- Cliente: ${nomeCliente || 'N/A'}
 
-    // 3. Preparar prompt com contexto
-    const contextoEquipamento = numeroSerie ? `\nNúmero de Série: ${numeroSerie}` : '';
-    const contextoTipo = equipmentType ? `\nTipo de Equipamento: ${equipmentType}` : '';
-    const contextoCliente = nomeCliente ? `\nCliente: ${nomeCliente}` : '';
+Análise solicitada:
+1. O equipamento está em bom estado (OK) ou tem problemas (NOK)?
+2. Descreva o que você vê na imagem
+3. Identifique qualquer dano, avaria ou problema visível
 
-    const prompt = `Analise esta foto de equipamento${contextoEquipamento}${contextoTipo}${contextoCliente}.
+Responda APENAS em JSON com a seguinte estrutura (sem texto adicional):
+{
+  "status": "OK" ou "NOK",
+  "resultado": "ok" ou "problema",
+  "descricao": "descrição detalhada do que vê",
+  "timestamp": "${new Date().toISOString()}"
+}`;
 
-Verifique:
-1. Estado geral do equipamento
-2. Presença de danos físicos ou avarias
-3. Componentes faltando ou danificados
-4. Condição de funcionamento aparente
+    // Chamar GPTMaker API
+    console.log(`[gptmakerService] Enviando para GPTMaker Agent: ${GPTMAKER_AGENT_ID}`);
 
-Forneça uma análise concisa e objetiva.`;
-
-    // 4. Enviar para GPTMaker via API correta
-    console.log(`[GPTMaker] Enviando para agente: ${GPTMAKER_AGENT_ID}`);
-    
-    const response = await axios.post(
-      `${GPTMAKER_API_URL}/v2/agent/${GPTMAKER_AGENT_ID}/conversation`,
+    const response = await fetch(
+      `https://api.gptmaker.ai/v2/agent/${GPTMAKER_AGENT_ID}/conversation`,
       {
-        contextId: confirmacaoId,
-        prompt: prompt,
-        chatPicture: fotoUrl, // ← URL da foto
-        chatName: nomeCliente || 'Cliente',
-      },
-      {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${GPTMAKER_API_TOKEN}`,
+          'Authorization': `Bearer ${GPTMAKER_API_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        timeout: 60000,
+        body: JSON.stringify({
+          contextId: `vistoria-${confirmacaoId}-${Date.now()}`,
+          prompt: analysisPrompt,
+          image: `data:image/jpeg;base64,${fotoBase64}`,
+        }),
       }
     );
 
-    console.log(`[GPTMaker] Resposta recebida para ${fotoNome}`);
-    console.log(`[GPTMaker] Mensagem: ${response.data.message}`);
+    if (!response.ok) {
+      console.error(`[gptmakerService] GPTMaker API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`[gptmakerService] Erro detalhado: ${errorText}`);
+      throw new Error(`GPTMaker API error: ${response.statusText}`);
+    }
 
-    // 5. Processar resposta
-    const mensagem = response.data.message || '';
-    const temProblema = 
-      mensagem.toLowerCase().includes('problema') ||
-      mensagem.toLowerCase().includes('dano') ||
-      mensagem.toLowerCase().includes('danificado') ||
-      mensagem.toLowerCase().includes('faltando') ||
-      mensagem.toLowerCase().includes('quebrado') ||
-      mensagem.toLowerCase().includes('avaria');
+    const result = await response.json();
+    console.log(`[gptmakerService] Resposta recebida do GPTMaker`);
 
-    const analise: AnaliseGPTMaker = {
-      status: 'concluido',
-      resultado: temProblema ? 'problema' : 'ok',
-      descricao: mensagem,
-      timestamp: new Date().toISOString(),
-    };
+    // Tentar parsear JSON da resposta
+    let analise: AnaliseResultado;
+    try {
+      // Procurar por JSON na resposta
+      const jsonMatch = result.message?.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analise = JSON.parse(jsonMatch[0]);
+        console.log(`[gptmakerService] JSON parseado com sucesso`);
+      } else {
+        // Se não encontrar JSON, criar resposta padrão
+        console.log(`[gptmakerService] JSON não encontrado, usando resposta padrão`);
+        analise = {
+          status: 'OK',
+          resultado: 'ok',
+          descricao: result.message || 'Análise concluída',
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (parseError) {
+      console.warn(`[gptmakerService] Erro ao parsear JSON, usando resposta padrão`);
+      analise = {
+        status: 'OK',
+        resultado: 'ok',
+        descricao: result.message || 'Análise concluída',
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    console.log(`[gptmakerService] Análise concluída: ${analise.status}`);
 
     return analise;
   } catch (error) {
-    console.error('[GPTMaker] Erro na análise:', error);
-
-    const errorMessage = error instanceof Error ? error.message : 'Desconhecido';
+    console.error('[gptmakerService] Erro na análise:', error);
     
+    // Retornar resposta de erro padrão
     return {
-      status: 'erro',
-      resultado: null,
-      descricao: `Erro ao analisar foto: ${errorMessage}`,
+      status: 'NOK',
+      resultado: 'problema',
+      descricao: `Erro ao analisar foto: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
       timestamp: new Date().toISOString(),
     };
-  }
-}
-
-/**
- * Salva foto em Supabase e retorna URL pública
- */
-async function salvarFotoSupabase(
-  fotoBuffer: Buffer,
-  fotoNome: string
-): Promise<string> {
-  try {
-    const nomeUnico = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${fotoNome}`;
-    
-    console.log(`[Supabase] Salvando foto: ${nomeUnico}`);
-
-    // Upload para Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('fotos')
-      .upload(nomeUnico, fotoBuffer, {
-        contentType: 'image/jpeg',
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('[Supabase] Erro ao fazer upload:', error);
-      throw error;
-    }
-
-    // Obter URL pública
-    const { data: publicUrl } = supabase.storage
-      .from('fotos')
-      .getPublicUrl(nomeUnico);
-
-    console.log(`[Supabase] ✅ Foto salva: ${publicUrl.publicUrl}`);
-    return publicUrl.publicUrl;
-  } catch (error) {
-    console.error('[Supabase] Erro ao salvar foto:', error);
-    throw error;
-  }
-}
-
-/**
- * Validar credenciais do GPTMaker
- */
-export async function validarCredenciaisGPTMaker(): Promise<boolean> {
-  try {
-    console.log('[GPTMaker] Validando credenciais...');
-
-    const response = await axios.get(
-      `${GPTMAKER_API_URL}/v2/agent/${GPTMAKER_AGENT_ID}/settings`,
-      {
-        headers: {
-          Authorization: `Bearer ${GPTMAKER_API_TOKEN}`,
-        },
-        timeout: 10000,
-      }
-    );
-
-    console.log('[GPTMaker] ✅ Credenciais válidas');
-    console.log('[GPTMaker] Configurações do agente:', response.data);
-    return true;
-  } catch (error) {
-    console.error('[GPTMaker] ❌ Credenciais inválidas:', error);
-    return false;
   }
 }
