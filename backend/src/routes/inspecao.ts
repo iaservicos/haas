@@ -2,6 +2,8 @@ import express from 'express';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
+import { salvarFoto } from '../services/fotoService.js';
+import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
 
 const router = express.Router();
 
@@ -367,6 +369,56 @@ router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
     res.status(500).json({ 
       error: 'Erro ao buscar inspeções',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+/**
+ * POST /api/inspecao/upload-foto
+ * Recebe foto em base64, salva no banco (fotos_vistoria) e envia para GPTMaker analisar
+ */
+router.post('/upload-foto', async (req, res) => {
+  try {
+    const { fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente } = req.body;
+
+    if (!fotoBase64 || !fotoNome || !confirmacaoId) {
+      return res.status(400).json({
+        error: 'Faltam parâmetros: fotoBase64, fotoNome, confirmacaoId',
+      });
+    }
+
+    console.log(`[inspecao.ts] Upload de foto para serial: ${numeroSerie}, tipo: ${equipmentType}, cliente: ${nomeCliente}`);
+
+    // 1. Salvar foto no banco (fotos_vistoria)
+    const fotoBuffer = Buffer.from(fotoBase64, 'base64');
+    const fotoData = {
+      confirmacao_id: confirmacaoId,
+      foto_data: fotoBase64,
+      foto_nome: fotoNome,
+      foto_tipo: 'image/jpeg',
+      tamanho_bytes: fotoBuffer.length,
+    };
+
+    const { id: fotoId } = await salvarFoto(fotoData);
+    console.log(`[inspecao.ts] Foto salva com ID: ${fotoId}`);
+
+    // 2. Enviar para análise do GPTMaker
+    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente);
+    console.log(`[inspecao.ts] Análise GPTMaker concluída: ${analise.resultado}`);
+
+    // 3. Retornar resposta esperada pelo frontend
+    return res.status(200).json({
+      fotoId,
+      analise: {
+        status: analise.status,
+        resultado: analise.resultado,
+        descricao: analise.descricao,
+      },
+    });
+  } catch (error) {
+    console.error('[inspecao.ts] Erro no upload:', error);
+    return res.status(500).json({
+      error: `Erro ao processar foto: ${error instanceof Error ? error.message : 'Desconhecido'}`,
     });
   }
 });
