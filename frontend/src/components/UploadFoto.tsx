@@ -8,7 +8,13 @@ interface UploadFotoProps {
   onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
 
-export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, numeroSerie, equipmentType, nomeCliente, onUploadSuccess }) => {
+export const UploadFoto: React.FC<UploadFotoProps> = ({ 
+  confirmacaoId, 
+  numeroSerie,
+  equipmentType,
+  nomeCliente,
+  onUploadSuccess 
+}) => {
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -43,7 +49,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, numeroSer
         const fotoBase64 = event.target?.result as string;
         const base64Data = fotoBase64.split(',')[1];
 
-        const response = await fetch('/api/inspecao/upload-foto', {
+        const response = await fetch('/api/vistorias/upload-foto', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
