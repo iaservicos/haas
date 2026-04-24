@@ -4,7 +4,9 @@ import { authMiddleware } from '../middleware/auth.js';
 import { salvarFoto, listarFotosPorConfirmacao } from '../services/fotoService.js';
 import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
 
-const router = Router();
+
+const router = Router( );
+
 
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -120,19 +122,15 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// ===== ROTAS NOVAS PARA FOTOS E GPTMAKER =====
+
 /**
- * POST /api/vistorias/upload-foto
- * Recebe foto em base64, salva no banco (fotos_vistoria) e envia para GPTMaker analisar
- * 
- * Fluxo:
- * 1. Recebe foto em base64 + confirmacaoId
- * 2. Salva foto em fotos_vistoria (bytea)
- * 3. Envia para GPTMaker analisar
- * 4. Retorna fotoId + análise
+ * POST /api/vistoria/upload-foto
+ * Recebe foto, salva no banco e envia para GPTMaker
  */
 router.post('/upload-foto', async (req: Request, res: Response) => {
   try {
-    const { fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente } = req.body;
+    const { fotoBase64, fotoNome, confirmacaoId } = req.body;
 
     if (!fotoBase64 || !fotoNome || !confirmacaoId) {
       return res.status(400).json({
@@ -140,9 +138,7 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
       });
     }
 
-    console.log(`[Vistoria] Upload de foto para serial: ${numeroSerie}, tipo: ${equipmentType}, cliente: ${nomeCliente}`);
-
-    // 1. Salvar foto no banco (fotos_vistoria)
+    // 1. Salvar foto no banco
     const fotoBuffer = Buffer.from(fotoBase64, 'base64');
     const fotoData = {
       confirmacao_id: confirmacaoId,
@@ -156,17 +152,27 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
     console.log(`[Vistoria] Foto salva com ID: ${fotoId}`);
 
     // 2. Enviar para análise do GPTMaker
-    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId, numeroSerie, equipmentType, nomeCliente);
-    console.log(`[Vistoria] Análise GPTMaker concluída: ${analise.resultado}`);
+    const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId);
 
-    // 3. Retornar resposta esperada pelo frontend
+    // 3. Atualizar confirmação com resultado da análise
+    const { error: updateError } = await supabase
+      .from('cliente_confirmacoes')
+      .update({
+        analise_gptmaker: analise.descricao,
+        status_analise: analise.status,
+        resultado_analise: analise.resultado,
+      })
+      .eq('id', confirmacaoId);
+
+    if (updateError) {
+      console.error('Erro ao atualizar confirmação:', updateError);
+    }
+
     return res.status(200).json({
+      success: true,
       fotoId,
-      analise: {
-        status: analise.status,
-        resultado: analise.resultado,
-        descricao: analise.descricao,
-      },
+      analise,
+      message: 'Foto salva e analisada com sucesso',
     });
   } catch (error) {
     console.error('[Vistoria] Erro no upload:', error);
@@ -177,7 +183,7 @@ router.post('/upload-foto', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/vistorias/confirmacao/:id
+ * GET /api/vistoria/confirmacao/:id
  * Retorna dados da confirmação com fotos
  */
 router.get('/confirmacao/:id', async (req: Request, res: Response) => {
@@ -211,7 +217,7 @@ router.get('/confirmacao/:id', async (req: Request, res: Response) => {
 });
 
 /**
- * PUT /api/vistorias/confirmacao/:id
+ * PUT /api/vistoria/confirmacao/:id
  * Atualiza checklist da confirmação
  */
 router.put('/confirmacao/:id', async (req: Request, res: Response) => {
@@ -255,5 +261,6 @@ router.put('/confirmacao/:id', async (req: Request, res: Response) => {
     });
   }
 });
+
 
 export default router;
