@@ -35,8 +35,8 @@ router.post('/upload-foto', async (req, res) => {
 
       console.log(`[inspecao] Foto salva com sucesso! ID: ${fotoSalva.id}`);
 
-      // TODO: Analisar foto com GPTMaker (desabilitado temporariamente)
-      // const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId);
+      // TODO: Analisar foto com LLM (desabilitado temporariamente)
+      // const analise = await analisarFotoLLM(fotoBase64, fotoNome, confirmacaoId);
       // console.log(`[inspecao] Análise concluída:`, analise);
 
       // Retornar resultado
@@ -48,7 +48,7 @@ router.post('/upload-foto', async (req, res) => {
           confirmacao_id: confirmacaoId,
           foto_nome: fotoNome,
         },
-        // analise: analise, // TODO: Adicionar quando GPTMaker estiver funcionando
+        // analise: analise, // TODO: Adicionar quando LLM estiver funcionando
       });
     } catch (dbError) {
       console.error('[inspecao] Erro ao salvar/analisar foto:', dbError);
@@ -204,32 +204,6 @@ router.post('/salvar', async (req, res) => {
 });
 
 /**
- * GET /api/inspecao/:vistoriaId
- * Retorna as respostas de uma inspeção específica
- */
-router.get('/:vistoriaId', async (req, res) => {
-  try {
-    const { vistoriaId } = req.params;
-
-    const { data, error } = await supabase
-      .from('inspecao_respostas')
-      .select('*')
-      .eq('vistoria_id', vistoriaId)
-      .single();
-
-    if (error) {
-      console.error('Erro ao buscar inspeção:', error);
-      return res.status(404).json({ error: 'Inspeção não encontrada' });
-    }
-
-    res.json(data);
-  } catch (error) {
-    console.error('Erro ao buscar inspeção:', error);
-    res.status(500).json({ error: 'Erro ao buscar inspeção' });
-  }
-});
-
-/**
  * GET /api/inspecao/portal/listar
  * Retorna todas as inspeções do portal com dados de equipamento e contrato
  */
@@ -335,6 +309,33 @@ router.get('/portal/listar', async (req, res) => {
       error: 'Erro ao listar inspeções',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
+  }
+});
+
+/**
+ * GET /api/inspecao/:vistoriaId
+ * Retorna as respostas de uma inspeção específica
+ * IMPORTANTE: Esta rota DEVE estar por último para não capturar outras rotas!
+ */
+router.get('/:vistoriaId', async (req, res) => {
+  try {
+    const { vistoriaId } = req.params;
+
+    const { data, error } = await supabase
+      .from('inspecao_respostas')
+      .select('*')
+      .eq('vistoria_id', vistoriaId)
+      .single();
+
+    if (error) {
+      console.error('Erro ao buscar inspeção:', error);
+      return res.status(404).json({ error: 'Inspeção não encontrada' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Erro ao buscar inspeção:', error);
+    res.status(500).json({ error: 'Erro ao buscar inspeção' });
   }
 });
 
