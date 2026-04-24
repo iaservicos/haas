@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UploadFoto } from '../components/UploadFoto';
 import { ChecklistVistoria } from '../components/ChecklistVistoria';
+import { supabase } from '../services/supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -24,6 +25,7 @@ export const VistoriaCliente: React.FC = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [vistoriaId, setVistoriaId] = useState<string>('');
+  const [confirmacaoId, setConfirmacaoId] = useState<string>(''); // ✅ NOVO: ID real da confirmacao
   const [confirmacaoData, setConfirmacaoData] = useState<any>(null);
   const [fotos, setFotos] = useState<any[]>([]);
   const [analiseResultado, setAnaliseResultado] = useState<any>(null);
@@ -67,18 +69,54 @@ export const VistoriaCliente: React.FC = () => {
     }
   };
 
-  const criarConfirmacao = () => {
-    // Gerar um UUID único para esta vistoria
-    const novoVistoriaId = generateUUID();
-    setVistoriaId(novoVistoriaId);
-    
-    setConfirmacaoData({
-      id: equipamentoId,
-      numero_serie: numeroSerie,
-      status_analise: 'Pendente',
-      resultado_analise: null,
-    });
-    setFotos([]);
+  // ✅ NOVO: Criar confirmacao no banco de dados
+  const criarConfirmacao = async () => {
+    try {
+      setLoading(true);
+      console.log('[VistoriaCliente] Criando confirmacao...');
+
+      // Gerar um UUID único para esta vistoria
+      const novoVistoriaId = generateUUID();
+      setVistoriaId(novoVistoriaId);
+
+      // ✅ NOVO: Criar registro na tabela cliente_confirmacoes
+      const { data, error } = await supabase
+        .from('cliente_confirmacoes')
+        .insert([
+          {
+            id: novoVistoriaId, // Usar o UUID gerado como ID
+            equipamento_id: parseInt(equipamentoId || '0'),
+            numero_serie: numeroSerie,
+            status: 'Pendente',
+            data_criacao: new Date().toISOString(),
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('[VistoriaCliente] Erro ao criar confirmacao:', error);
+        setErro('Erro ao iniciar a vistoria. Tente novamente.');
+        throw error;
+      }
+
+      console.log('[VistoriaCliente] Confirmacao criada com sucesso:', data);
+
+      // ✅ NOVO: Usar o ID real da confirmacao
+      setConfirmacaoId(novoVistoriaId);
+
+      setConfirmacaoData({
+        id: equipamentoId,
+        numero_serie: numeroSerie,
+        status_analise: 'Pendente',
+        resultado_analise: null,
+      });
+      setFotos([]);
+      setLoading(false);
+    } catch (error) {
+      console.error('[VistoriaCliente] Erro ao criar confirmacao:', error);
+      setErro('Erro ao iniciar a vistoria. Tente novamente.');
+      setLoading(false);
+    }
   };
 
   const handleUploadSuccess = (fotoId: string, analise: any) => {
@@ -147,7 +185,20 @@ export const VistoriaCliente: React.FC = () => {
 
         {/* CONTENT */}
         <div className="flex-1 overflow-auto p-8">
-          {confirmacaoData && equipmentType && vistoriaId ? (
+          {erro && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-red-700">{erro}</p>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Iniciando vistoria...</p>
+              </div>
+            </div>
+          ) : confirmacaoData && equipmentType && confirmacaoId ? (
             <div className="max-w-4xl mx-auto space-y-6">
               {/* CARD: UPLOAD DE FOTO */}
               <div className="bg-white rounded-lg shadow-md p-6">
@@ -155,7 +206,7 @@ export const VistoriaCliente: React.FC = () => {
                 <p className="text-sm text-gray-600 mb-4">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
                 
                 <UploadFoto
-                  confirmacaoId={vistoriaId}
+                  confirmacaoId={confirmacaoId}
                   numeroSerie={numeroSerie || ''}
                   equipmentType={equipmentType}
                   nomeCliente="Cliente"
@@ -212,7 +263,7 @@ export const VistoriaCliente: React.FC = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Checklist de Vistoria</h2>
                 <ChecklistVistoria
-                  confirmacaoId={vistoriaId}
+                  confirmacaoId={confirmacaoId}
                   equipmentType={equipmentType}
                   equipamentoId={parseInt(equipamentoId || '0')}
                   onChecklistSave={handleChecklistSave}
