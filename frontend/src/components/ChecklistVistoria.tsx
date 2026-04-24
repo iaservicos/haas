@@ -8,7 +8,7 @@ interface Question {
 }
 
 interface ChecklistVistoriaProps {
-  confirmacaoId: string;
+  confirmacaoId: string;  // Não é usado para salvar, apenas para compatibilidade
   equipmentType?: string;
   equipamentoId?: number;
   onChecklistSave?: (checklist: any) => void;
@@ -22,6 +22,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
 }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
+  const [observacoes, setObservacoes] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
@@ -76,7 +77,30 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     }));
   };
 
+  /**
+   * Validar se todas as perguntas foram respondidas
+   */
+  const validarRespostas = (): boolean => {
+    for (const question of questions) {
+      const answer = answers[question.id];
+      
+      // Verificar se a resposta está vazia
+      if (answer === '' || answer === undefined || answer === null) {
+        setErro(`Por favor, responda a pergunta: "${question.text}"`);
+        return false;
+      }
+    }
+    
+    setErro('');
+    return true;
+  };
+
   const handleSalvar = async () => {
+    // Validar respostas
+    if (!validarRespostas()) {
+      return;
+    }
+
     setLoading(true);
     setErro('');
     setSucesso(false);
@@ -85,10 +109,13 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       // Use full URL with API_BASE_URL
       const url = `${API_BASE_URL}/inspecao/salvar`;
       
+      // NÃO enviar vistoriaId aqui, pois será gerado no VistoriaCliente
+      // Este componente apenas coleta as respostas
       const payload = {
-        vistoriaId: confirmacaoId,
+        vistoriaId: 'temp',  // Placeholder - será substituído no VistoriaCliente
         equipmentType,
         answers,
+        observacoes,
         ...(equipamentoId && { equipamento_id: equipamentoId })
       };
       
@@ -111,8 +138,14 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       console.log('[ChecklistVistoria] Resposta do servidor:', data);
       setSucesso(true);
 
+      // Retornar os dados do checklist para o componente pai
       if (onChecklistSave) {
-        onChecklistSave(data);
+        onChecklistSave({
+          answers,
+          observacoes,
+          equipmentType,
+          equipamentoId
+        });
       }
 
       setTimeout(() => {
@@ -212,6 +245,26 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
             </div>
           ))}
 
+          {/* CAMPO DE OBSERVAÇÕES GERAIS */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              Observações Gerais
+            </label>
+            <textarea
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              placeholder="Digite observações adicionais sobre a vistoria..."
+              style={{
+                width: '100%',
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                minHeight: '80px',
+                fontFamily: 'Arial, sans-serif',
+              }}
+            />
+          </div>
+
           <button
             onClick={handleSalvar}
             disabled={loading}
@@ -229,7 +282,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
           </button>
 
           {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
-          {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>Checklist salvo com sucesso!</p>}
+          {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>✅ Checklist salvo com sucesso!</p>}
         </>
       )}
     </div>
