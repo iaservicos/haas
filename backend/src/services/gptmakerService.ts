@@ -82,7 +82,7 @@ Responda APENAS em JSON com a seguinte estrutura (sem texto adicional):
       throw new Error(`GPTMaker API error: ${response.statusText}`);
     }
 
-    const result = await response.json() as any;
+    const result = (await response.json()) as any;
     console.log(`[gptmakerService] Resposta recebida do GPTMaker`);
 
     // Tentar parsear JSON da resposta

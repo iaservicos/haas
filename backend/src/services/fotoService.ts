@@ -1,9 +1,10 @@
-import { Pool } from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
-// Conexão com PostgreSQL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+// Inicializar cliente Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_ANON_KEY || ''
+);
 
 /**
  * Salva foto na tabela fotos_vistoria
@@ -20,35 +21,40 @@ export async function salvarFoto(fotoData: {
   try {
     console.log(`[fotoService] Salvando foto: ${fotoData.foto_nome} para confirmacao: ${fotoData.confirmacao_id}`);
 
-    // Converter base64 para Buffer
+    // Converter base64 para buffer
     const fotoBuffer = Buffer.from(fotoData.foto_data, 'base64');
 
     // Inserir na tabela fotos_vistoria
-    const query = `
-      INSERT INTO fotos_vistoria (confirmacao_id, foto_data, foto_nome, foto_tipo, tamanho_bytes, data_upload)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      RETURNING id, confirmacao_id, foto_nome, data_upload;
-    `;
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .insert([
+        {
+          confirmacao_id: fotoData.confirmacao_id,
+          foto_data: fotoBuffer, // Supabase converte automaticamente para bytea
+          foto_nome: fotoData.foto_nome,
+          foto_tipo: fotoData.foto_tipo,
+          tamanho_bytes: fotoData.tamanho_bytes,
+          data_upload: new Date().toISOString(),
+        },
+      ])
+      .select();
 
-    const result = await pool.query(query, [
-      fotoData.confirmacao_id,
-      fotoBuffer, // PostgreSQL converte automaticamente para bytea
-      fotoData.foto_nome,
-      fotoData.foto_tipo,
-      fotoData.tamanho_bytes,
-    ]);
+    if (error) {
+      console.error('[fotoService] Erro ao salvar foto:', error);
+      throw new Error(`Erro ao salvar foto: ${error.message}`);
+    }
 
-    if (!result.rows || result.rows.length === 0) {
+    if (!data || data.length === 0) {
       throw new Error('Nenhuma foto foi salva');
     }
 
-    console.log(`[fotoService] Foto salva com sucesso! ID: ${result.rows[0].id}`);
+    console.log(`[fotoService] Foto salva com sucesso! ID: ${data[0].id}`);
 
     return {
-      id: result.rows[0].id,
-      confirmacao_id: result.rows[0].confirmacao_id,
-      foto_nome: result.rows[0].foto_nome,
-      data_upload: result.rows[0].data_upload,
+      id: data[0].id,
+      confirmacao_id: data[0].confirmacao_id,
+      foto_nome: data[0].foto_nome,
+      data_upload: data[0].data_upload,
     };
   } catch (error) {
     console.error('[fotoService] Erro ao salvar foto:', error);
@@ -65,18 +71,20 @@ export async function listarFotosPorConfirmacao(confirmacao_id: string) {
   try {
     console.log(`[fotoService] Listando fotos para confirmacao: ${confirmacao_id}`);
 
-    const query = `
-      SELECT id, confirmacao_id, foto_nome, foto_tipo, tamanho_bytes, data_upload
-      FROM fotos_vistoria
-      WHERE confirmacao_id = $1
-      ORDER BY data_upload DESC;
-    `;
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .select('*')
+      .eq('confirmacao_id', confirmacao_id)
+      .order('data_upload', { ascending: false });
 
-    const result = await pool.query(query, [confirmacao_id]);
+    if (error) {
+      console.error('[fotoService] Erro ao listar fotos:', error);
+      throw new Error(`Erro ao listar fotos: ${error.message}`);
+    }
 
-    console.log(`[fotoService] ${result.rows.length} fotos encontradas`);
+    console.log(`[fotoService] ${data?.length || 0} fotos encontradas`);
 
-    return result.rows || [];
+    return data || [];
   } catch (error) {
     console.error('[fotoService] Erro ao listar fotos:', error);
     throw error;
@@ -92,9 +100,15 @@ export async function deletarFoto(foto_id: number) {
   try {
     console.log(`[fotoService] Deletando foto: ${foto_id}`);
 
-    const query = `DELETE FROM fotos_vistoria WHERE id = $1;`;
+    const { error } = await supabase
+      .from('fotos_vistoria')
+      .delete()
+      .eq('id', foto_id);
 
-    await pool.query(query, [foto_id]);
+    if (error) {
+      console.error('[fotoService] Erro ao deletar foto:', error);
+      throw new Error(`Erro ao deletar foto: ${error.message}`);
+    }
 
     console.log(`[fotoService] Foto deletada com sucesso!`);
 
@@ -114,21 +128,20 @@ export async function obterFoto(foto_id: number) {
   try {
     console.log(`[fotoService] Obtendo foto: ${foto_id}`);
 
-    const query = `
-      SELECT id, confirmacao_id, foto_nome, foto_tipo, tamanho_bytes, data_upload
-      FROM fotos_vistoria
-      WHERE id = $1;
-    `;
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .select('*')
+      .eq('id', foto_id)
+      .single();
 
-    const result = await pool.query(query, [foto_id]);
-
-    if (!result.rows || result.rows.length === 0) {
-      throw new Error('Foto não encontrada');
+    if (error) {
+      console.error('[fotoService] Erro ao obter foto:', error);
+      throw new Error(`Erro ao obter foto: ${error.message}`);
     }
 
     console.log(`[fotoService] Foto encontrada!`);
 
-    return result.rows[0];
+    return data;
   } catch (error) {
     console.error('[fotoService] Erro ao obter foto:', error);
     throw error;
