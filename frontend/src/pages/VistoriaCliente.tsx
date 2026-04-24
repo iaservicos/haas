@@ -24,6 +24,7 @@ export const VistoriaCliente: React.FC = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [vistoriaId, setVistoriaId] = useState<string>('');
+  const [checklistSalvo, setChecklistSalvo] = useState(false); // ✅ NOVO: controlar se checklist foi salvo
   const [confirmacaoData, setConfirmacaoData] = useState<any>(null);
   const [fotos, setFotos] = useState<any[]>([]);
   const [analiseResultado, setAnaliseResultado] = useState<any>(null);
@@ -79,6 +80,7 @@ export const VistoriaCliente: React.FC = () => {
       resultado_analise: null,
     });
     setFotos([]);
+    setChecklistSalvo(false); // ✅ NOVO: resetar flag quando criar nova confirmação
   };
 
   const handleUploadSuccess = (fotoId: string, analise: any) => {
@@ -87,8 +89,10 @@ export const VistoriaCliente: React.FC = () => {
   };
 
   const handleChecklistSave = (confirmacao: any) => {
+    console.log('[VistoriaCliente] Checklist salvo com sucesso:', confirmacao);
     setConfirmacaoData(confirmacao);
-    alert('Vistoria salva com sucesso!');
+    setChecklistSalvo(true); // ✅ NOVO: marcar checklist como salvo
+    alert('Vistoria salva com sucesso! Agora você pode fazer upload de fotos.');
   };
 
   const handleLogout = () => {
@@ -149,15 +153,46 @@ export const VistoriaCliente: React.FC = () => {
         <div className="flex-1 overflow-auto p-8">
           {confirmacaoData && equipmentType && vistoriaId ? (
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* CARD: UPLOAD DE FOTO */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload de Foto</h2>
-                <p className="text-sm text-gray-600 mb-4">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
+              {/* CARD: CHECKLIST (PRIMEIRO) */}
+              <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-600">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-2xl font-bold text-blue-600">1️⃣</span>
+                  <h2 className="text-xl font-semibold text-gray-900">Checklist de Vistoria</h2>
+                  {checklistSalvo && <span className="text-green-600 text-xl">✅</span>}
+                </div>
                 
-                <UploadFoto
+                <ChecklistVistoria
                   confirmacaoId={vistoriaId}
-                  onUploadSuccess={handleUploadSuccess}
+                  equipmentType={equipmentType}
+                  equipamentoId={parseInt(equipamentoId || '0')}
+                  onChecklistSave={handleChecklistSave}
                 />
+              </div>
+
+              {/* CARD: UPLOAD DE FOTO (SEGUNDO - DESABILITADO ATÉ CHECKLIST SER SALVO) */}
+              <div className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${checklistSalvo ? 'border-green-600' : 'border-gray-300'}`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-2xl font-bold" style={{ opacity: checklistSalvo ? 1 : 0.5 }}>2️⃣</span>
+                  <h2 className="text-xl font-semibold text-gray-900" style={{ opacity: checklistSalvo ? 1 : 0.5 }}>Upload de Foto</h2>
+                  {fotos.length > 0 && <span className="text-green-600 text-xl">✅</span>}
+                </div>
+                
+                {!checklistSalvo ? (
+                  <div style={{ padding: '20px', backgroundColor: '#fff3cd', borderRadius: '4px', marginBottom: '20px' }}>
+                    <p style={{ color: '#856404', margin: 0 }}>
+                      ⚠️ <strong>Salve o checklist primeiro</strong> antes de fazer upload de fotos.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600 mb-4">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
+                    
+                    <UploadFoto
+                      confirmacaoId={vistoriaId}
+                      onUploadSuccess={handleUploadSuccess}
+                    />
+                  </>
+                )}
               </div>
 
               {/* CARD: RESULTADO DA ANÁLISE */}
@@ -204,17 +239,6 @@ export const VistoriaCliente: React.FC = () => {
                   </div>
                 </div>
               )}
-
-              {/* CARD: CHECKLIST */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Checklist de Vistoria</h2>
-                <ChecklistVistoria
-                  confirmacaoId={vistoriaId}
-                  equipmentType={equipmentType}
-                  equipamentoId={parseInt(equipamentoId || '0')}
-                  onChecklistSave={handleChecklistSave}
-                />
-              </div>
 
               {/* BOTÕES DE AÇÃO */}
               <div className="flex gap-4 justify-end">
