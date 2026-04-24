@@ -8,7 +8,7 @@ interface Question {
 }
 
 interface ChecklistVistoriaProps {
-  confirmacaoId: string;  // Não é usado para salvar, apenas para compatibilidade
+  confirmacaoId: string;
   equipmentType?: string;
   equipamentoId?: number;
   onChecklistSave?: (checklist: any) => void;
@@ -77,30 +77,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     }));
   };
 
-  /**
-   * Validar se todas as perguntas foram respondidas
-   */
-  const validarRespostas = (): boolean => {
-    for (const question of questions) {
-      const answer = answers[question.id];
-      
-      // Verificar se a resposta está vazia
-      if (answer === '' || answer === undefined || answer === null) {
-        setErro(`Por favor, responda a pergunta: "${question.text}"`);
-        return false;
-      }
-    }
-    
-    setErro('');
-    return true;
-  };
-
   const handleSalvar = async () => {
-    // Validar respostas
-    if (!validarRespostas()) {
-      return;
-    }
-
     setLoading(true);
     setErro('');
     setSucesso(false);
@@ -109,10 +86,8 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       // Use full URL with API_BASE_URL
       const url = `${API_BASE_URL}/inspecao/salvar`;
       
-      // NÃO enviar vistoriaId aqui, pois será gerado no VistoriaCliente
-      // Este componente apenas coleta as respostas
       const payload = {
-        vistoriaId: 'temp',  // Placeholder - será substituído no VistoriaCliente
+        vistoriaId: confirmacaoId,
         equipmentType,
         answers,
         observacoes,
