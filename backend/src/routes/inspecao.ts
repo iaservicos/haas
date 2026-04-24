@@ -3,7 +3,7 @@ import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
 import { salvarFoto } from '../services/fotoService.js';
-import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
+// import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
 
 const router = express.Router();
 
@@ -35,21 +35,20 @@ router.post('/upload-foto', async (req, res) => {
 
       console.log(`[inspecao] Foto salva com sucesso! ID: ${fotoSalva.id}`);
 
-      // Analisar foto com GPTMaker
-      const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId);
-
-      console.log(`[inspecao] Análise concluída:`, analise);
+      // TODO: Analisar foto com GPTMaker (desabilitado temporariamente)
+      // const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId);
+      // console.log(`[inspecao] Análise concluída:`, analise);
 
       // Retornar resultado
       res.json({
         success: true,
-        message: 'Foto enviada, salva e analisada com sucesso',
+        message: 'Foto enviada e salva com sucesso',
         foto: {
           id: fotoSalva.id,
           confirmacao_id: confirmacaoId,
           foto_nome: fotoNome,
         },
-        analise,
+        // analise: analise, // TODO: Adicionar quando GPTMaker estiver funcionando
       });
     } catch (dbError) {
       console.error('[inspecao] Erro ao salvar/analisar foto:', dbError);
@@ -334,100 +333,6 @@ router.get('/portal/listar', async (req, res) => {
     console.error('[inspecao.ts] Erro geral ao listar inspeções do portal:', error);
     res.status(500).json({ 
       error: 'Erro ao listar inspeções',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
-  }
-});
-
-/**
- * GET /api/inspecao/portal/equipamento/:equipamentoId
- * Retorna todas as inspeções para um equipamento específico
- */
-router.get('/portal/equipamento/:equipamentoId', async (req, res) => {
-  try {
-    const { equipamentoId } = req.params;
-
-    console.log(`[inspecao.ts] Buscando inspeções para equipamento ${equipamentoId}`);
-
-    const { data: inspecoes, error: inspecoesError } = await supabase
-      .from('inspecao_respostas')
-      .select('*')
-      .eq('equipamento_id', equipamentoId)
-      .order('data_inspecao', { ascending: false });
-
-    if (inspecoesError) {
-      console.error('[inspecao.ts] Erro ao buscar inspeções do equipamento:', inspecoesError);
-      return res.status(500).json({ 
-        error: 'Erro ao buscar inspeções',
-        details: inspecoesError.message 
-      });
-    }
-
-    // Enriquecer dados com informações de equipamento e contrato
-    const enrichedData = await Promise.all(
-      (inspecoes || []).map(async (inspecao) => {
-        try {
-          // Buscar dados do equipamento
-          const { data: equipamento, error: equipError } = await supabase
-            .from('contrato_equipamentos')
-            .select('id, numero_serie, modelo, tipo_material, contrato_id')
-            .eq('id', inspecao.equipamento_id)
-            .single();
-
-          if (equipError) {
-            console.warn(`[inspecao.ts] Equipamento ${inspecao.equipamento_id} não encontrado:`, equipError);
-            return {
-              ...inspecao,
-              contrato_equipamentos: null,
-            };
-          }
-
-          // Buscar dados do contrato
-          const { data: contrato, error: contratoError } = await supabase
-            .from('contratos')
-            .select('id, numero_contrato, nome_cliente')
-            .eq('id', equipamento.contrato_id)
-            .single();
-
-          if (contratoError) {
-            console.warn(`[inspecao.ts] Contrato ${equipamento.contrato_id} não encontrado:`, contratoError);
-            return {
-              ...inspecao,
-              contrato_equipamentos: {
-                ...equipamento,
-                contratos: null,
-              },
-            };
-          }
-
-          return {
-            ...inspecao,
-            contrato_equipamentos: {
-              ...equipamento,
-              contratos: contrato,
-            },
-          };
-        } catch (enrichError) {
-          console.error(`[inspecao.ts] Erro ao enriquecer inspeção ${inspecao.id}:`, enrichError);
-          return {
-            ...inspecao,
-            contrato_equipamentos: null,
-          };
-        }
-      })
-    );
-
-    console.log(`[inspecao.ts] ${enrichedData.length} inspeções encontradas para equipamento ${equipamentoId}`);
-
-    res.json({
-      success: true,
-      data: enrichedData || [],
-      total: enrichedData?.length || 0,
-    });
-  } catch (error) {
-    console.error('[inspecao.ts] Erro ao buscar inspeções do equipamento:', error);
-    res.status(500).json({ 
-      error: 'Erro ao buscar inspeções',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
   }
