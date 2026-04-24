@@ -2,8 +2,70 @@ import express from 'express';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
+import { salvarFoto } from '../services/fotoService.js';
+import { analisarFotoGPTMaker } from '../services/gptmakerService.js';
 
 const router = express.Router();
+
+/**
+ * POST /api/inspecao/upload-foto
+ * Faz upload de foto, salva no banco e retorna resultado
+ */
+router.post('/upload-foto', async (req, res) => {
+  try {
+    const { fotoBase64, fotoNome, confirmacaoId } = req.body;
+
+    if (!fotoBase64 || !fotoNome || !confirmacaoId) {
+      return res.status(400).json({
+        error: 'Dados incompletos: fotoBase64, fotoNome e confirmacaoId são obrigatórios',
+      });
+    }
+
+    console.log(`[inspecao] Iniciando upload de foto: ${fotoNome}`);
+
+    try {
+      // Salvar foto no banco de dados
+      const fotoSalva = await salvarFoto({
+        confirmacao_id: confirmacaoId,
+        foto_data: fotoBase64,
+        foto_nome: fotoNome,
+        foto_tipo: 'jpeg',
+        tamanho_bytes: Buffer.from(fotoBase64, 'base64').length,
+      });
+
+      console.log(`[inspecao] Foto salva com sucesso! ID: ${fotoSalva.id}`);
+
+      // Analisar foto com GPTMaker
+      const analise = await analisarFotoGPTMaker(fotoBase64, fotoNome, confirmacaoId);
+
+      console.log(`[inspecao] Análise concluída:`, analise);
+
+      // Retornar resultado
+      res.json({
+        success: true,
+        message: 'Foto enviada, salva e analisada com sucesso',
+        foto: {
+          id: fotoSalva.id,
+          confirmacao_id: confirmacaoId,
+          foto_nome: fotoNome,
+        },
+        analise,
+      });
+    } catch (dbError) {
+      console.error('[inspecao] Erro ao salvar/analisar foto:', dbError);
+      return res.status(500).json({
+        error: 'Erro ao salvar ou analisar foto',
+        details: dbError instanceof Error ? dbError.message : 'Erro desconhecido',
+      });
+    }
+  } catch (error) {
+    console.error('[inspecao] Erro geral:', error);
+    res.status(500).json({
+      error: 'Erro ao processar foto',
+      details: error instanceof Error ? error.message : 'Desconhecido',
+    });
+  }
+});
 
 /**
  * GET /api/inspecao/equipamento/:equipamentoId
