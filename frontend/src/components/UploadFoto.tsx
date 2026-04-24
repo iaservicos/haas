@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface UploadFotoProps {
-  confirmacaoId: string;
+  confirmacaoId: string;  // Mantém o nome por compatibilidade, mas é vistoria_id
   numeroSerie?: string;
   equipmentType?: string;
   nomeCliente?: string;
@@ -46,14 +46,14 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
     // Criar novo FileReader para a leitura da foto
     const reader = new FileReader();
     
-    // O try/catch agora está DENTRO do onload
+    // O try/catch está DENTRO do onload
     reader.onload = async (event) => {
       try {
         const fotoBase64 = event.target?.result as string;
         const base64Data = fotoBase64.split(',')[1];
 
         console.log('[UploadFoto] Iniciando upload para /api/inspecao/upload-foto');
-        console.log('[UploadFoto] confirmacaoId:', confirmacaoId);
+        console.log('[UploadFoto] vistoria_id (confirmacaoId):', confirmacaoId);
 
         const response = await fetch('/api/inspecao/upload-foto', {
           method: 'POST',
@@ -63,7 +63,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
           body: JSON.stringify({
             fotoBase64: base64Data,
             fotoNome: foto.name,
-            confirmacaoId,
+            confirmacaoId,  // Será salvo como vistoria_id no banco
             numeroSerie: numeroSerie || 'Desconhecido',
             equipmentType: equipmentType || 'Desconhecido',
             nomeCliente: nomeCliente || 'Desconhecido',
@@ -94,7 +94,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         console.error('[UploadFoto] Erro:', err);
         setErro(err instanceof Error ? err.message : 'Erro desconhecido');
       } finally {
-        // setLoading(false) agora é executado DEPOIS que tudo termina
+        // setLoading(false) é executado DEPOIS que tudo termina
         setLoading(false);
       }
     };
