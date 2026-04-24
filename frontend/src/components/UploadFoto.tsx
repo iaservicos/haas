@@ -43,13 +43,19 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
     setLoading(true);
     setErro('');
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
+    // Criar novo FileReader para a leitura da foto
+    const reader = new FileReader();
+    
+    // O try/catch agora está DENTRO do onload
+    reader.onload = async (event) => {
+      try {
         const fotoBase64 = event.target?.result as string;
         const base64Data = fotoBase64.split(',')[1];
 
-        const response = await fetch('/api/vistorias/upload-foto', {
+        console.log('[UploadFoto] Iniciando upload para /api/inspecao/upload-foto');
+        console.log('[UploadFoto] confirmacaoId:', confirmacaoId);
+
+        const response = await fetch('/api/inspecao/upload-foto', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -64,25 +70,37 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
           }),
         });
 
+        console.log('[UploadFoto] Response status:', response.status);
+
         if (!response.ok) {
-          throw new Error('Erro ao fazer upload');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || 
+            `Erro ao fazer upload: ${response.status} ${response.statusText}`
+          );
         }
 
         const data = await response.json();
+        console.log('[UploadFoto] Upload bem-sucedido:', data);
+
         setResultado(data.analise);
         setFoto(null);
         setPreview('');
 
         if (onUploadSuccess) {
-          onUploadSuccess(data.fotoId, data.analise);
+          onUploadSuccess(data.foto?.id || '', data.analise);
         }
-      };
-      reader.readAsDataURL(foto);
-    } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
-    } finally {
-      setLoading(false);
-    }
+      } catch (err) {
+        console.error('[UploadFoto] Erro:', err);
+        setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      } finally {
+        // setLoading(false) agora é executado DEPOIS que tudo termina
+        setLoading(false);
+      }
+    };
+
+    // Inicia a leitura do arquivo
+    reader.readAsDataURL(foto);
   };
 
   return (
