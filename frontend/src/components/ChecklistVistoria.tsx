@@ -14,6 +14,15 @@ interface ChecklistVistoriaProps {
   onChecklistSave?: (checklist: any) => void;
 }
 
+// Função para gerar UUID v4
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({ 
   confirmacaoId, 
   equipmentType = 'Desktop',
@@ -85,8 +94,11 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       // Use full URL with API_BASE_URL
       const url = `${API_BASE_URL}/inspecao/salvar`;
       
+      // ✅ CORREÇÃO: Gerar UUID válido ao invés de "equip-ID"
+      const vistoriaId = confirmacaoId || generateUUID();
+      
       const payload = {
-        vistoriaId: confirmacaoId,
+        vistoriaId,
         equipmentType,
         answers,
         ...(equipamentoId && { equipamento_id: equipamentoId })

@@ -40,7 +40,8 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadS
         const fotoBase64 = event.target?.result as string;
         const base64Data = fotoBase64.split(',')[1];
 
-        const response = await fetch('/api/vistorias/upload-foto', {
+        // ✅ CORREÇÃO: Mudar URL de /api/vistorias/upload-foto para /api/inspecao/upload-foto
+        const response = await fetch('/api/inspecao/upload-foto', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
