@@ -22,10 +22,10 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
 }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
-  const [observacoes, setObservacoes] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
+  const [observacoes, setObservacoes] = useState<string>('');
 
   // Get API base URL from environment variable
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -68,7 +68,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     };
 
     loadQuestions();
-  }, [equipmentType]);
+  }, [equipmentType, API_BASE_URL]);
 
   const handleAnswerChange = (questionId: string, value: string | boolean) => {
     setAnswers(prev => ({
@@ -86,22 +86,21 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       // Use full URL with API_BASE_URL
       const url = `${API_BASE_URL}/inspecao/salvar`;
       
-      const payload = {
-        vistoriaId: confirmacaoId,
-        equipmentType,
-        answers,
-        observacoes,
-        ...(equipamentoId && { equipamento_id: equipamentoId })
-      };
-      
-      console.log('[ChecklistVistoria] Enviando payload:', payload);
+      // ✅ CORREÇÃO: Se confirmacaoId estiver vazio, usar equipamentoId como fallback
+      const vistoriaId = confirmacaoId || `equip-${equipamentoId}`;
       
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          vistoriaId,
+          equipmentType,
+          answers,
+          observacoes,
+          ...(equipamentoId && { equipamento_id: equipamentoId })
+        }),
       });
 
       if (!response.ok) {
@@ -110,16 +109,16 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       }
 
       const data = await response.json();
-      console.log('[ChecklistVistoria] Resposta do servidor:', data);
       setSucesso(true);
 
-      // Retornar os dados do checklist para o componente pai
       if (onChecklistSave) {
         onChecklistSave({
           answers,
           observacoes,
           equipmentType,
-          equipamentoId
+          equipamentoId,
+          vistoriaId,
+          ...data
         });
       }
 
@@ -127,9 +126,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
         setSucesso(false);
       }, 2000);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
-      console.error('[ChecklistVistoria] Erro ao salvar:', errorMsg);
-      setErro(errorMsg);
+      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
     }
