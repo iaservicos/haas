@@ -1,20 +1,11 @@
 import React, { useState } from 'react';
 
 interface UploadFotoProps {
-  confirmacaoId: string;  // Mantém o nome por compatibilidade, mas é vistoria_id
-  numeroSerie?: string;
-  equipmentType?: string;
-  nomeCliente?: string;
+  confirmacaoId: string;
   onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
 
-export const UploadFoto: React.FC<UploadFotoProps> = ({ 
-  confirmacaoId, 
-  numeroSerie,
-  equipmentType,
-  nomeCliente,
-  onUploadSuccess 
-}) => {
+export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadSuccess }) => {
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -43,19 +34,13 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
     setLoading(true);
     setErro('');
 
-    // Criar novo FileReader para a leitura da foto
-    const reader = new FileReader();
-    
-    // O try/catch está DENTRO do onload
-    reader.onload = async (event) => {
-      try {
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
         const fotoBase64 = event.target?.result as string;
         const base64Data = fotoBase64.split(',')[1];
 
-        console.log('[UploadFoto] Iniciando upload para /api/inspecao/upload-foto');
-        console.log('[UploadFoto] vistoria_id (confirmacaoId):', confirmacaoId);
-
-        const response = await fetch('/api/inspecao/upload-foto', {
+        const response = await fetch('/api/vistorias/upload-foto', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -63,44 +48,29 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
           body: JSON.stringify({
             fotoBase64: base64Data,
             fotoNome: foto.name,
-            confirmacaoId,  // Será salvo como vistoria_id no banco
-            numeroSerie: numeroSerie || 'Desconhecido',
-            equipmentType: equipmentType || 'Desconhecido',
-            nomeCliente: nomeCliente || 'Desconhecido',
+            confirmacaoId,
           }),
         });
 
-        console.log('[UploadFoto] Response status:', response.status);
-
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || 
-            `Erro ao fazer upload: ${response.status} ${response.statusText}`
-          );
+          throw new Error('Erro ao fazer upload');
         }
 
         const data = await response.json();
-        console.log('[UploadFoto] Upload bem-sucedido:', data);
-
         setResultado(data.analise);
         setFoto(null);
         setPreview('');
 
         if (onUploadSuccess) {
-          onUploadSuccess(data.foto?.id || '', data.analise);
+          onUploadSuccess(data.fotoId, data.analise);
         }
-      } catch (err) {
-        console.error('[UploadFoto] Erro:', err);
-        setErro(err instanceof Error ? err.message : 'Erro desconhecido');
-      } finally {
-        // setLoading(false) é executado DEPOIS que tudo termina
-        setLoading(false);
-      }
-    };
-
-    // Inicia a leitura do arquivo
-    reader.readAsDataURL(foto);
+      };
+      reader.readAsDataURL(foto);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

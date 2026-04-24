@@ -25,7 +25,6 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
-  const [observacoes, setObservacoes] = useState<string>('');
 
   // Get API base URL from environment variable
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -68,7 +67,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     };
 
     loadQuestions();
-  }, [equipmentType, API_BASE_URL]);
+  }, [equipmentType]);
 
   const handleAnswerChange = (questionId: string, value: string | boolean) => {
     setAnswers(prev => ({
@@ -86,21 +85,21 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       // Use full URL with API_BASE_URL
       const url = `${API_BASE_URL}/inspecao/salvar`;
       
-      // ✅ CORREÇÃO: Se confirmacaoId estiver vazio, usar equipamentoId como fallback
-      const vistoriaId = confirmacaoId || `equip-${equipamentoId}`;
+      const payload = {
+        vistoriaId: confirmacaoId,
+        equipmentType,
+        answers,
+        ...(equipamentoId && { equipamento_id: equipamentoId })
+      };
+      
+      console.log('[ChecklistVistoria] Enviando payload:', payload);
       
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          vistoriaId,
-          equipmentType,
-          answers,
-          observacoes,
-          ...(equipamentoId && { equipamento_id: equipamentoId })
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -109,24 +108,20 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
       }
 
       const data = await response.json();
+      console.log('[ChecklistVistoria] Resposta do servidor:', data);
       setSucesso(true);
 
       if (onChecklistSave) {
-        onChecklistSave({
-          answers,
-          observacoes,
-          equipmentType,
-          equipamentoId,
-          vistoriaId,
-          ...data
-        });
+        onChecklistSave(data);
       }
 
       setTimeout(() => {
         setSucesso(false);
       }, 2000);
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('[ChecklistVistoria] Erro ao salvar:', errorMsg);
+      setErro(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -217,26 +212,6 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
             </div>
           ))}
 
-          {/* CAMPO DE OBSERVAÇÕES GERAIS */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              Observações Gerais
-            </label>
-            <textarea
-              value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Digite observações adicionais sobre a vistoria..."
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '4px',
-                border: '1px solid #ccc',
-                minHeight: '80px',
-                fontFamily: 'Arial, sans-serif',
-              }}
-            />
-          </div>
-
           <button
             onClick={handleSalvar}
             disabled={loading}
@@ -254,7 +229,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
           </button>
 
           {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
-          {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>✅ Checklist salvo com sucesso!</p>}
+          {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>Checklist salvo com sucesso!</p>}
         </>
       )}
     </div>

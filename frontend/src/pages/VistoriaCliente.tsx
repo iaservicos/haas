@@ -1,11 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../services/supabase';
 import { UploadFoto } from '../components/UploadFoto';
 import { ChecklistVistoria } from '../components/ChecklistVistoria';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Função para gerar UUID v4
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export const VistoriaCliente: React.FC = () => {
   const navigate = useNavigate();
@@ -16,18 +24,16 @@ export const VistoriaCliente: React.FC = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [vistoriaId, setVistoriaId] = useState<string>('');
-  const [equipmentType, setEquipmentType] = useState<string>('');
+  const [confirmacaoData, setConfirmacaoData] = useState<any>(null);
   const [fotos, setFotos] = useState<any[]>([]);
   const [analiseResultado, setAnaliseResultado] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string>('');
-  
-  // Estados para controlar o fluxo
-  const [checklistSalvo, setChecklistSalvo] = useState(false);
-  const [fotoObrigatoria, setFotoObrigatoria] = useState(false);
+  const [equipmentType, setEquipmentType] = useState<string>('');
 
   useEffect(() => {
     if (numeroSerie && equipamentoId) {
+      criarConfirmacao();
       buscarTipoEquipamento();
     }
   }, [numeroSerie, equipamentoId]);
@@ -61,62 +67,28 @@ export const VistoriaCliente: React.FC = () => {
     }
   };
 
-  /**
-   * Chamado quando o checklist é salvo
-   * Cria o registro em inspecao_respostas e obtém o vistoria_id
-   */
-  const handleChecklistSave = async (checklistData: any) => {
-    try {
-      setLoading(true);
-      console.log('[VistoriaCliente] Salvando checklist...', checklistData);
-
-      // Gerar UUID para vistoria_id
-      const novoVistoriaId = generateUUID();
-      console.log('[VistoriaCliente] vistoria_id gerado:', novoVistoriaId);
-
-      // Criar registro em inspecao_respostas
-      const { data, error } = await supabase
-        .from('inspecao_respostas')
-        .insert({
-          vistoria_id: novoVistoriaId,
-          equipment_type: equipmentType,
-          respostas: checklistData.answers || {},
-          observacoes: checklistData.observacoes || null,
-          equipamento_id: parseInt(equipamentoId || '0'),
-          data_inspecao: new Date().toISOString(),
-        })
-        .select();
-
-      if (error) {
-        console.error('[VistoriaCliente] Erro ao salvar checklist:', error);
-        throw error;
-      }
-
-      console.log('[VistoriaCliente] Checklist salvo com sucesso:', data);
-
-      // Salvar vistoria_id para uso no upload de fotos
-      setVistoriaId(novoVistoriaId);
-      setChecklistSalvo(true);
-      setFotoObrigatoria(true);
-      setErro('');
-
-      // Mostrar mensagem de sucesso
-      alert('✅ Checklist salvo com sucesso! Agora faça upload das fotos.');
-    } catch (error) {
-      console.error('[VistoriaCliente] Erro ao salvar checklist:', error);
-      setErro('Erro ao salvar checklist. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
+  const criarConfirmacao = () => {
+    // Gerar um UUID único para esta vistoria
+    const novoVistoriaId = generateUUID();
+    setVistoriaId(novoVistoriaId);
+    
+    setConfirmacaoData({
+      id: equipamentoId,
+      numero_serie: numeroSerie,
+      status_analise: 'Pendente',
+      resultado_analise: null,
+    });
+    setFotos([]);
   };
 
-  /**
-   * Chamado quando uma foto é enviada com sucesso
-   */
   const handleUploadSuccess = (fotoId: string, analise: any) => {
-    console.log('[VistoriaCliente] Upload bem-sucedido. Foto ID:', fotoId);
     setAnaliseResultado(analise);
     setFotos([...fotos, { id: fotoId, foto_nome: `Foto ${fotos.length + 1}` }]);
+  };
+
+  const handleChecklistSave = (confirmacao: any) => {
+    setConfirmacaoData(confirmacao);
+    alert('Vistoria salva com sucesso!');
   };
 
   const handleLogout = () => {
@@ -125,19 +97,6 @@ export const VistoriaCliente: React.FC = () => {
   };
 
   const handleCancelar = () => {
-    navigate('/dashboard-cliente');
-  };
-
-  /**
-   * Finalizar vistoria (após fotos obrigatórias)
-   */
-  const handleFinalizarVistoria = () => {
-    if (fotos.length === 0) {
-      setErro('⚠️ Você precisa fazer upload de pelo menos uma foto!');
-      return;
-    }
-
-    alert('✅ Vistoria finalizada com sucesso!');
     navigate('/dashboard-cliente');
   };
 
@@ -188,127 +147,84 @@ export const VistoriaCliente: React.FC = () => {
 
         {/* CONTENT */}
         <div className="flex-1 overflow-auto p-8">
-          {erro && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              {erro}
-            </div>
-          )}
-
-          {equipmentType ? (
+          {confirmacaoData && equipmentType && vistoriaId ? (
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* STEP 1: CHECKLIST (OBRIGATÓRIO PRIMEIRO) */}
-              <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-600">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    1️⃣ Checklist de Vistoria {checklistSalvo && '✅'}
-                  </h2>
-                  {checklistSalvo && (
-                    <span className="text-green-600 font-semibold">Concluído</span>
-                  )}
-                </div>
-
-                {!checklistSalvo ? (
-                  <>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Preencha o checklist abaixo. Este é o primeiro passo obrigatório.
-                    </p>
-                    <ChecklistVistoria
-                      confirmacaoId=""  // Não precisa de ID ainda
-                      equipmentType={equipmentType}
-                      equipamentoId={parseInt(equipamentoId || '0')}
-                      onChecklistSave={handleChecklistSave}
-                    />
-                  </>
-                ) : (
-                  <div className="bg-green-50 p-4 rounded border border-green-200">
-                    <p className="text-green-700">
-                      ✅ Checklist salvo com sucesso! Você pode agora fazer upload das fotos.
-                    </p>
-                  </div>
-                )}
+              {/* CARD: UPLOAD DE FOTO */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload de Foto</h2>
+                <p className="text-sm text-gray-600 mb-4">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
+                
+                <UploadFoto
+                  confirmacaoId={vistoriaId}
+                  onUploadSuccess={handleUploadSuccess}
+                />
               </div>
 
-              {/* STEP 2: UPLOAD DE FOTOS (HABILITADO APÓS CHECKLIST) */}
-              {checklistSalvo && (
-                <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-600">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      2️⃣ Upload de Fotos {fotos.length > 0 && '✅'}
-                    </h2>
-                    {fotos.length > 0 && (
-                      <span className="text-green-600 font-semibold">{fotos.length} foto(s)</span>
-                    )}
+              {/* CARD: RESULTADO DA ANÁLISE */}
+              {analiseResultado && (
+                <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-600">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Resultado da Análise IA</h2>
+                  
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="bg-gray-50 p-4 rounded">
+                      <p className="text-xs text-gray-600 uppercase">Status</p>
+                      <p className="text-lg font-semibold text-gray-900">{analiseResultado.status}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <p className="text-xs text-gray-600 uppercase">Resultado</p>
+                      <p className={`text-lg font-semibold ${analiseResultado.resultado === 'ok' ? 'text-green-600' : 'text-red-600'}`}>
+                        {analiseResultado.resultado === 'ok' ? '✓ OK' : '✗ Problema'}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <p className="text-xs text-gray-600 uppercase">Timestamp</p>
+                      <p className="text-sm text-gray-900">{new Date(analiseResultado.timestamp).toLocaleTimeString('pt-BR')}</p>
+                    </div>
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-4">
-                    📸 Tire fotos claras do equipamento. <strong>Mínimo 1 foto obrigatória.</strong>
-                  </p>
-                  
-                  <UploadFoto
-                    confirmacaoId={vistoriaId}
-                    numeroSerie={numeroSerie || ''}
-                    equipmentType={equipmentType}
-                    nomeCliente="Cliente"
-                    onUploadSuccess={handleUploadSuccess}
-                  />
+                  <div className="bg-blue-50 p-4 rounded border border-blue-200">
+                    <p className="text-sm text-gray-700"><strong>Análise:</strong> {analiseResultado.descricao}</p>
+                  </div>
+                </div>
+              )}
 
-                  {/* RESULTADO DA ANÁLISE */}
-                  {analiseResultado && (
-                    <div className="mt-6 bg-blue-50 p-4 rounded border border-blue-200">
-                      <h3 className="text-sm font-semibold text-blue-900 mb-2">Resultado da Análise:</h3>
-                      <p className="text-sm text-blue-700">
-                        <strong>Status:</strong> {analiseResultado.status}
-                      </p>
-                      <p className="text-sm text-blue-700">
-                        <strong>Resultado:</strong> {analiseResultado.resultado === 'ok' ? '✓ OK' : '✗ Problema'}
-                      </p>
-                      <p className="text-sm text-blue-700">
-                        <strong>Descrição:</strong> {analiseResultado.descricao}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* FOTOS ENVIADAS */}
-                  {fotos.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Fotos Enviadas:</h3>
-                      <div className="grid grid-cols-4 gap-4">
-                        {fotos.map((foto, idx) => (
-                          <div key={idx} className="bg-gray-100 rounded-lg p-4 text-center">
-                            <div className="w-full h-24 bg-gray-300 rounded mb-2 flex items-center justify-center">
-                              <span className="text-gray-600 text-sm">Foto {idx + 1}</span>
-                            </div>
-                            <p className="text-xs text-gray-600">{foto.foto_nome}</p>
-                          </div>
-                        ))}
+              {/* CARD: FOTOS ENVIADAS */}
+              {fotos.length > 0 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Fotos Enviadas ({fotos.length})</h2>
+                  <div className="grid grid-cols-4 gap-4">
+                    {fotos.map((foto, idx) => (
+                      <div key={idx} className="bg-gray-100 rounded-lg p-4 text-center">
+                        <div className="w-full h-24 bg-gray-300 rounded mb-2 flex items-center justify-center">
+                          <span className="text-gray-600 text-sm">Foto {idx + 1}</span>
+                        </div>
+                        <p className="text-xs text-gray-600">{foto.foto_nome}</p>
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* STEP 3: BOTÕES DE AÇÃO */}
-              {checklistSalvo && (
-                <div className="flex gap-4 justify-end">
-                  <button
-                    onClick={handleCancelar}
-                    className="px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 rounded-lg font-semibold transition"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleFinalizarVistoria}
-                    disabled={fotos.length === 0}
-                    className={`px-6 py-2 rounded-lg font-semibold transition ${
-                      fotos.length === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-green-600 hover:bg-green-700 text-white'
-                    }`}
-                  >
-                    ✅ Finalizar Vistoria
-                  </button>
-                </div>
-              )}
+              {/* CARD: CHECKLIST */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Checklist de Vistoria</h2>
+                <ChecklistVistoria
+                  confirmacaoId={vistoriaId}
+                  equipmentType={equipmentType}
+                  equipamentoId={parseInt(equipamentoId || '0')}
+                  onChecklistSave={handleChecklistSave}
+                />
+              </div>
+
+              {/* BOTÕES DE AÇÃO */}
+              <div className="flex gap-4 justify-end">
+                <button
+                  onClick={handleCancelar}
+                  className="px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 rounded-lg font-semibold transition"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -323,12 +239,3 @@ export const VistoriaCliente: React.FC = () => {
     </div>
   );
 };
-
-// Função para gerar UUID v4
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
