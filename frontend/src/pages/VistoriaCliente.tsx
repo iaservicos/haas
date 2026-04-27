@@ -189,6 +189,7 @@ export const VistoriaCliente: React.FC = () => {
                     
                     <UploadFoto
                       confirmacaoId={vistoriaId}
+                      numeroSerie={numeroSerie || ''}
                       onUploadSuccess={handleUploadSuccess}
                     />
                   </>
