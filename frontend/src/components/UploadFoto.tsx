@@ -55,12 +55,16 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadS
       console.log('[UploadFoto] foto_nome:', foto.name);
       console.log('[UploadFoto] tamanho_bytes:', uint8Array.length);
 
+      // ✅ CORREÇÃO: Converter bytes para base64
+      const base64String = btoa(String.fromCharCode(...uint8Array));
+      console.log('[UploadFoto] Base64 length:', base64String.length);
+
       // Insert into fotos_vistoria table
       const { data, error } = await supabase
         .from('fotos_vistoria')
         .insert({
           vistoria_id: confirmacaoId,
-          foto_data: uint8Array,
+          foto_data: base64String,  // ✅ Agora é string base64
           foto_nome: foto.name,
           foto_tipo: foto.type,
           tamanho_bytes: uint8Array.length,
