@@ -1,18 +1,9 @@
 import express from 'express';
-import multer from 'multer';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
 
 const router = express.Router();
-
-// ✅ NOVO: Configurar multer para upload de arquivos
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
-  },
-});
 
 /**
  * GET /api/inspecao/equipamento/:equipamentoId
@@ -146,69 +137,6 @@ router.post('/salvar', async (req, res) => {
     console.error('Erro ao salvar inspeção:', error);
     res.status(500).json({ 
       error: 'Erro ao salvar inspeção',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
-  }
-});
-
-/**
- * ✅ NOVO: POST /api/inspecao/upload-foto
- * Salva uma foto da vistoria no Supabase
- * Usa multer para processar o arquivo
- */
-router.post('/upload-foto', upload.single('file'), async (req: any, res) => {
-  try {
-    console.log('[inspecao.ts] Iniciando upload de foto...');
-
-    const { vistoria_id, foto_nome, foto_tipo } = req.body;
-    const file = req.file;
-
-    // Validar dados obrigatórios
-    if (!vistoria_id || !file) {
-      return res.status(400).json({
-        error: 'Dados incompletos: vistoria_id e arquivo são obrigatórios'
-      });
-    }
-
-    console.log('[inspecao.ts] vistoria_id:', vistoria_id);
-    console.log('[inspecao.ts] foto_nome:', foto_nome);
-    console.log('[inspecao.ts] tamanho_bytes:', file.size);
-
-    // ✅ Converter buffer para base64
-    const base64String = file.buffer.toString('base64');
-
-    // Inserir foto no banco de dados
-    const { data, error } = await supabase
-      .from('fotos_vistoria')
-      .insert({
-        vistoria_id: vistoria_id,
-        foto_data: base64String,
-        foto_nome: foto_nome || file.originalname,
-        foto_tipo: foto_tipo || file.mimetype,
-        tamanho_bytes: file.size,
-      })
-      .select();
-
-    if (error) {
-      console.error('[inspecao.ts] Erro ao salvar foto:', error);
-      return res.status(500).json({
-        error: 'Erro ao salvar foto',
-        details: error.message
-      });
-    }
-
-    console.log('[inspecao.ts] Foto salva com sucesso:', data[0]);
-
-    res.json({
-      success: true,
-      message: 'Foto salva com sucesso',
-      id: data[0].id,
-      data: data[0],
-    });
-  } catch (error) {
-    console.error('[inspecao.ts] Erro ao fazer upload de foto:', error);
-    res.status(500).json({
-      error: 'Erro ao fazer upload de foto',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
   }
