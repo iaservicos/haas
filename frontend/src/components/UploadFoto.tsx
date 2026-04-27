@@ -1,140 +1,143 @@
 import React, { useState } from 'react';
-import { API_BASE_URL } from '../services/api';
 
 interface UploadFotoProps {
   confirmacaoId: string;
-  onUploadSuccess?: (fotoId: string) => void;
+  numeroSerie?: string;
+  equipmentType?: string;
+  nomeCliente?: string;
+  onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
 
-export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadSuccess }) => {
+export const UploadFoto: React.FC<UploadFotoProps> = ({ 
+  confirmacaoId, 
+  numeroSerie,
+  equipmentType,
+  nomeCliente,
+  onUploadSuccess 
+}) => {
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
+  const [resultado, setResultado] = useState<any>(null);
+  const [erro, setErro] = useState<string>('');
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setFoto(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
+      reader.onload = (event) => {
+        setPreview(event.target?.result as string);
       };
       reader.readAsDataURL(file);
+      setErro('');
     }
   };
 
   const handleUpload = async () => {
     if (!foto) {
-      setMensagem({ tipo: 'erro', texto: 'Selecione uma foto' });
+      setErro('Selecione uma foto');
       return;
     }
 
     setLoading(true);
-    setMensagem(null);
+    setErro('');
 
-    try {
-      const formData = new FormData();
-      formData.append('file', foto);
-      formData.append('vistoria_id', confirmacaoId);
-      formData.append('foto_nome', foto.name);
-      formData.append('foto_tipo', foto.type);
+    // Criar novo FileReader para a leitura da foto
+    const reader = new FileReader();
+    
+    // O try/catch agora está DENTRO do onload
+    reader.onload = async (event) => {
+      try {
+        const fotoBase64 = event.target?.result as string;
+        const base64Data = fotoBase64.split(',')[1];
 
-      const response = await fetch(`${API_BASE_URL}/inspecao/upload-foto`, {
-        method: 'POST',
-        body: formData,
-      });
+        console.log('[UploadFoto] Iniciando upload para /api/inspecao/upload-foto');
+        console.log('[UploadFoto] confirmacaoId:', confirmacaoId);
 
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}`);
+        const response = await fetch('/api/inspecao/upload-foto', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fotoBase64: base64Data,
+            fotoNome: foto.name,
+            confirmacaoId,
+            numeroSerie: numeroSerie || 'Desconhecido',
+            equipmentType: equipmentType || 'Desconhecido',
+            nomeCliente: nomeCliente || 'Desconhecido',
+          }),
+        });
+
+        console.log('[UploadFoto] Response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || 
+            `Erro ao fazer upload: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+        console.log('[UploadFoto] Upload bem-sucedido:', data);
+
+        setResultado(data.analise);
+        setFoto(null);
+        setPreview('');
+
+        if (onUploadSuccess) {
+          onUploadSuccess(data.foto?.id || '', data.analise);
+        }
+      } catch (err) {
+        console.error('[UploadFoto] Erro:', err);
+        setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      } finally {
+        // setLoading(false) agora é executado DEPOIS que tudo termina
+        setLoading(false);
       }
+    };
 
-      const data = await response.json();
-      
-      setMensagem({ 
-        tipo: 'sucesso', 
-        texto: '✅ Foto enviada com sucesso!' 
-      });
-      
-      setFoto(null);
-      setPreview('');
-      
-      if (onUploadSuccess) {
-        onUploadSuccess(data.id);
-      }
-
-      // Limpar mensagem após 3 segundos
-      setTimeout(() => {
-        setMensagem(null);
-      }, 3000);
-
-    } catch (error) {
-      console.error('[UploadFoto] Erro:', error);
-      setMensagem({ 
-        tipo: 'erro', 
-        texto: '❌ Erro ao enviar foto. Tente novamente.' 
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Inicia a leitura do arquivo
+    reader.readAsDataURL(foto);
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Upload de Foto</h3>
-      
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-        {preview ? (
-          <div className="flex flex-col items-center gap-4">
-            <img src={preview} alt="Preview" className="w-40 h-40 object-cover rounded" />
-            <p className="text-sm text-gray-600">{foto?.name}</p>
-          </div>
-        ) : (
-          <label className="flex flex-col items-center gap-2 cursor-pointer">
-            <span className="text-gray-600">Clique para selecionar uma foto</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFotoChange}
-              className="hidden"
-            />
-          </label>
-        )}
-      </div>
+    <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
+      <h3>Upload de Foto</h3>
 
-      {mensagem && (
-        <div className={`p-4 rounded-lg ${
-          mensagem.tipo === 'sucesso' 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {mensagem.texto}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleFotoChange}
+        disabled={loading}
+      />
+
+      {preview && (
+        <div style={{ marginTop: '10px' }}>
+          <img src={preview} alt="Preview" style={{ maxWidth: '200px', maxHeight: '200px' }} />
         </div>
       )}
 
-      <div className="flex gap-2">
-        <button
-          onClick={handleUpload}
-          disabled={!foto || loading}
-          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded disabled:bg-gray-400"
-        >
-          {loading ? 'Enviando...' : 'Enviar Foto'}
-        </button>
-        
-        {preview && (
-          <button
-            onClick={() => {
-              setFoto(null);
-              setPreview('');
-            }}
-            className="px-4 py-2 border border-gray-300 rounded"
-          >
-            Cancelar
-          </button>
-        )}
-      </div>
+      <button
+        onClick={handleUpload}
+        disabled={!foto || loading}
+        style={{ marginTop: '10px', padding: '10px 20px' }}
+      >
+        {loading ? 'Enviando...' : 'Enviar Foto'}
+      </button>
+
+      {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
+
+      {resultado && (
+        <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
+          <h4>Resultado da Análise:</h4>
+          <p><strong>Status:</strong> {resultado.status}</p>
+          <p><strong>Resultado:</strong> {resultado.resultado}</p>
+          <p><strong>Descrição:</strong> {resultado.descricao}</p>
+        </div>
+      )}
     </div>
   );
 };
-
-export default UploadFoto;
