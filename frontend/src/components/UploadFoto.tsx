@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '@/services/apis';
+
 
 interface UploadFotoProps {
   confirmacaoId: string;
@@ -51,7 +53,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadS
       formData.append('foto_nome', foto.name);
       formData.append('foto_tipo', foto.type);
 
-      const response = await fetch('/api/inspecao/upload-foto', {
+      const response = await fetch(`${API_BASE_URL}/inspecao/upload-foto`, {
         method: 'POST',
         body: formData,
       });
