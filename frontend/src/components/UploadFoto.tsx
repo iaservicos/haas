@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { API_BASE_URL } from '@/services/apis';
+import { API_BASE_URL } from '@/services/api';
+
 
 
 interface UploadFotoProps {
