@@ -1,15 +1,9 @@
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 
 interface UploadFotoProps {
   confirmacaoId: string;
   onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
-
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadSuccess }) => {
   const [foto, setFoto] = useState<File | null>(null);
@@ -46,39 +40,31 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadS
     setErro('');
 
     try {
-      // Read file as bytes
-      const arrayBuffer = await foto.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-
-      console.log('[UploadFoto] Iniciando upload para Supabase...');
+      console.log('[UploadFoto] Iniciando upload para backend...');
       console.log('[UploadFoto] vistoria_id:', confirmacaoId);
       console.log('[UploadFoto] foto_nome:', foto.name);
-      console.log('[UploadFoto] tamanho_bytes:', uint8Array.length);
 
-      // ✅ CORREÇÃO: Converter bytes para base64
-      const base64String = btoa(String.fromCharCode(...uint8Array));
-      console.log('[UploadFoto] Base64 length:', base64String.length);
+      // ✅ NOVO: Enviar para o backend ao invés de Supabase diretamente
+      const formData = new FormData();
+      formData.append('file', foto);
+      formData.append('vistoria_id', confirmacaoId);
+      formData.append('foto_nome', foto.name);
+      formData.append('foto_tipo', foto.type);
 
-      // Insert into fotos_vistoria table
-      const { data, error } = await supabase
-        .from('fotos_vistoria')
-        .insert({
-          vistoria_id: confirmacaoId,
-          foto_data: base64String,  // ✅ Agora é string base64
-          foto_nome: foto.name,
-          foto_tipo: foto.type,
-          tamanho_bytes: uint8Array.length,
-        })
-        .select();
+      const response = await fetch('/api/inspecao/upload-foto', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (error) {
-        console.error('[UploadFoto] Erro ao salvar foto:', error);
-        throw new Error(`Erro ao salvar foto: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
       }
 
+      const data = await response.json();
       console.log('[UploadFoto] Foto salva com sucesso:', data);
 
-      // Simulate analysis result (in real app, this would come from backend)
+      // Simulate analysis result
       const analiseResultado = {
         status: 'Análise Concluída',
         resultado: 'ok',
@@ -90,15 +76,15 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({ confirmacaoId, onUploadS
       setFoto(null);
       setPreview('');
 
-      if (onUploadSuccess && data && data[0]) {
-        onUploadSuccess(data[0].id, analiseResultado);
+      if (onUploadSuccess && data.id) {
+        onUploadSuccess(data.id, analiseResultado);
       }
 
       console.log('[UploadFoto] Upload concluído com sucesso');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
-      console.error('[UploadFoto] Erro:', errorMsg);
-      setErro(errorMsg);
+      console.error('[UploadFoto] Erro ao salvar foto:', errorMsg);
+      setErro(`Erro ao salvar foto: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
