@@ -4,7 +4,6 @@ import { env } from './config/env.js';
 import { testConnection } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
-import vistoriasRoutes from './routes/vistorias.js';
 import componentesRoutes from './routes/componentes.js';
 import fotosRoutes from './routes/fotos.js';
 import usuarioRoutes from './routes/usuarioroutes.js';
@@ -21,7 +20,6 @@ app.use(express.json());
 app.options('*', corsOptions);
 
 app.use('/api/auth', authRoutes);
-app.use('/api/vistorias', vistoriasRoutes);
 app.use('/api/componentes', componentesRoutes);
 app.use('/api/fotos', fotosRoutes);
 app.use('/api/usuario', usuarioRoutes);
