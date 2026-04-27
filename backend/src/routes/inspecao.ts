@@ -1,9 +1,18 @@
 import express from 'express';
+import multer from 'multer';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
 
 const router = express.Router();
+
+// ✅ NOVO: Configurar multer para upload de arquivos
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB
+  },
+});
 
 /**
  * GET /api/inspecao/equipamento/:equipamentoId
@@ -145,8 +154,9 @@ router.post('/salvar', async (req, res) => {
 /**
  * ✅ NOVO: POST /api/inspecao/upload-foto
  * Salva uma foto da vistoria no Supabase
+ * Usa multer para processar o arquivo
  */
-router.post('/upload-foto', async (req, res) => {
+router.post('/upload-foto', upload.single('file'), async (req, res) => {
   try {
     console.log('[inspecao.ts] Iniciando upload de foto...');
 
@@ -164,7 +174,7 @@ router.post('/upload-foto', async (req, res) => {
     console.log('[inspecao.ts] foto_nome:', foto_nome);
     console.log('[inspecao.ts] tamanho_bytes:', file.size);
 
-    // Converter buffer para base64
+    // ✅ Converter buffer para base64
     const base64String = file.buffer.toString('base64');
 
     // Inserir foto no banco de dados
