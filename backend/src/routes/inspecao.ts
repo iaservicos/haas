@@ -156,7 +156,7 @@ router.post('/salvar', async (req, res) => {
  * Salva uma foto da vistoria no Supabase
  * Usa multer para processar o arquivo
  */
-router.post('/upload-foto', upload.single('file'), async (req, res) => {
+router.post('/upload-foto', upload.single('file'), async (req: any, res) => {
   try {
     console.log('[inspecao.ts] Iniciando upload de foto...');
 
