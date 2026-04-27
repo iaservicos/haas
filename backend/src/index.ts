@@ -15,7 +15,8 @@ import inspecaoRoutes from './routes/inspecao.js';
 const app = express();
 
 app.use(corsOptions);
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.options('*', corsOptions);
 
