@@ -11,7 +11,7 @@
 
 import axios from 'axios';
 import cron from 'node-cron';
-import { supabase } from './supabaseClient'; // Ajuste o caminho conforme necessário
+import { supabase } from './supabaseClient.js';
 
 interface GPTMakerChat {
   id: string;
@@ -176,11 +176,12 @@ async function saveAnalisesToSupabase(analises: AnalisisData[]): Promise<boolean
 }
 
 /**
- * Sincroniza todas as análises do GPTMaker para o Supabase
+ * Sincroniza todas as fotos do GPTMaker para o Supabase
+ * NOME MANTIDO PARA COMPATIBILIDADE COM gptmakerRoutes.ts
  */
-export async function syncAnalisisFromGPTMaker(): Promise<{
+export async function syncPhotosFromGPTMaker(): Promise<{
   success: boolean;
-  analisesCount: number;
+  photosCount: number;
   message: string;
 }> {
   try {
@@ -193,7 +194,7 @@ export async function syncAnalisisFromGPTMaker(): Promise<{
       console.log('Nenhum chat encontrado');
       return {
         success: true,
-        analisesCount: 0,
+        photosCount: 0,
         message: 'Nenhum chat encontrado',
       };
     }
@@ -215,7 +216,7 @@ export async function syncAnalisisFromGPTMaker(): Promise<{
       if (!saved) {
         return {
           success: false,
-          analisesCount: allAnalises.length,
+          photosCount: allAnalises.length,
           message: 'Erro ao salvar análises no Supabase',
         };
       }
@@ -225,14 +226,14 @@ export async function syncAnalisisFromGPTMaker(): Promise<{
 
     return {
       success: true,
-      analisesCount: allAnalises.length,
+      photosCount: allAnalises.length,
       message: `${allAnalises.length} análises sincronizadas com sucesso`,
     };
   } catch (error) {
     console.error('Erro na sincronização:', error);
     return {
       success: false,
-      analisesCount: 0,
+      photosCount: 0,
       message: `Erro: ${error instanceof Error ? error.message : 'Desconhecido'}`,
     };
   }
@@ -241,17 +242,17 @@ export async function syncAnalisisFromGPTMaker(): Promise<{
 /**
  * Inicia o job automático de sincronização (a cada 5 minutos)
  */
-export function startAnalisisSyncScheduler(): void {
+export function startPhotoSyncScheduler(): void {
   // Executar a cada 5 minutos
   const task = cron.schedule('*/5 * * * *', async () => {
     console.log('[Scheduler] Executando sincronização de análises...');
-    await syncAnalisisFromGPTMaker();
+    await syncPhotosFromGPTMaker();
   });
 
   console.log('[Scheduler] ✅ Job de sincronização iniciado (a cada 5 minutos)');
 
   // Executar uma vez ao iniciar
-  syncAnalisisFromGPTMaker().catch((error) => {
+  syncPhotosFromGPTMaker().catch((error) => {
     console.error('[Scheduler] Erro na primeira execução:', error);
   });
 }
