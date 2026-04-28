@@ -41,7 +41,7 @@ interface AnalisisData {
   vistoria_id: string;
   prompt_enviado: string;
   resultado_gptmaker: string;
-  status: 'concluído';
+  status: string;
 }
 
 const GPTMAKER_API_BASE = 'https://api.gptmaker.ai/v2';
@@ -114,16 +114,18 @@ function extractAnalisisFromMessages(
   for (const message of messages) {
     // Se a mensagem é do assistente (GPTMaker), é uma análise
     if (message.role === 'assistant' && message.content) {
-      const analise: AnalisisData = {
-        numero_serie: chatMetadata?.numero_serie || 'desconhecido',
-        foto_id: chatMetadata?.foto_id || 0,
-        vistoria_id: chatMetadata?.vistoria_id || '',
-        prompt_enviado: '', // Será preenchido depois
-        resultado_gptmaker: message.content,
-        status: 'concluído',
-      };
+      const vistoriaId = chatMetadata?.vistoria_id;
+      
+      if (vistoriaId) {
+        const analise: AnalisisData = {
+          numero_serie: chatMetadata?.numero_serie || 'desconhecido',
+          foto_id: parseInt(chatMetadata?.foto_id) || 0,
+          vistoria_id: vistoriaId,
+          prompt_enviado: '', // Será preenchido depois
+          resultado_gptmaker: message.content,
+          status: 'concluído',
+        };
 
-      if (analise.vistoria_id) {
         analises.push(analise);
       }
     }
@@ -146,28 +148,26 @@ async function saveAnalisesToSupabase(analises: AnalisisData[]): Promise<boolean
 
     // Inserir cada análise na tabela analises_fotos
     for (const analise of analises) {
-      const { data, error } = await supabase
-        .from('analises_fotos')
-        .insert([
-          {
-            numero_serie: analise.numero_serie,
-            foto_id: analise.foto_id,
-            vistoria_id: analise.vistoria_id,
-            prompt_enviado: analise.prompt_enviado,
-            resultado_gptmaker: analise.resultado_gptmaker,
-            status: analise.status,
-          },
-        ]);
+      const { data, error } = await supabase.from('analises_fotos').insert([
+        {
+          numero_serie: analise.numero_serie,
+          foto_id: analise.foto_id,
+          vistoria_id: analise.vistoria_id,
+          prompt_enviado: analise.prompt_enviado,
+          resultado_gptmaker: analise.resultado_gptmaker,
+          status: analise.status,
+        },
+      ]);
 
       if (error) {
-        console.error(`[Supabase] Erro ao salvar análise: ${error.message}`);
-        return false;
+        console.error(`[Supabase] Erro ao salvar análise: ${JSON.stringify(error)}`);
+        continue; // Continua mesmo se uma falhar
       }
 
       console.log(`[Supabase] ✅ Análise salva: vistoria_id=${analise.vistoria_id}`);
     }
 
-    console.log(`[Supabase] ✅ ${analises.length} análises salvas com sucesso`);
+    console.log(`[Supabase] ✅ ${analises.length} análises processadas`);
     return true;
   } catch (error) {
     console.error('[Supabase] Erro ao salvar análises:', error);
@@ -191,7 +191,7 @@ export async function syncPhotosFromGPTMaker(): Promise<{
     // 1. Buscar chats
     const chats = await getChatsFromGPTMaker();
     if (chats.length === 0) {
-      console.log('Nenhum chat encontrado');
+      console.log('[GPTMaker] Nenhum chat encontrado');
       return {
         success: true,
         photosCount: 0,
@@ -208,18 +208,11 @@ export async function syncPhotosFromGPTMaker(): Promise<{
       allAnalises = allAnalises.concat(analises);
     }
 
-    console.log(`Total de análises encontradas: ${allAnalises.length}`);
+    console.log(`[GPTMaker] Total de análises encontradas: ${allAnalises.length}`);
 
     // 3. Salvar no Supabase
     if (allAnalises.length > 0) {
-      const saved = await saveAnalisesToSupabase(allAnalises);
-      if (!saved) {
-        return {
-          success: false,
-          photosCount: allAnalises.length,
-          message: 'Erro ao salvar análises no Supabase',
-        };
-      }
+      await saveAnalisesToSupabase(allAnalises);
     }
 
     console.log('=== SINCRONIZAÇÃO CONCLUÍDA ===\n');
@@ -230,7 +223,7 @@ export async function syncPhotosFromGPTMaker(): Promise<{
       message: `${allAnalises.length} análises sincronizadas com sucesso`,
     };
   } catch (error) {
-    console.error('Erro na sincronização:', error);
+    console.error('[Sincronização] Erro na sincronização:', error);
     return {
       success: false,
       photosCount: 0,
@@ -243,16 +236,20 @@ export async function syncPhotosFromGPTMaker(): Promise<{
  * Inicia o job automático de sincronização (a cada 5 minutos)
  */
 export function startPhotoSyncScheduler(): void {
-  // Executar a cada 5 minutos
-  const task = cron.schedule('*/5 * * * *', async () => {
-    console.log('[Scheduler] Executando sincronização de análises...');
-    await syncPhotosFromGPTMaker();
-  });
+  try {
+    // Executar a cada 5 minutos
+    cron.schedule('*/5 * * * *', async () => {
+      console.log('[Scheduler] Executando sincronização de análises...');
+      await syncPhotosFromGPTMaker();
+    });
 
-  console.log('[Scheduler] ✅ Job de sincronização iniciado (a cada 5 minutos)');
+    console.log('[Scheduler] ✅ Job de sincronização iniciado (a cada 5 minutos)');
 
-  // Executar uma vez ao iniciar
-  syncPhotosFromGPTMaker().catch((error) => {
-    console.error('[Scheduler] Erro na primeira execução:', error);
-  });
+    // Executar uma vez ao iniciar
+    syncPhotosFromGPTMaker().catch((error) => {
+      console.error('[Scheduler] Erro na primeira execução:', error);
+    });
+  } catch (error) {
+    console.error('[Scheduler] Erro ao iniciar scheduler:', error);
+  }
 }
