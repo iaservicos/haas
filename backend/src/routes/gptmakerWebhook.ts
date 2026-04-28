@@ -4,8 +4,8 @@ const router = Router();
 
 /**
  * POST /api/webhooks/gptmaker
- * Webhook simples para receber análises do GPTMaker
- * Salva diretamente no Supabase via REST API
+ * Webhook para receber análises do GPTMaker
+ * Salva diretamente no Supabase via REST API (sem importar cliente)
  */
 router.post('/gptmaker', async (req: Request, res: Response) => {
   try {
@@ -27,6 +27,28 @@ router.post('/gptmaker', async (req: Request, res: Response) => {
       numero_serie,
     });
 
+    // Pegar credenciais do ambiente
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('[GPTMaker Webhook] ⚠️ Supabase não configurado, salvando em log apenas');
+      
+      // Apenas registrar em log se Supabase não estiver configurado
+      console.log('[GPTMaker Webhook] Dados recebidos:', {
+        foto_id,
+        vistoria_id,
+        numero_serie,
+        content,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Webhook recebido (Supabase não configurado)',
+        data: { foto_id, vistoria_id, numero_serie },
+      });
+    }
+
     // Preparar dados para salvar
     const analysisData = {
       numero_serie: numero_serie || 'desconhecido',
@@ -39,19 +61,7 @@ router.post('/gptmaker', async (req: Request, res: Response) => {
       updated_at: new Date().toISOString(),
     };
 
-    // Salvar no Supabase via REST API
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('[GPTMaker Webhook] Credenciais do Supabase não configuradas');
-      return res.status(500).json({
-        success: false,
-        error: 'Servidor não configurado corretamente',
-      });
-    }
-
-    // Fazer requisição para Supabase
+    // Fazer requisição para Supabase REST API
     const supabaseResponse = await fetch(
       `${supabaseUrl}/rest/v1/analises_fotos`,
       {
@@ -67,7 +77,8 @@ router.post('/gptmaker', async (req: Request, res: Response) => {
 
     if (!supabaseResponse.ok) {
       const error = await supabaseResponse.text();
-      console.error('[GPTMaker Webhook] Erro ao salvar no Supabase:', error);
+      console.error('[GPTMaker Webhook] ❌ Erro ao salvar no Supabase:', error);
+      
       return res.status(500).json({
         success: false,
         error: 'Erro ao salvar análise',
@@ -87,7 +98,7 @@ router.post('/gptmaker', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[GPTMaker Webhook] Erro:', error);
+    console.error('[GPTMaker Webhook] ❌ Erro:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao processar webhook',
