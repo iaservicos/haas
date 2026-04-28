@@ -43,69 +43,61 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
     setLoading(true);
     setErro('');
 
-    // Criar novo FileReader para a leitura da foto
-    const reader = new FileReader();
-    
-    // O try/catch agora está DENTRO do onload
-    reader.onload = async (event) => {
-      try {
-        const fotoBase64 = event.target?.result as string;
-        const base64Data = fotoBase64.split(',')[1];
+    try {
+      // ✅ CORRIGIDO: Usar FormData para enviar o arquivo como multipart
+      const formData = new FormData();
+      formData.append('file', foto);
+      formData.append('vistoria_id', confirmacaoId);
+      formData.append('foto_nome', foto.name);
+      formData.append('foto_tipo', 'equipamento');
+      formData.append('numero_serie', numeroSerie || 'Desconhecido');
 
-        // ✅ CORRIGIDO: Usar a URL completa do backend em produção
-        const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? '/api/inspecao/upload-foto'
-          : 'https://haas-mu.vercel.app/api/inspecao/upload-foto';
+      // ✅ CORRIGIDO: Usar a URL completa do backend em produção
+      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? '/api/inspecao/upload-foto'
+        : 'https://haas-mu.vercel.app/api/inspecao/upload-foto';
 
-        console.log('[UploadFoto] Iniciando upload para:', apiUrl);
-        console.log('[UploadFoto] confirmacaoId:', confirmacaoId);
+      console.log('[UploadFoto] Iniciando upload para:', apiUrl);
+      console.log('[UploadFoto] vistoria_id:', confirmacaoId);
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fotoBase64: base64Data,
-            fotoNome: foto.name,
-            confirmacaoId,
-            numeroSerie: numeroSerie || 'Desconhecido',
-            equipmentType: equipmentType || 'Desconhecido',
-            nomeCliente: nomeCliente || 'Desconhecido',
-          }),
-        });
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+        // NÃO definir Content-Type - o navegador vai definir automaticamente com boundary
+      });
 
-        console.log('[UploadFoto] Response status:', response.status);
+      console.log('[UploadFoto] Response status:', response.status);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || 
-            `Erro ao fazer upload: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-        console.log('[UploadFoto] Upload bem-sucedido:', data);
-
-        setResultado(data.analise);
-        setFoto(null);
-        setPreview('');
-
-        if (onUploadSuccess) {
-          onUploadSuccess(data.foto?.id || '', data.analise);
-        }
-      } catch (err) {
-        console.error('[UploadFoto] Erro:', err);
-        setErro(err instanceof Error ? err.message : 'Erro desconhecido');
-      } finally {
-        // setLoading(false) agora é executado DEPOIS que tudo termina
-        setLoading(false);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || 
+          `Erro ao fazer upload: ${response.status} ${response.statusText}`
+        );
       }
-    };
 
-    // Inicia a leitura do arquivo
-    reader.readAsDataURL(foto);
+      const data = await response.json();
+      console.log('[UploadFoto] Upload bem-sucedido:', data);
+
+      // ✅ Extrair análise da resposta
+      setResultado(data.data?.analise || data.analise || {
+        status: 'Análise em progresso',
+        resultado: 'pendente',
+        descricao: 'A análise será feita em background'
+      });
+      
+      setFoto(null);
+      setPreview('');
+
+      if (onUploadSuccess) {
+        onUploadSuccess(data.data?.id || data.id || '', data.data?.analise || data.analise);
+      }
+    } catch (err) {
+      console.error('[UploadFoto] Erro:', err);
+      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
