@@ -10,7 +10,6 @@ import usuarioRoutes from './routes/usuarioroutes.js';
 import clientesRoutes from './routes/clientesroutes.js';
 import confirmacoeRoutes from './routes/confirmacoes.js';
 import inspecaoRoutes from './routes/inspecao.js';
-import gptmakerWebhook from './routes/gptmakerWebhook.js';
 
 
 const app = express();
