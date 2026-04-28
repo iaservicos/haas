@@ -7,10 +7,11 @@ import authRoutes from './routes/auth.js';
 import componentesRoutes from './routes/componentes.js';
 import fotosRoutes from './routes/fotos.js';
 import usuarioRoutes from './routes/usuarioroutes.js';
-import gptmakerRoutes from './routes/gptmakerRoutes.js';
 import clientesRoutes from './routes/clientesroutes.js';
 import confirmacoeRoutes from './routes/confirmacoes.js';
 import inspecaoRoutes from './routes/inspecao.js';
+import gptmakerWebhook from './routes/gptmakerWebhook.js';
+
 
 const app = express();
 
@@ -24,7 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/componentes', componentesRoutes);
 app.use('/api/fotos', fotosRoutes);
 app.use('/api/usuario', usuarioRoutes);
-app.use('/api/gptmaker', gptmakerRoutes);
+app.use('/api/gptmaker', gptmakerWebhook);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/confirmacoes', confirmacoeRoutes);
 app.use('/api/inspecao', inspecaoRoutes);

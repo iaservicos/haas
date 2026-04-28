@@ -1,99 +1,116 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('[Supabase] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+
 /**
- * Cliente Supabase - Versão Simplificada com TypeScript Correto
- * 
- * Conecta ao banco de dados Supabase usando fetch nativo
+ * Interface para dados de análise do GPTMaker
  */
-
-interface SupabaseError {
-  message: string;
-  code?: string;
+export interface AnalisisFoto {
+  numero_serie: string;
+  foto_id: number;
+  vistoria_id: string;
+  prompt_enviado?: string;
+  resultado_gptmaker: string;
+  status: 'pendente' | 'concluído' | 'erro';
 }
 
-interface SupabaseResponse<T> {
-  data?: T;
-  error?: SupabaseError;
-}
+/**
+ * Salva análise de foto no Supabase
+ */
+export async function saveAnalisisFoto(data: AnalisisFoto): Promise<boolean> {
+  try {
+    console.log(`[Supabase] Salvando análise para foto_id: ${data.foto_id}`);
 
-class SupabaseClient {
-  private url: string;
-  private key: string;
-
-  constructor(url: string, key: string) {
-    this.url = url;
-    this.key = key;
-  }
-
-  /**
-   * Insere dados em uma tabela
-   */
-  async insert<T extends Record<string, any>>(
-    table: string,
-    data: T[]
-  ): Promise<SupabaseResponse<T[]>> {
-    try {
-      const response = await fetch(`${this.url}/rest/v1/${table}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.key,
-          'Authorization': `Bearer ${this.key}`,
+    const { error } = await supabase
+      .from('analises_fotos')
+      .insert([
+        {
+          numero_serie: data.numero_serie,
+          foto_id: data.foto_id,
+          vistoria_id: data.vistoria_id,
+          prompt_enviado: data.prompt_enviado || null,
+          resultado_gptmaker: data.resultado_gptmaker,
+          status: data.status,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
-        body: JSON.stringify(data),
-      });
+      ]);
 
-      if (!response.ok) {
-        let errorMessage = 'Erro ao inserir dados';
-        try {
-          const errorData = await response.json() as Record<string, any>;
-          errorMessage = errorData.message || errorMessage;
-        } catch {
-          // Se não conseguir parsear JSON, usa a mensagem padrão
-        }
-        
-        return {
-          error: {
-            message: errorMessage,
-            code: response.status.toString(),
-          },
-        };
-      }
-
-      const result = (await response.json()) as T[];
-      return { data: result };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      return {
-        error: {
-          message,
-        },
-      };
+    if (error) {
+      console.error(`[Supabase] Erro ao salvar análise:`, error);
+      return false;
     }
+
+    console.log(`[Supabase] ✅ Análise salva com sucesso`);
+    return true;
+  } catch (error) {
+    console.error('[Supabase] Erro ao salvar análise:', error);
+    return false;
   }
-
-  /**
-   * Retorna um objeto com método from() para compatibilidade
-   */
-  from(table: string) {
-    return {
-      insert: async (data: Record<string, any>[]) => {
-        return this.insert(table, data);
-      },
-    };
-  }
-}
-
-// Credenciais do Supabase (devem estar nas variáveis de ambiente)
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('[Supabase] Erro: SUPABASE_URL ou SUPABASE_ANON_KEY não configuradas!');
-  console.error('[Supabase] Certifique-se de que as variáveis de ambiente estão definidas no Vercel');
 }
 
 /**
- * Cria e exporta a instância do cliente Supabase
+ * Atualiza análise de foto no Supabase
  */
-export const supabase = new SupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export async function updateAnalisisFoto(
+  fotoId: number,
+  data: Partial<AnalisisFoto>
+): Promise<boolean> {
+  try {
+    console.log(`[Supabase] Atualizando análise para foto_id: ${fotoId}`);
 
-export default supabase;
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (data.resultado_gptmaker) updateData.resultado_gptmaker = data.resultado_gptmaker;
+    if (data.status) updateData.status = data.status;
+    if (data.prompt_enviado) updateData.prompt_enviado = data.prompt_enviado;
+
+    const { error } = await supabase
+      .from('analises_fotos')
+      .update(updateData)
+      .eq('foto_id', fotoId);
+
+    if (error) {
+      console.error(`[Supabase] Erro ao atualizar análise:`, error);
+      return false;
+    }
+
+    console.log(`[Supabase] ✅ Análise atualizada com sucesso`);
+    return true;
+  } catch (error) {
+    console.error('[Supabase] Erro ao atualizar análise:', error);
+    return false;
+  }
+}
+
+/**
+ * Busca análise de foto no Supabase
+ */
+export async function getAnalisisFoto(fotoId: number): Promise<AnalisisFoto | null> {
+  try {
+    const { data, error } = await supabase
+      .from('analises_fotos')
+      .select('*')
+      .eq('foto_id', fotoId)
+      .single();
+
+    if (error) {
+      console.error(`[Supabase] Erro ao buscar análise:`, error);
+      return null;
+    }
+
+    return data as AnalisisFoto;
+  } catch (error) {
+    console.error('[Supabase] Erro ao buscar análise:', error);
+    return null;
+  }
+}
