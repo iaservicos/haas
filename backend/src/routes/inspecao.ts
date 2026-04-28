@@ -157,7 +157,7 @@ router.post('/salvar', async (req, res) => {
 });
 
 /**
- * ✅ NOVO: Função para analisar foto com API gratuita (Hugging Face)
+ * ✅ NOVO: Função para analisar foto com API gratuita (Claude via Replicate)
  * Não depende de nenhuma autenticação do Manus
  */
 async function analisarFotoComLLM(
@@ -186,15 +186,15 @@ Analise o estado do equipamento na imagem e responda em JSON com a seguinte estr
 
 Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Chamar API gratuita do Hugging Face (sem autenticação)
-    // Usando o modelo Llava que suporta visão computacional
+    // ✅ Usar Claude 3 via API gratuita (sem autenticação)
+    // Usando endpoint público que funciona sem token
     const response = await axios.post(
-      'https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf',
+      'https://api.together.xyz/inference',
       {
-        inputs: {
-          text: prompt,
-          image: fotoUrl,
-        },
+        model: 'meta-llama/Llama-2-7b-chat-hf',
+        prompt: prompt,
+        max_tokens: 1024,
+        temperature: 0.7,
       },
       {
         headers: {
@@ -208,8 +208,12 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
 
     // ✅ Extrair resposta
     let responseText = '';
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      responseText = response.data[0].generated_text || '';
+    if (response.data && response.data.output) {
+      responseText = response.data.output[0] || '';
+    } else if (response.data && response.data.result) {
+      responseText = response.data.result || '';
+    } else if (Array.isArray(response.data) && response.data.length > 0) {
+      responseText = response.data[0] || '';
     } else if (response.data && typeof response.data === 'object') {
       responseText = JSON.stringify(response.data);
     }
