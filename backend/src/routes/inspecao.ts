@@ -20,6 +20,10 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const STORAGE_BUCKET = 'fotos';
 
+// ✅ Configuração do Gemini Pro
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
 /**
  * GET /api/inspecao/equipamento/:equipamentoId
  * Retorna o tipo de equipamento pelo ID
@@ -157,10 +161,10 @@ router.post('/salvar', async (req, res) => {
 });
 
 /**
- * ✅ NOVO: Função para analisar foto com API gratuita (Claude via Replicate)
- * Não depende de nenhuma autenticação do Manus
+ * ✅ NOVO: Função para analisar foto com Gemini Pro
+ * Usa a API oficial do Google Gemini
  */
-async function analisarFotoComLLM(
+async function analisarFotoComGemini(
   fotoId: number,
   numeroSerie: string,
   vistoriaId: string,
@@ -168,7 +172,12 @@ async function analisarFotoComLLM(
   fotoNome: string
 ) {
   try {
-    console.log(`[LLM] Iniciando análise da foto ${fotoId}...`);
+    console.log(`[Gemini] Iniciando análise da foto ${fotoId}...`);
+
+    if (!GEMINI_API_KEY) {
+      console.error('[Gemini] GEMINI_API_KEY não configurada');
+      throw new Error('GEMINI_API_KEY não configurada');
+    }
 
     // ✅ Prompt para análise de equipamento
     const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
@@ -186,15 +195,27 @@ Analise o estado do equipamento na imagem e responda em JSON com a seguinte estr
 
 Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Usar Claude 3 via API gratuita (sem autenticação)
-    // Usando endpoint público que funciona sem token
+    // ✅ Chamar Gemini Pro com a imagem
     const response = await axios.post(
-      'https://api.together.xyz/inference',
+      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
-        model: 'meta-llama/Llama-2-7b-chat-hf',
-        prompt: prompt,
-        max_tokens: 1024,
-        temperature: 0.7,
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: await fetch(fotoUrl)
+                    .then(res => res.arrayBuffer())
+                    .then(buffer => Buffer.from(buffer).toString('base64')),
+                },
+              },
+            ],
+          },
+        ],
       },
       {
         headers: {
@@ -204,21 +225,18 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
       }
     );
 
-    console.log(`[LLM] Resposta recebida para foto ${fotoId}`);
+    console.log(`[Gemini] Resposta recebida para foto ${fotoId}`);
 
-    // ✅ Extrair resposta
+    // ✅ Extrair resposta do Gemini
     let responseText = '';
-    if (response.data && response.data.output) {
-      responseText = response.data.output[0] || '';
-    } else if (response.data && response.data.result) {
-      responseText = response.data.result || '';
-    } else if (Array.isArray(response.data) && response.data.length > 0) {
-      responseText = response.data[0] || '';
-    } else if (response.data && typeof response.data === 'object') {
-      responseText = JSON.stringify(response.data);
+    if (response.data && response.data.candidates && response.data.candidates.length > 0) {
+      const content = response.data.candidates[0].content;
+      if (content && content.parts && content.parts.length > 0) {
+        responseText = content.parts[0].text || '';
+      }
     }
 
-    console.log('[LLM] Resposta bruta:', responseText);
+    console.log('[Gemini] Resposta bruta:', responseText);
 
     // ✅ Tentar fazer parse do JSON
     let analiseResultado;
@@ -231,7 +249,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
         throw new Error('Nenhum JSON encontrado na resposta');
       }
     } catch (parseError) {
-      console.error('[LLM] Erro ao fazer parse da resposta:', parseError);
+      console.error('[Gemini] Erro ao fazer parse da resposta:', parseError);
       // Se falhar, criar resposta padrão
       analiseResultado = {
         status: 'OK',
@@ -241,7 +259,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
       };
     }
 
-    console.log(`[LLM] Análise concluída para foto ${fotoId}:`, analiseResultado);
+    console.log(`[Gemini] Análise concluída para foto ${fotoId}:`, analiseResultado);
 
     // ✅ Salvar resultado no Supabase
     const { error: insertError } = await supabase
@@ -256,15 +274,15 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
       });
 
     if (insertError) {
-      console.error('[LLM] Erro ao salvar resultado:', insertError);
+      console.error('[Gemini] Erro ao salvar resultado:', insertError);
       throw insertError;
     }
 
-    console.log(`[LLM] Resultado salvo para foto ${fotoId}`);
+    console.log(`[Gemini] Resultado salvo para foto ${fotoId}`);
     return analiseResultado;
 
   } catch (error) {
-    console.error('[LLM] Erro ao analisar foto:', error);
+    console.error('[Gemini] Erro ao analisar foto:', error);
 
     // ✅ Registrar erro na tabela
     try {
@@ -284,7 +302,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
           status: 'erro',
         });
     } catch (insertError) {
-      console.error('[LLM] Erro ao registrar erro de análise:', insertError);
+      console.error('[Gemini] Erro ao registrar erro de análise:', insertError);
     }
 
     throw error;
@@ -295,7 +313,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
  * ✅ ATUALIZADO: POST /api/inspecao/upload-foto
  * 1. Salva foto no Supabase Storage (bucket 'fotos')
  * 2. Obtém URL pública
- * 3. Analisa com LLM gratuito (síncrono)
+ * 3. Analisa com Gemini Pro (síncrono)
  * 4. Salva resultado no Supabase
  */
 router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
@@ -365,11 +383,11 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
 
     console.log('[inspecao.ts] Foto salva no banco com sucesso:', data[0]);
 
-    // ✅ NOVO: Analisar foto com LLM gratuito (síncrono)
+    // ✅ NOVO: Analisar foto com Gemini Pro (síncrono)
     let analiseResultado = null;
     if (numero_serie) {
       try {
-        analiseResultado = await analisarFotoComLLM(
+        analiseResultado = await analisarFotoComGemini(
           data[0].id,
           numero_serie,
           vistoria_id,
