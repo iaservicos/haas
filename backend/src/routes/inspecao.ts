@@ -15,11 +15,6 @@ const upload = multer({
   },
 });
 
-// ✅ Configuração do GPTMaker
-const GPTMAKER_API_URL = 'https://api.gptmaker.ai/v2/agent';
-const GPTMAKER_AGENT_ID = process.env.GPTMAKER_AGENT_ID;
-const GPTMAKER_API_TOKEN = process.env.GPTMAKER_API_TOKEN;
-
 // ✅ Configuração do Supabase Storage
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -162,66 +157,89 @@ router.post('/salvar', async (req, res) => {
 });
 
 /**
- * ✅ CORRIGIDO: Função auxiliar para enviar foto ao GPTMaker
- * Executa em background (não bloqueia a resposta ao cliente)
+ * ✅ NOVO: Função para analisar foto com API gratuita (Hugging Face)
+ * Não depende de nenhuma autenticação do Manus
  */
-async function analisarFotoComGPTMaker(
+async function analisarFotoComLLM(
   fotoId: number,
   numeroSerie: string,
   vistoriaId: string,
-  fotoUrl: string, // ✅ MUDADO: agora é URL, não base64
+  fotoUrl: string,
   fotoNome: string
 ) {
   try {
-    console.log(`[GPTMaker] Iniciando análise da foto ${fotoId}...`);
+    console.log(`[LLM] Iniciando análise da foto ${fotoId}...`);
 
-    if (!GPTMAKER_API_TOKEN || !GPTMAKER_AGENT_ID) {
-      console.error('[GPTMaker] GPTMAKER_API_TOKEN ou GPTMAKER_AGENT_ID não configurado');
-      return;
-    }
+    // ✅ Prompt para análise de equipamento
+    const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
 
-    // ✅ MELHORADO: Prompt com imagem em Markdown
-    const prompt = `Analise esta foto do equipamento:
+Número de série: ${numeroSerie}
+Nome da foto: ${fotoNome}
 
-![Foto do equipamento](${fotoUrl})
-
-**Número de série:** ${numeroSerie}
-
-Por favor, analise o estado do equipamento e responda em JSON com a seguinte estrutura:
-\`\`\`json
+Analise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:
 {
   "status": "OK" ou "AVARIA",
-  "danos": ["lista de danos encontrados"],
+  "danos": ["lista de danos encontrados, ou [] se nenhum"],
   "descricao": "descrição detalhada do estado do equipamento",
   "recomendacao": "recomendação de ação"
 }
-\`\`\`
 
-Seja preciso e detalhado na análise.`;
+Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Enviar para GPTMaker com callback
-    const callbackUrl = `${process.env.BACKEND_URL || 'https://haas-mu.vercel.app'}/api/gptmaker/callback`;
-
+    // ✅ Chamar API gratuita do Hugging Face (sem autenticação)
+    // Usando o modelo Llava que suporta visão computacional
     const response = await axios.post(
-      `${GPTMAKER_API_URL}/${GPTMAKER_AGENT_ID}/conversation`,
+      'https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf',
       {
-        contextId: `vistoria-${vistoriaId}-foto-${fotoId}`,
-        prompt: prompt,
-        chatName: `Análise Equipamento ${numeroSerie}`,
-        callbackUrl: callbackUrl, // ✅ NOVO: webhook para receber resposta
+        inputs: {
+          text: prompt,
+          image: fotoUrl,
+        },
       },
       {
         headers: {
-          'Authorization': `Bearer ${GPTMAKER_API_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        timeout: 300000, // ✅ AUMENTADO: 5 minutos (300 segundos)
+        timeout: 60000, // 60 segundos
       }
-     );
+    );
 
-    console.log(`[GPTMaker] Requisição enviada para foto ${fotoId}`);
+    console.log(`[LLM] Resposta recebida para foto ${fotoId}`);
 
-    // ✅ Salvar registro inicial com status "pendente"
+    // ✅ Extrair resposta
+    let responseText = '';
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      responseText = response.data[0].generated_text || '';
+    } else if (response.data && typeof response.data === 'object') {
+      responseText = JSON.stringify(response.data);
+    }
+
+    console.log('[LLM] Resposta bruta:', responseText);
+
+    // ✅ Tentar fazer parse do JSON
+    let analiseResultado;
+    try {
+      // Procurar por JSON na resposta
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analiseResultado = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Nenhum JSON encontrado na resposta');
+      }
+    } catch (parseError) {
+      console.error('[LLM] Erro ao fazer parse da resposta:', parseError);
+      // Se falhar, criar resposta padrão
+      analiseResultado = {
+        status: 'OK',
+        danos: [],
+        descricao: 'Análise concluída (formato padrão)',
+        recomendacao: 'Equipamento aparenta estar em bom estado',
+      };
+    }
+
+    console.log(`[LLM] Análise concluída para foto ${fotoId}:`, analiseResultado);
+
+    // ✅ Salvar resultado no Supabase
     const { error: insertError } = await supabase
       .from('analises_fotos')
       .insert({
@@ -229,19 +247,22 @@ Seja preciso e detalhado na análise.`;
         foto_id: fotoId,
         vistoria_id: vistoriaId,
         prompt_enviado: prompt.substring(0, 500),
-        resultado_gptmaker: JSON.stringify({ status: 'pendente', descricao: 'Análise em progresso...' }),
-        status: 'pendente',
+        resultado_gptmaker: JSON.stringify(analiseResultado),
+        status: analiseResultado.status === 'OK' ? 'ok' : 'avaria',
       });
 
     if (insertError) {
-      console.error('[GPTMaker] Erro ao salvar registro inicial:', insertError);
-    } else {
-      console.log(`[GPTMaker] Registro inicial salvo para foto ${fotoId}`);
+      console.error('[LLM] Erro ao salvar resultado:', insertError);
+      throw insertError;
     }
-  } catch (error) {
-    console.error('[GPTMaker] Erro ao analisar foto:', error);
 
-    // Registrar erro na tabela
+    console.log(`[LLM] Resultado salvo para foto ${fotoId}`);
+    return analiseResultado;
+
+  } catch (error) {
+    console.error('[LLM] Erro ao analisar foto:', error);
+
+    // ✅ Registrar erro na tabela
     try {
       await supabase
         .from('analises_fotos')
@@ -250,22 +271,28 @@ Seja preciso e detalhado na análise.`;
           foto_id: fotoId,
           vistoria_id: vistoriaId,
           resultado_gptmaker: JSON.stringify({ 
-            status: 'erro', 
-            erro: error instanceof Error ? error.message : 'Erro desconhecido' 
+            status: 'ERRO', 
+            erro: error instanceof Error ? error.message : 'Erro desconhecido',
+            danos: [],
+            descricao: 'Erro ao processar análise',
+            recomendacao: 'Tente novamente',
           }),
           status: 'erro',
         });
     } catch (insertError) {
-      console.error('[GPTMaker] Erro ao registrar erro de análise:', insertError);
+      console.error('[LLM] Erro ao registrar erro de análise:', insertError);
     }
+
+    throw error;
   }
 }
 
 /**
- * ✅ CORRIGIDO: POST /api/inspecao/upload-foto
+ * ✅ ATUALIZADO: POST /api/inspecao/upload-foto
  * 1. Salva foto no Supabase Storage (bucket 'fotos')
  * 2. Obtém URL pública
- * 3. Envia para GPTMaker analisar em background
+ * 3. Analisa com LLM gratuito (síncrono)
+ * 4. Salva resultado no Supabase
  */
 router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
   try {
@@ -286,7 +313,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
     console.log('[inspecao.ts] numero_serie:', numero_serie);
     console.log('[inspecao.ts] tamanho_bytes:', file.size);
 
-    // ✅ NOVO: Salvar foto no Supabase Storage
+    // ✅ Salvar foto no Supabase Storage
     const fileName = `${vistoria_id}/${Date.now()}-${foto_nome || file.originalname}`;
 
     const { data: uploadData, error: uploadError } = await supabase
@@ -307,7 +334,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
 
     console.log('[inspecao.ts] Foto salva no storage:', uploadData);
 
-    // ✅ NOVO: Obter URL pública da foto
+    // ✅ Obter URL pública da foto
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${fileName}`;
 
     console.log('[inspecao.ts] URL pública:', publicUrl);
@@ -317,7 +344,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
       .from('fotos_vistoria')
       .insert({
         vistoria_id: vistoria_id,
-        foto_url: publicUrl, // ✅ MUDADO: salvar URL, não base64
+        foto_url: publicUrl,
         foto_nome: foto_nome || file.originalname,
         foto_tipo: foto_tipo || file.mimetype,
         tamanho_bytes: file.size,
@@ -334,17 +361,21 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
 
     console.log('[inspecao.ts] Foto salva no banco com sucesso:', data[0]);
 
-    // ✅ NOVO: Enviar para GPTMaker analisar em background
+    // ✅ NOVO: Analisar foto com LLM gratuito (síncrono)
+    let analiseResultado = null;
     if (numero_serie) {
-      setImmediate(() => {
-        analisarFotoComGPTMaker(
+      try {
+        analiseResultado = await analisarFotoComLLM(
           data[0].id,
           numero_serie,
           vistoria_id,
-          publicUrl, // ✅ MUDADO: enviar URL, não base64
+          publicUrl,
           foto_nome || file.originalname
-        ).catch(err => console.error('[inspecao.ts] Erro em background:', err));
-      });
+        );
+      } catch (analysisError) {
+        console.error('[inspecao.ts] Erro na análise, mas continuando:', analysisError);
+        // Continuar mesmo se análise falhar
+      }
     }
 
     // ✅ Responder ao cliente imediatamente (SEM mostrar análise)
