@@ -180,18 +180,24 @@ async function analisarFotoComGPTMaker(
       return;
     }
 
-    // ✅ Preparar prompt com URL da foto (não base64)
-    const prompt = `Analise esta foto do equipamento com número de série ${numeroSerie}.
-    
-Forneça uma análise detalhada em JSON com a seguinte estrutura:
+    // ✅ MELHORADO: Prompt com imagem em Markdown
+    const prompt = `Analise esta foto do equipamento:
+
+![Foto do equipamento](${fotoUrl})
+
+**Número de série:** ${numeroSerie}
+
+Por favor, analise o estado do equipamento e responda em JSON com a seguinte estrutura:
+\`\`\`json
 {
   "status": "OK" ou "AVARIA",
   "danos": ["lista de danos encontrados"],
-  "descricao": "descrição detalhada do estado",
+  "descricao": "descrição detalhada do estado do equipamento",
   "recomendacao": "recomendação de ação"
 }
+\`\`\`
 
-Foto: ${fotoUrl}`;
+Seja preciso e detalhado na análise.`;
 
     // ✅ Enviar para GPTMaker com callback
     const callbackUrl = `${process.env.BACKEND_URL || 'https://haas-mu.vercel.app'}/api/gptmaker/callback`;
@@ -209,7 +215,7 @@ Foto: ${fotoUrl}`;
           'Authorization': `Bearer ${GPTMAKER_API_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        timeout: 60000, // 60 segundos
+        timeout: 300000, // ✅ AUMENTADO: 5 minutos (300 segundos)
       }
      );
 
@@ -341,7 +347,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
       });
     }
 
-    // ✅ Responder ao cliente imediatamente
+    // ✅ Responder ao cliente imediatamente (SEM mostrar análise)
     res.json({
       success: true,
       message: 'Foto enviada com sucesso',
@@ -350,11 +356,6 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
         id: data[0].id,
         foto_url: publicUrl,
         foto_nome: data[0].foto_nome,
-        analise: {
-          status: 'pendente',
-          resultado: 'Análise em progresso',
-          descricao: 'A análise será feita em background e o resultado será atualizado'
-        }
       },
     });
   } catch (error) {
