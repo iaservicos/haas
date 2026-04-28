@@ -10,8 +10,7 @@ import usuarioRoutes from './routes/usuarioroutes.js';
 import clientesRoutes from './routes/clientesroutes.js';
 import confirmacoeRoutes from './routes/confirmacoes.js';
 import inspecaoRoutes from './routes/inspecao.js';
-import gptmakerWebhook from './routes/gptmakerWebhook.js';
-
+import gptmakerCallback from './routes/gptmakerCallback.js';
 
 const app = express();
 
@@ -28,7 +27,7 @@ app.use('/api/usuario', usuarioRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/confirmacoes', confirmacoeRoutes);
 app.use('/api/inspecao', inspecaoRoutes);
-app.use('/api/webhooks/gptmaker', gptmakerWebhook);
+app.use('/api/gptmaker', gptmakerCallback);
 
 
 app.get('/health', (req, res) => {
