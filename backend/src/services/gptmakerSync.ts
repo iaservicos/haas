@@ -1,22 +1,26 @@
 /**
- * Serviço de Sincronização de Fotos do GPTMaker
+ * Serviço de Sincronização de Análises do GPTMaker
  * 
  * Fluxo:
  * 1. Conecta na API do GPTMaker com o token JWT
  * 2. Lista todos os chats do agente
- * 3. Para cada chat, lista as mensagens (que contêm as fotos)
- * 4. Extrai as URLs das fotos
- * 5. Envia para o Power Automate via webhook
- * 6. Power Automate salva as fotos no SharePoint
+ * 3. Para cada chat, lista as mensagens (que contêm as análises)
+ * 4. Extrai os resultados das análises
+ * 5. Salva os resultados na tabela analises_fotos do Supabase
  */
 
 import axios from 'axios';
 import cron from 'node-cron';
-
+import { supabase } from './supabaseClient'; // Ajuste o caminho conforme necessário
 
 interface GPTMakerChat {
   id: string;
   visitorId?: string;
+  metadata?: {
+    vistoria_id?: string;
+    foto_id?: string;
+    numero_serie?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -31,21 +35,19 @@ interface GPTMakerMessage {
   createdAt: string;
 }
 
-interface PhotoData {
-  messageId: string;
-  imageUrl: string;
-  fileName: string;
-  time: number;
-  whatsappPhone?: string;
-  chatId: string;
-  agentId: string;
+interface AnalisisData {
+  numero_serie: string;
+  foto_id: number;
+  vistoria_id: string;
+  prompt_enviado: string;
+  resultado_gptmaker: string;
+  status: 'concluído';
 }
 
 const GPTMAKER_API_BASE = 'https://api.gptmaker.ai/v2';
 const GPTMAKER_TOKEN = process.env.GPTMAKER_API_TOKEN;
 const GPTMAKER_AGENT_ID = process.env.GPTMAKER_AGENT_ID;
 const GPTMAKER_WORKSPACE_ID = process.env.GPTMAKER_WORKSPACE_ID;
-const POWER_AUTOMATE_WEBHOOK_URL = process.env.POWER_AUTOMATE_WEBHOOK_URL;
 
 /**
  * Busca todos os chats do agente
@@ -101,84 +103,88 @@ async function getMessagesFromChat(chatId: string): Promise<GPTMakerMessage[]> {
 }
 
 /**
- * Extrai as fotos das mensagens
+ * Extrai as análises das mensagens
  */
-function extractPhotosFromMessages(
+function extractAnalisisFromMessages(
   messages: GPTMakerMessage[],
-  chatId: string
-): PhotoData[] {
-  const photos: PhotoData[] = [];
+  chatMetadata?: any
+): AnalisisData[] {
+  const analises: AnalisisData[] = [];
 
   for (const message of messages) {
-    if (message.imageUrl) {
-      const fileName = `photo_${message.id}_${Date.now()}.jpg`;
-      photos.push({
-        messageId: message.id,
-        imageUrl: message.imageUrl,
-        fileName,
-        time: new Date(message.createdAt).getTime(),
-        chatId,
-        agentId: GPTMAKER_AGENT_ID || '',
-      });
+    // Se a mensagem é do assistente (GPTMaker), é uma análise
+    if (message.role === 'assistant' && message.content) {
+      const analise: AnalisisData = {
+        numero_serie: chatMetadata?.numero_serie || 'desconhecido',
+        foto_id: chatMetadata?.foto_id || 0,
+        vistoria_id: chatMetadata?.vistoria_id || '',
+        prompt_enviado: '', // Será preenchido depois
+        resultado_gptmaker: message.content,
+        status: 'concluído',
+      };
+
+      if (analise.vistoria_id) {
+        analises.push(analise);
+      }
     }
   }
 
-  return photos;
+  return analises;
 }
 
 /**
- * Envia as fotos para o Power Automate
+ * Salva as análises no Supabase
  */
-async function sendPhotosToPowerAutomate(photos: PhotoData[]): Promise<boolean> {
-  if (photos.length === 0) {
-    console.log('[PowerAutomate] Nenhuma foto para enviar');
+async function saveAnalisesToSupabase(analises: AnalisisData[]): Promise<boolean> {
+  if (analises.length === 0) {
+    console.log('[Supabase] Nenhuma análise para salvar');
     return true;
   }
 
-  if (!POWER_AUTOMATE_WEBHOOK_URL) {
-    console.error('[PowerAutomate] POWER_AUTOMATE_WEBHOOK_URL não configurada');
-    return false;
-  }
-
   try {
-    console.log(`[PowerAutomate] Enviando ${photos.length} fotos...`);
+    console.log(`[Supabase] Salvando ${analises.length} análises...`);
 
-    const payload = {
-      action: 'store_photos',
-      photos,
-      timestamp: new Date().toISOString(),
-    };
+    // Inserir cada análise na tabela analises_fotos
+    for (const analise of analises) {
+      const { data, error } = await supabase
+        .from('analises_fotos')
+        .insert([
+          {
+            numero_serie: analise.numero_serie,
+            foto_id: analise.foto_id,
+            vistoria_id: analise.vistoria_id,
+            prompt_enviado: analise.prompt_enviado,
+            resultado_gptmaker: analise.resultado_gptmaker,
+            status: analise.status,
+          },
+        ]);
 
-    const response = await axios.post(POWER_AUTOMATE_WEBHOOK_URL, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    });
+      if (error) {
+        console.error(`[Supabase] Erro ao salvar análise: ${error.message}`);
+        return false;
+      }
 
-    if (response.status === 200 || response.status === 202) {
-      console.log(`[PowerAutomate] ✅ ${photos.length} fotos enviadas com sucesso`);
-      return true;
-    } else {
-      console.error(`[PowerAutomate] Erro na resposta: ${response.status}`);
-      return false;
+      console.log(`[Supabase] ✅ Análise salva: vistoria_id=${analise.vistoria_id}`);
     }
+
+    console.log(`[Supabase] ✅ ${analises.length} análises salvas com sucesso`);
+    return true;
   } catch (error) {
-    console.error('[PowerAutomate] Erro ao enviar fotos:', error);
+    console.error('[Supabase] Erro ao salvar análises:', error);
     return false;
   }
 }
 
 /**
- * Sincroniza todas as fotos do GPTMaker para o Power Automate
+ * Sincroniza todas as análises do GPTMaker para o Supabase
  */
-export async function syncPhotosFromGPTMaker(): Promise<{
+export async function syncAnalisisFromGPTMaker(): Promise<{
   success: boolean;
-  photosCount: number;
+  analisesCount: number;
   message: string;
 }> {
   try {
-    console.log('\n=== INICIANDO SINCRONIZAÇÃO DE FOTOS ===');
+    console.log('\n=== INICIANDO SINCRONIZAÇÃO DE ANÁLISES ===');
     console.log(`Timestamp: ${new Date().toISOString()}`);
 
     // 1. Buscar chats
@@ -187,30 +193,30 @@ export async function syncPhotosFromGPTMaker(): Promise<{
       console.log('Nenhum chat encontrado');
       return {
         success: true,
-        photosCount: 0,
+        analisesCount: 0,
         message: 'Nenhum chat encontrado',
       };
     }
 
-    // 2. Para cada chat, buscar mensagens e extrair fotos
-    let allPhotos: PhotoData[] = [];
+    // 2. Para cada chat, buscar mensagens e extrair análises
+    let allAnalises: AnalisisData[] = [];
 
     for (const chat of chats) {
       const messages = await getMessagesFromChat(chat.id);
-      const photos = extractPhotosFromMessages(messages, chat.id);
-      allPhotos = allPhotos.concat(photos);
+      const analises = extractAnalisisFromMessages(messages, chat.metadata);
+      allAnalises = allAnalises.concat(analises);
     }
 
-    console.log(`Total de fotos encontradas: ${allPhotos.length}`);
+    console.log(`Total de análises encontradas: ${allAnalises.length}`);
 
-    // 3. Enviar para Power Automate
-    if (allPhotos.length > 0) {
-      const sent = await sendPhotosToPowerAutomate(allPhotos);
-      if (!sent) {
+    // 3. Salvar no Supabase
+    if (allAnalises.length > 0) {
+      const saved = await saveAnalisesToSupabase(allAnalises);
+      if (!saved) {
         return {
           success: false,
-          photosCount: allPhotos.length,
-          message: 'Erro ao enviar fotos para Power Automate',
+          analisesCount: allAnalises.length,
+          message: 'Erro ao salvar análises no Supabase',
         };
       }
     }
@@ -219,14 +225,14 @@ export async function syncPhotosFromGPTMaker(): Promise<{
 
     return {
       success: true,
-      photosCount: allPhotos.length,
-      message: `${allPhotos.length} fotos sincronizadas com sucesso`,
+      analisesCount: allAnalises.length,
+      message: `${allAnalises.length} análises sincronizadas com sucesso`,
     };
   } catch (error) {
     console.error('Erro na sincronização:', error);
     return {
       success: false,
-      photosCount: 0,
+      analisesCount: 0,
       message: `Erro: ${error instanceof Error ? error.message : 'Desconhecido'}`,
     };
   }
@@ -235,20 +241,17 @@ export async function syncPhotosFromGPTMaker(): Promise<{
 /**
  * Inicia o job automático de sincronização (a cada 5 minutos)
  */
-export function startPhotoSyncScheduler(): void {
-  // Importar node-cron apenas quando necessário
-
-
+export function startAnalisisSyncScheduler(): void {
   // Executar a cada 5 minutos
   const task = cron.schedule('*/5 * * * *', async () => {
-    console.log('[Scheduler] Executando sincronização de fotos...');
-    await syncPhotosFromGPTMaker();
+    console.log('[Scheduler] Executando sincronização de análises...');
+    await syncAnalisisFromGPTMaker();
   });
 
   console.log('[Scheduler] ✅ Job de sincronização iniciado (a cada 5 minutos)');
 
   // Executar uma vez ao iniciar
-  syncPhotosFromGPTMaker().catch((error) => {
+  syncAnalisisFromGPTMaker().catch((error) => {
     console.error('[Scheduler] Erro na primeira execução:', error);
   });
 }
