@@ -1,15 +1,17 @@
 /**
- * Cliente Supabase - Versão Simplificada
+ * Cliente Supabase - Versão Simplificada com TypeScript Correto
  * 
  * Conecta ao banco de dados Supabase usando fetch nativo
  */
 
+interface SupabaseError {
+  message: string;
+  code?: string;
+}
+
 interface SupabaseResponse<T> {
   data?: T;
-  error?: {
-    message: string;
-    code?: string;
-  };
+  error?: SupabaseError;
 }
 
 class SupabaseClient {
@@ -24,7 +26,10 @@ class SupabaseClient {
   /**
    * Insere dados em uma tabela
    */
-  async insert<T>(table: string, data: T[]): Promise<SupabaseResponse<T[]>> {
+  async insert<T extends Record<string, any>>(
+    table: string,
+    data: T[]
+  ): Promise<SupabaseResponse<T[]>> {
     try {
       const response = await fetch(`${this.url}/rest/v1/${table}`, {
         method: 'POST',
@@ -37,21 +42,29 @@ class SupabaseClient {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        let errorMessage = 'Erro ao inserir dados';
+        try {
+          const errorData = await response.json() as Record<string, any>;
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // Se não conseguir parsear JSON, usa a mensagem padrão
+        }
+        
         return {
           error: {
-            message: error.message || 'Erro ao inserir dados',
-            code: error.code,
+            message: errorMessage,
+            code: response.status.toString(),
           },
         };
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as T[];
       return { data: result };
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
       return {
         error: {
-          message: error instanceof Error ? error.message : 'Erro desconhecido',
+          message,
         },
       };
     }
@@ -62,7 +75,7 @@ class SupabaseClient {
    */
   from(table: string) {
     return {
-      insert: async (data: any[]) => {
+      insert: async (data: Record<string, any>[]) => {
         return this.insert(table, data);
       },
     };
