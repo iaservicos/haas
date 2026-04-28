@@ -52,10 +52,15 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         const fotoBase64 = event.target?.result as string;
         const base64Data = fotoBase64.split(',')[1];
 
-        console.log('[UploadFoto] Iniciando upload para /api/inspecao/upload-foto');
+        // ✅ CORRIGIDO: Usar a URL completa do backend em produção
+        const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+          ? '/api/inspecao/upload-foto'
+          : 'https://haas-mu.vercel.app/api/inspecao/upload-foto';
+
+        console.log('[UploadFoto] Iniciando upload para:', apiUrl);
         console.log('[UploadFoto] confirmacaoId:', confirmacaoId);
 
-        const response = await fetch('/api/inspecao/upload-foto', {
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
