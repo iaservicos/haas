@@ -17,6 +17,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * ✅ POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
+ * PROMPT ASSERTIVO COM CATEGORIAS ESPECÍFICAS
  */
 router.post('/analise-fotos', async (req: any, res: any  ) => {
   try {
@@ -109,7 +110,71 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
               {
                 parts: [
                   {
-                    text: `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.\n\nNúmero de série: ${analise.numero_serie || 'N/A'}\nNome da foto: ${fileName}\n\nAnalise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:\n{\n  "status": "OK" ou "AVARIA",\n  "danos": ["lista de danos encontrados, ou [] se nenhum"],\n  "descricao": "descrição detalhada do estado do equipamento",\n  "recomendacao": "recomendação de ação"\n}\n\nSeja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`,
+                    text: `Você é um especialista em inspeção de equipamentos de TI da Positivo Tecnologia. Analise a foto do equipamento e identifique danos ESPECÍFICOS e ASSERTIVOS.
+
+Número de série: ${analise.numero_serie || 'N/A'}
+Nome da foto: ${fileName}
+
+CATEGORIAS DE AVARIAS ACEITAS (use EXATAMENTE como está):
+
+TELA/DISPLAY:
+- Trincas (pequenas, médias, grandes)
+- Quebras (vidro quebrado)
+- Manchas (pixel morto, mancha de tinta)
+- Desbotamento
+- Linhas horizontais/verticais
+- Vidro solto
+
+CARCAÇA:
+- Amassados
+- Trincas
+- Queimaduras
+- Corrosão
+- Deformação
+- Peças faltando
+
+TECLADO:
+- Teclas faltando
+- Teclas soltas
+- Derramamento de líquido
+
+TOUCHPAD:
+- Trincado
+- Solto
+- Molhado
+
+CONECTORES:
+- USB danificado
+- HDMI danificado
+- Carregador danificado
+- Conectores soltos
+- Conectores quebrados
+
+BATERIA (Notebooks):
+- Inchada
+- Danificada
+- Vazando
+
+OUTROS:
+- Sinais de líquido
+- Oxidação
+
+INSTRUÇÕES:
+1. Se o equipamento está OK (sem danos visíveis), retorne status="OK" e deixe categoria e tipo_dano vazios
+2. Se houver dano, identifique a CATEGORIA e o TIPO_DANO específico
+3. A descrição deve ser RESUMIDA em 1-2 linhas máximo
+4. Seja ASSERTIVO e ESPECÍFICO
+
+Responda em JSON com EXATAMENTE esta estrutura:
+{
+  "status": "OK" ou "AVARIA",
+  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "TOUCHPAD" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
+  "tipo_dano": "tipo específico encontrado" (ex: "Trincas", "Quebras", "Amassados") (vazio se OK),
+  "descricao": "descrição resumida em 1-2 linhas",
+  "recomendacao": "ação recomendada"
+}
+
+Responda APENAS com o JSON, sem explicações adicionais.`,
                   },
                   {
                     inline_data: {
@@ -189,7 +254,8 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
               resultado_gptmaker: JSON.stringify({
                 status: 'ERRO',
                 erro: error instanceof Error ? error.message : 'Erro desconhecido',
-                danos: [],
+                categoria: '',
+                tipo_dano: '',
                 descricao: 'Erro ao processar análise',
                 recomendacao: 'Tente novamente',
               }),
