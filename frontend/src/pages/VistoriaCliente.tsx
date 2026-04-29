@@ -118,7 +118,7 @@ export const VistoriaCliente: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-white">
       {/* SIDEBAR - MANTÉM O PADRÃO */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col shadow-2xl`}>
         <div className="p-4 border-b border-gray-700">
@@ -152,10 +152,10 @@ export const VistoriaCliente: React.FC = () => {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER - MANTÉM O PADRÃO */}
-        <div className="bg-white border-b border-gray-300 px-6 py-4 flex justify-between items-center shadow-md">
+        <div className="bg-white border-b border-gray-200 px-8 py-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Vistoria de Equipamento</h1>
-            <p className="text-sm text-gray-600 mt-1">Série: <strong className="text-gray-900">{numeroSerie}</strong></p>
+            <p className="text-sm text-gray-600 mt-2">Série: <strong className="text-gray-900">{numeroSerie}</strong></p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')}</p>
@@ -163,34 +163,34 @@ export const VistoriaCliente: React.FC = () => {
         </div>
 
         {/* CONTENT - FULL WIDTH */}
-        <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div className="flex-1 overflow-auto p-8 bg-white">
           {confirmacaoData && equipmentType && vistoriaId ? (
-            <div className="w-full space-y-6">
+            <div className="w-full space-y-8">
               {/* STEP 1: CHECKLIST */}
-              <div className={`w-full rounded-lg shadow-md border-l-4 transition-all duration-300 ${
+              <div className={`w-full rounded-none border-t-4 transition-all duration-300 ${
                 checklistSalvo 
-                  ? 'border-l-green-500 bg-white' 
-                  : 'border-l-blue-500 bg-white'
+                  ? 'border-t-green-600 bg-white' 
+                  : 'border-t-gray-900 bg-white'
               }`}>
-                <div className="p-8">
-                  <div className="flex items-start justify-between mb-8">
-                    <div className="flex items-center gap-6">
-                      <div className={`flex-shrink-0 w-14 h-14 rounded-lg flex items-center justify-center font-bold text-xl shadow ${
+                <div className="p-0 pt-8">
+                  <div className="flex items-start justify-between mb-8 pb-6 border-b border-gray-200">
+                    <div className="flex items-center gap-8">
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-none flex items-center justify-center font-bold text-xl ${
                         checklistSalvo 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-blue-100 text-blue-700'
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-gray-900 text-white'
                       }`}>
                         1
                       </div>
                       <div>
                         <h2 className="text-2xl font-bold text-gray-900">Checklist de Vistoria</h2>
-                        <p className="text-gray-600 mt-2">Preencha as informações do equipamento</p>
+                        <p className="text-gray-600 mt-1">Preencha as informações do equipamento</p>
                       </div>
                     </div>
                     {checklistSalvo && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg border border-green-200">
-                        <span className="text-lg font-bold text-green-600">✓</span>
-                        <span className="text-sm font-semibold text-green-700">Concluído</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-green-600">✓</span>
+                        <span className="text-sm font-bold text-green-600 uppercase tracking-wide">Concluído</span>
                       </div>
                     )}
                   </div>
@@ -205,44 +205,44 @@ export const VistoriaCliente: React.FC = () => {
               </div>
 
               {/* STEP 2: UPLOAD DE FOTO */}
-              <div className={`w-full rounded-lg shadow-md border-l-4 transition-all duration-300 ${
+              <div className={`w-full rounded-none border-t-4 transition-all duration-300 ${
                 !checklistSalvo
-                  ? 'border-l-gray-400 bg-white opacity-60'
+                  ? 'border-t-gray-300 bg-white opacity-50'
                   : fotoUploadada
-                  ? 'border-l-green-500 bg-white'
-                  : 'border-l-amber-500 bg-white'
+                  ? 'border-t-green-600 bg-white'
+                  : 'border-t-gray-900 bg-white'
               }`}>
-                <div className="p-8">
-                  <div className="flex items-start justify-between mb-8">
-                    <div className="flex items-center gap-6">
-                      <div className={`flex-shrink-0 w-14 h-14 rounded-lg flex items-center justify-center font-bold text-xl shadow ${
+                <div className="p-0 pt-8">
+                  <div className="flex items-start justify-between mb-8 pb-6 border-b border-gray-200">
+                    <div className="flex items-center gap-8">
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-none flex items-center justify-center font-bold text-xl ${
                         !checklistSalvo
-                          ? 'bg-gray-200 text-gray-600'
+                          ? 'bg-gray-300 text-gray-600'
                           : fotoUploadada
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-amber-100 text-amber-700'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-900 text-white'
                       }`}>
                         2
                       </div>
                       <div>
                         <h2 className="text-2xl font-bold text-gray-900">Upload de Foto</h2>
-                        <p className="text-gray-600 mt-2">Tire uma foto clara do equipamento para análise IA</p>
+                        <p className="text-gray-600 mt-1">Tire uma foto clara do equipamento para análise IA</p>
                       </div>
                     </div>
                     {fotoUploadada && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg border border-green-200">
-                        <span className="text-lg font-bold text-green-600">✓</span>
-                        <span className="text-sm font-semibold text-green-700">Concluído</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-green-600">✓</span>
+                        <span className="text-sm font-bold text-green-600 uppercase tracking-wide">Concluído</span>
                       </div>
                     )}
                   </div>
 
                   {!checklistSalvo ? (
-                    <div className="flex items-start gap-4 p-6 bg-amber-50 border border-amber-300 rounded-lg">
-                      <span className="text-2xl font-bold text-amber-700 flex-shrink-0">⚠</span>
+                    <div className="flex items-start gap-4 p-6 bg-gray-100 border border-gray-300 rounded-none">
+                      <span className="text-2xl font-bold text-gray-700 flex-shrink-0">⚠</span>
                       <div>
-                        <p className="font-bold text-amber-900 text-lg">Passo anterior necessário</p>
-                        <p className="text-amber-800 mt-2">Complete o checklist de vistoria antes de fazer upload de fotos.</p>
+                        <p className="font-bold text-gray-900 text-lg">Passo anterior necessário</p>
+                        <p className="text-gray-700 mt-2">Complete o checklist de vistoria antes de fazer upload de fotos.</p>
                       </div>
                     </div>
                   ) : (
@@ -260,10 +260,10 @@ export const VistoriaCliente: React.FC = () => {
               </div>
 
               {/* BOTÕES DE AÇÃO */}
-              <div className="flex gap-4 justify-end pt-6">
+              <div className="flex gap-4 justify-end pt-8 border-t border-gray-200">
                 <button
                   onClick={handleCancelar}
-                  className="px-8 py-3 bg-gray-300 hover:bg-gray-400 text-gray-900 rounded-lg font-bold transition-colors shadow-md"
+                  className="px-8 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-none font-bold text-lg transition-colors uppercase tracking-wide"
                 >
                   Cancelar
                 </button>
@@ -272,7 +272,7 @@ export const VistoriaCliente: React.FC = () => {
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-20 w-20 border-4 border-gray-300 border-t-blue-600 mx-auto"></div>
+                <div className="animate-spin rounded-full h-20 w-20 border-4 border-gray-300 border-t-gray-900 mx-auto"></div>
                 <p className="mt-8 text-gray-700 font-semibold text-lg">Carregando informações do equipamento...</p>
               </div>
             </div>
@@ -282,18 +282,15 @@ export const VistoriaCliente: React.FC = () => {
 
       {/* MODAL DE SUCESSO */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-10 text-center">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-none shadow-2xl max-w-md w-full p-12 text-center border-t-4 border-t-green-600">
             <div className="flex justify-center mb-8">
-              <div className="relative">
-                <div className="absolute inset-0 bg-green-200 rounded-full animate-pulse"></div>
-                <div className="relative w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-6xl font-bold text-green-600">✓</span>
-                </div>
+              <div className="w-20 h-20 bg-green-600 rounded-none flex items-center justify-center">
+                <span className="text-5xl font-bold text-white">✓</span>
               </div>
             </div>
             
-            <h3 className="text-3xl font-bold text-gray-900 mb-3">Importação Resolvida!</h3>
+            <h3 className="text-3xl font-bold text-gray-900 mb-4 uppercase tracking-wide">Importação Resolvida!</h3>
             <p className="text-gray-700 mb-8 text-lg">
               A vistoria foi processada com sucesso. Você será redirecionado em breve.
             </p>
@@ -301,7 +298,7 @@ export const VistoriaCliente: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => navigate('/dashboard-cliente')}
-                className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-lg transition-colors shadow-md"
+                className="flex-1 px-6 py-4 bg-gray-900 hover:bg-gray-800 text-white rounded-none font-bold text-lg transition-colors uppercase tracking-wide"
               >
                 Voltar ao Dashboard
               </button>
