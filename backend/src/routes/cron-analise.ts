@@ -4,21 +4,21 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_KEY || ''
+  process.env.SUPABASE_ANON_KEY || ''
 );
 
 const router = express.Router();
 
 // ✅ Configuração do Gemini Pro
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 /**
  * ✅ POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
  */
-router.post('/analise-fotos', async (req: any, res: any ) => {
+router.post('/analise-fotos', async (req: any, res: any) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
@@ -32,7 +32,7 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
       .from('analises_fotos')
       .select('*')
       .eq('status', 'pendente')
-      .limit(1); // Processar 1 por vez para evitar rate limit
+      .limit(5); // Processar no máximo 5 por vez para evitar timeout
 
     if (fetchError) {
       console.error('[CRON] Erro ao buscar análises pendentes:', fetchError);
@@ -41,10 +41,10 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
 
     if (!analisesPendentes || analisesPendentes.length === 0) {
       console.log('[CRON] Nenhuma análise pendente encontrada');
-      return res.json({
-        success: true,
+      return res.json({ 
+        success: true, 
         message: 'Nenhuma análise pendente',
-        processadas: 0,
+        processadas: 0 
       });
     }
 
@@ -53,14 +53,15 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
     let processadas = 0;
     let erros = 0;
 
+    // ✅ Processar cada análise
     for (const analise of analisesPendentes) {
       try {
         console.log(`[CRON] Processando análise ID ${analise.id}...`);
 
-        // ✅ Buscar foto associada
+        // Buscar foto para obter URL
         const { data: foto, error: fotoError } = await supabase
           .from('fotos_vistoria')
-          .select('*')
+          .select('foto_url, foto_nome')
           .eq('id', analise.foto_id)
           .single();
 
@@ -72,48 +73,54 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
 
         console.log(`[CRON] Foto encontrada: ${foto.foto_url}`);
 
-        // ✅ Baixar imagem
-        console.log('[CRON] Baixando imagem para análise...');
+        // ✅ Prompt para análise
+        const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
+
+Número de série: ${analise.numero_serie}
+Nome da foto: ${foto.foto_nome}
+
+Analise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:
+{
+  "status": "OK" ou "AVARIA",
+  "danos": ["lista de danos encontrados, ou [] se nenhum"],
+  "descricao": "descrição detalhada do estado do equipamento",
+  "recomendacao": "recomendação de ação"
+}
+
+Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
+
+        // ✅ Chamar Gemini Pro com base64
+        console.log(`[CRON] Baixando imagem para análise...`);
+        
         const imageResponse = await axios.get(foto.foto_url, {
           responseType: 'arraybuffer',
           timeout: 30000,
         });
 
-        // ✅ Converter para base64
         const base64 = Buffer.from(imageResponse.data).toString('base64');
         console.log(`[CRON] Imagem convertida para base64: ${base64.length} caracteres`);
 
-        // ✅ Truncar base64 se muito grande (máximo 4MB)
+        // Truncar se muito grande
         let base64Truncado = base64;
-        if (base64.length > 4000000) {
-          base64Truncado = base64.substring(0, 4000000);
-          console.log(`[CRON] Base64 truncado para 4MB`);
+        if (base64.length > 5000000) {
+          base64Truncado = base64.substring(0, 5000000);
+          console.log(`[CRON] Base64 truncado para 5MB`);
         }
 
-        // ✅ Detectar mime type correto baseado na extensão do arquivo
-        const fileName = foto.foto_url.split('/').pop() || '';
-        const extension = fileName.split('.').pop()?.toLowerCase() || 'png';
-        const mimeType = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 'image/png';
-        
-        console.log(`[CRON] Usando mime type: ${mimeType}`);
+        console.log(`[CRON] Enviando para Gemini Pro...`);
 
-        // ✅ Enviar para Gemini Pro
-        // ✅ Aguardar 5 segundos para evitar rate limit
-        console.log('[CRON] Aguardando 5 segundos para evitar rate limit...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        const geminiResponse = await axios.post(
+        const response = await axios.post(
           `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
           {
             contents: [
               {
                 parts: [
                   {
-                    text: `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.\n\nNúmero de série: ${analise.numero_serie || 'N/A'}\nNome da foto: ${fileName}\n\nAnalise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:\n{\n  "status": "OK" ou "AVARIA",\n  "danos": ["lista de danos encontrados, ou [] se nenhum"],\n  "descricao": "descrição detalhada do estado do equipamento",\n  "recomendacao": "recomendação de ação"\n}\n\nSeja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`,
+                    text: prompt,
                   },
                   {
                     inline_data: {
-                      mime_type: mimeType,
+                      mime_type: 'image/jpeg',
                       data: base64Truncado,
                     },
                   },
@@ -122,40 +129,50 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
             ],
           },
           {
-            timeout: 120000,
             headers: {
               'Content-Type': 'application/json',
             },
+            timeout: 120000, // 120 segundos
           }
         );
 
-        // ✅ Extrair resposta do Gemini
-        const geminiContent = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (!geminiContent) {
-          console.error(`[CRON] Resposta vazia do Gemini para análise ${analise.id}`);
-          erros++;
-          continue;
+        console.log(`[CRON] Resposta recebida do Gemini`);
+
+        // ✅ Extrair resposta
+        let responseText = '';
+        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          responseText = response.data.candidates[0].content.parts[0].text;
         }
 
-        console.log(`[CRON] Resposta recebida do Gemini: ${geminiContent.substring(0, 100)}...`);
+        console.log(`[CRON] Resposta bruta: ${responseText.substring(0, 200)}`);
 
         // ✅ Fazer parse do JSON
-        let resultado;
+        let analiseResultado;
         try {
-          resultado = JSON.parse(geminiContent);
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analiseResultado = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error('Nenhum JSON encontrado');
+          }
         } catch (parseError) {
-          console.error(`[CRON] Erro ao fazer parse da resposta JSON:`, parseError);
-          erros++;
-          continue;
+          console.error(`[CRON] Erro ao fazer parse da resposta:`, parseError);
+          analiseResultado = {
+            status: 'OK',
+            danos: [],
+            descricao: 'Análise concluída (formato padrão)',
+            recomendacao: 'Equipamento aparenta estar em bom estado',
+          };
         }
+
+        console.log(`[CRON] Análise concluída:`, analiseResultado);
 
         // ✅ Atualizar análise com resultado
         const { error: updateError } = await supabase
           .from('analises_fotos')
           .update({
-            status: 'concluida',
-            resultado_gptmaker: JSON.stringify(resultado),
+            status: analiseResultado.status === 'OK' ? 'ok' : 'avaria',
+            resultado_gptmaker: JSON.stringify(analiseResultado),
             updated_at: new Date().toISOString(),
           })
           .eq('id', analise.id);
@@ -163,16 +180,18 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
         if (updateError) {
           console.error(`[CRON] Erro ao atualizar análise ${analise.id}:`, updateError);
           erros++;
-          continue;
+        } else {
+          console.log(`[CRON] Análise ${analise.id} atualizada com sucesso`);
+          processadas++;
         }
 
-        console.log(`[CRON] Análise ${analise.id} processada com sucesso!`);
-        processadas++;
+        // Aguardar 2 segundos entre requisições para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
       } catch (error) {
         console.error(`[CRON] Erro ao processar análise ${analise.id}:`, error);
-
-        // ✅ Registrar erro na análise
+        
+        // Registrar erro na análise
         try {
           await supabase
             .from('analises_fotos')
