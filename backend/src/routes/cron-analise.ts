@@ -162,7 +162,7 @@ OUTROS:
 INSTRUÇÕES:
 1. Se o equipamento está OK (sem danos visíveis), retorne status="OK" e deixe categoria e tipo_dano vazios
 2. Se houver dano, identifique a CATEGORIA e o TIPO_DANO específico
-3. A descrição deve ser RESUMIDA em 1-2 linhas máximo
+3. A descrição deve ser RESUMIDA em 1 linhas máximo
 4. Seja ASSERTIVO e ESPECÍFICO
 
 Responda em JSON com EXATAMENTE esta estrutura:
@@ -170,8 +170,7 @@ Responda em JSON com EXATAMENTE esta estrutura:
   "status": "OK" ou "AVARIA",
   "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "TOUCHPAD" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
   "tipo_dano": "tipo específico encontrado" (ex: "Trincas", "Quebras", "Amassados") (vazio se OK),
-  "descricao": "descrição resumida em 1-2 linhas",
-  "recomendacao": "ação recomendada"
+  "descricao": "descrição resumida em 1 linhas",  
 }
 
 Responda APENAS com o JSON, sem explicações adicionais.`,
