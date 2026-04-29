@@ -960,8 +960,9 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tipo</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Respostas</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Análise IA</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observações</th>
+                    
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
