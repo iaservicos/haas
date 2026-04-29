@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-export function Dashboard() {
+export function Dashboard( ) {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
   const [vistorias, setVistorias] = useState<Vistoria[]>([]);
@@ -296,7 +296,6 @@ export function Dashboard() {
       const updateData: any = {
         status: novoStatus,
         analyst_notes: notas,
-        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
@@ -443,12 +442,30 @@ export function Dashboard() {
       vistoriasExportacao.flatMap((v: any) => Object.keys(v.respostas || {}))
     )).sort();
 
-    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', ...itensUnicos, 'Observações'];
+    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Análise IA', ...itensUnicos, 'Observações'];
     
     const rows = vistoriasExportacao.map((v: any) => {
       const respostas = v.respostas || {};
       const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Não');
       const statusGeral = temAvaria ? 'NOK' : 'OK';
+      
+      // Extrair análise IA
+      let analiseIA = '—';
+      try {
+        const resultado = JSON.parse(v.resultado_gptmaker || '{}');
+        const status = resultado.status || 'pendente';
+        if (status === 'OK') {
+          analiseIA = 'OK - Sem problemas';
+        } else if (status === 'AVARIA') {
+          analiseIA = 'AVARIA - Danos detectados';
+        } else if (status === 'pendente') {
+          analiseIA = 'PENDENTE';
+        } else if (status === 'ERRO') {
+          analiseIA = 'ERRO - Análise falhou';
+        }
+      } catch (e) {
+        analiseIA = '—';
+      }
       
       const respostasIndividuais = itensUnicos.map((item) => {
         const resposta = respostas[item];
@@ -465,6 +482,7 @@ export function Dashboard() {
         v.equipment_type || '—',
         v.contrato_equipamentos?.contratos?.numero_contrato || '—',
         statusGeral,
+        analiseIA,
         ...respostasIndividuais,
         v.observacoes || '—',
       ];
@@ -479,13 +497,14 @@ export function Dashboard() {
         'Tipo': row[4],
         'Contrato': row[5],
         'Status': row[6],
+        'Analise IA': row[7],
       };
       
       itensUnicos.forEach((item, idx) => {
-        obj[item] = row[7 + idx];
+        obj[item] = row[8 + idx];
       });
       
-      obj['Observacoes'] = row[7 + itensUnicos.length];
+      obj['Observacoes'] = row[8 + itensUnicos.length];
       return obj;
     });
 
@@ -493,7 +512,7 @@ export function Dashboard() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vistorias');
     
-    const colWidths = [15, 20, 15, 25, 15, 20, 12, ...itensUnicos.map(() => 15), 30];
+    const colWidths = [15, 20, 15, 25, 15, 20, 12, 25, ...itensUnicos.map(() => 15), 30];
     ws['!cols'] = colWidths.map(w => ({ wch: w }));
     
     XLSX.writeFile(wb, `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -667,7 +686,7 @@ export function Dashboard() {
           <div className="px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <img
-                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
+                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1 )%20(1).png"
                 alt="Logo Positivo"
                 className="h-10 w-auto"
               />
@@ -844,95 +863,6 @@ export function Dashboard() {
                     </div>
                   </div>
                 </div>
-                
-                {/* TABELA MATRIZ - ITENS x SÉRIES */}
-                {filtroClientePortal && filtroTipoPortal && vistoriasPortalFiltradas.length > 0 && (() => {
-                  const itensUnicos = Array.from(new Set(
-                    vistoriasPortalFiltradas.flatMap((v: any) => 
-                      Object.keys(v.respostas || {})
-                    )
-                  )).sort();
-
-                  if (itensUnicos.length === 0) return null;
-
-                  const obterStatusResposta = (resposta: any) => {
-                    if (resposta === true || resposta === 'Sim' || resposta === 'OK') return 'OK';
-                    if (resposta === false || resposta === 'Não' || resposta === 'Faltando') return 'Faltando';
-                    return 'Sem resposta';
-                  };
-
-                  const obterCorStatusResposta = (status: string) => {
-                    if (status === 'OK') return 'bg-green-100 text-green-800 font-semibold';
-                    if (status === 'Faltando') return 'bg-red-100 text-red-800 font-semibold';
-                    return 'bg-gray-100 text-gray-800';
-                  };
-
-                  return (
-                    <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
-                      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                        <h3 className="text-lg font-bold text-gray-900">Análise por Série - Itens vs Respostas</h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse">
-                          <thead>
-                            <tr className="bg-gray-100 border-b-2 border-gray-300">
-                              <th className="px-4 py-3 text-left font-semibold text-gray-900 border-r border-gray-300 sticky left-0 bg-gray-100 min-w-[180px]">
-                                Série / Item
-                              </th>
-                              <th className="px-4 py-3 text-center font-semibold text-gray-900 border-r border-gray-300 min-w-[80px] text-xs">
-                                STATUS
-                              </th>
-                              {itensUnicos.map((item) => (
-                                <th
-                                  key={item}
-                                  className="px-3 py-3 text-center font-semibold text-gray-900 border-r border-gray-300 min-w-[100px] text-xs"
-                                >
-                                  {item.replace(/_/g, ' ')}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {vistoriasPortalFiltradas.map((vistoria: any, idx: number) => {
-                              const temAvaria = Object.values(vistoria.respostas || {}).some((r: any) => r === false || r === 'Não' || r === 'Faltando');
-                              const statusGeral = temAvaria ? 'NOK' : 'OK';
-                              return (
-                              <tr key={vistoria.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="px-4 py-3 font-medium text-gray-900 border-r border-gray-300 sticky left-0 bg-inherit">
-                                  <div className="flex flex-col">
-                                    <span className="font-semibold text-sm">{vistoria.contrato_equipamentos?.numero_serie || '—'}</span>
-                                    <span className="text-xs text-gray-500">{formatarData(vistoria.data_inspecao)}</span>
-                                  </div>
-                                </td>
-                                <td className={`px-4 py-3 text-center font-semibold border-r border-gray-300 ${
-                                  temAvaria ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                }`}>
-                                  {statusGeral}
-                                </td>
-                                {itensUnicos.map((item) => {
-                                  const resposta = vistoria.respostas?.[item];
-                                  const status = obterStatusResposta(resposta);
-                                  const corClasses = obterCorStatusResposta(status);
-                                  const simbolo = status === 'OK' ? '✓' : status === 'Faltando' ? '✕' : '—';
-
-                                  return (
-                                    <td
-                                      key={`${vistoria.id}-${item}`}
-                                      className={`px-3 py-3 text-center border-r border-gray-300 ${corClasses}`}
-                                    >
-                                      {simbolo}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* TABELA DE VISTORIAS DO PORTAL */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -961,8 +891,8 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Análise IA</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Respostas</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observações</th>
-                    
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -985,6 +915,38 @@ export function Dashboard() {
                                   }`}>
                                     {temAvaria ? 'Com Avaria' : 'OK'}
                                   </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {(() => {
+                                    try {
+                                      const resultado = JSON.parse(vistoria.resultado_gptmaker || '{}');
+                                      const status = resultado.status || 'pendente';
+                                      let statusDisplay = status.toUpperCase();
+                                      let corClass = 'bg-gray-100 text-gray-800';
+                                      
+                                      if (status === 'OK') {
+                                        corClass = 'bg-green-100 text-green-800';
+                                        statusDisplay = 'OK - Sem problemas';
+                                      } else if (status === 'AVARIA') {
+                                        corClass = 'bg-red-100 text-red-800';
+                                        statusDisplay = 'AVARIA - Danos detectados';
+                                      } else if (status === 'pendente') {
+                                        corClass = 'bg-yellow-100 text-yellow-800';
+                                        statusDisplay = 'PENDENTE';
+                                      } else if (status === 'ERRO') {
+                                        corClass = 'bg-gray-100 text-gray-800';
+                                        statusDisplay = 'ERRO - Análise falhou';
+                                      }
+                                      
+                                      return (
+                                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${corClass} inline-block`}>
+                                          {statusDisplay}
+                                        </div>
+                                      );
+                                    } catch (e) {
+                                      return <span className="text-gray-500">—</span>;
+                                    }
+                                  })()}
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
                                   <button
@@ -1102,7 +1064,7 @@ export function Dashboard() {
                       >
                         <option value="">Todos os Estados</option>
                         <option value="Equipamento OK">Equipamento OK</option>
-                        <option value="Equip. com AVARIA">Com Avaria</option>
+                        <option value="Equip. com AVARIA">Equip. com AVARIA</option>
                       </select>
                     </div>
 
@@ -1113,9 +1075,9 @@ export function Dashboard() {
                         onChange={(e) => setFiltroMouse(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="">Todos os Mouses</option>
-                        <option value="Mouse, OK">Mouse OK</option>
-                        <option value="Mouse, AUSENTE">Mouse Ausente</option>
+                        <option value="">Todos os Status</option>
+                        <option value="Mouse, OK">Mouse, OK</option>
+                        <option value="Mouse, AUSENTE">Mouse, AUSENTE</option>
                       </select>
                     </div>
 
@@ -1126,9 +1088,9 @@ export function Dashboard() {
                         onChange={(e) => setFiltroTeclado(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="">Todos os Teclados</option>
-                        <option value="Teclado, OK">Teclado OK</option>
-                        <option value="Teclado, AUSENTE">Teclado Ausente</option>
+                        <option value="">Todos os Status</option>
+                        <option value="Teclado, OK">Teclado, OK</option>
+                        <option value="Teclado, AUSENTE">Teclado, AUSENTE</option>
                       </select>
                     </div>
                   </div>
@@ -1137,16 +1099,16 @@ export function Dashboard() {
                 {/* TABELA DE VISTORIAS */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                   <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900">Vistorias Recentes ({stats.total})</h3>
+                    <h3 className="text-lg font-bold text-gray-900">Vistorias ({vistorias.length})</h3>
                   </div>
 
                   {loading ? (
                     <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Carregando dados...</p>
+                      <p className="text-gray-600 font-semibold">Carregando vistorias...</p>
                     </div>
-                  ) : stats.total === 0 ? (
+                  ) : vistorias.length === 0 ? (
                     <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Nenhuma vistoria encontrada com esses filtros</p>
+                      <p className="text-gray-600 font-semibold">Nenhuma vistoria encontrada</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1155,7 +1117,6 @@ export function Dashboard() {
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Análise da Foto</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
@@ -1167,53 +1128,26 @@ export function Dashboard() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {vistorias
-                            .filter((v: any) => {
-                              if (filtroTecnico && !v.tecnico?.toLowerCase().includes(filtroTecnico.toLowerCase())) return false;
-                              if (filtroCliente && !v.cliente?.toLowerCase().includes(filtroCliente.toLowerCase())) return false;
-                              if (filtroEquipamento && !v.equipamento?.toLowerCase().includes(filtroEquipamento.toLowerCase())) return false;
-                              if (filtroEstado && v.estado !== filtroEstado) return false;
-                              if (filtroMouse && v.mouse_status !== filtroMouse) return false;
-                              if (filtroTeclado && v.teclado_status !== filtroTeclado) return false;
-                              return true;
-                            })
-                            .map((vistoria: any) => (
-                              <tr key={vistoria.id} className="hover:bg-gray-50 transition">
-                                <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
-                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
-                                <td className="px-6 py-4 text-sm">
-                                  {vistoria.status_analise === 'concluido' ? (
-                                    <p className="text-sm text-gray-900 max-w-xs">{vistoria.analise_gptmaker || '—'}</p>
-                                  ) : vistoria.status_analise === 'analisando' ? (
-                                    <span className="text-xs text-yellow-600 font-semibold">Analisando...</span>
-                                  ) : vistoria.status_analise === 'erro' ? (
-                                    <span className="text-xs text-red-600 font-semibold">Erro na análise</span>
-                                  ) : (
-                                    <span className="text-xs text-gray-400">—</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
-                                <td className={`px-6 py-4 text-sm ${getCorEstado(vistoria.estado)}`}>
-                                  <span className={`${getCorEstado(vistoria.estado)}`}>
-                                    {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.laudo || '—'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{vistoria.avaria || '—'}</td>
-                                <td className="px-6 py-4 text-sm">
-                                  <span className={`${getCorComponente(vistoria.teclado_status)}`}>
-                                    {vistoria.teclado_status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm">
-                                  <span className={`${getCorComponente(vistoria.mouse_status)}`}>
-                                    {vistoria.mouse_status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                          {vistorias.map((vistoria: any) => (
+                            <tr key={vistoria.id} className="hover:bg-gray-50 transition">
+                              <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
+                              <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
+                              <td className={`px-6 py-4 text-sm font-semibold ${getCorEstado(vistoria.estado)}`}>
+                                {vistoria.estado === 'Equip. com AVARIA' ? 'Avaria' : 'OK'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.laudo || '—'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{vistoria.avaria || '—'}</td>
+                              <td className={`px-6 py-4 text-sm font-semibold ${getCorComponente(vistoria.teclado_status)}`}>
+                                {vistoria.teclado_status || '—'}
+                              </td>
+                              <td className={`px-6 py-4 text-sm font-semibold ${getCorComponente(vistoria.mouse_status)}`}>
+                                {vistoria.mouse_status || '—'}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -1222,58 +1156,33 @@ export function Dashboard() {
               </>
             ) : (
               <>
-                {/* ABA: EQUIPAMENTOS PENDENTES */}
+                {/* EQUIPAMENTOS PENDENTES */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-blue-100 rounded-lg shadow p-6">
+                  <div className="bg-yellow-100 rounded-lg shadow p-6">
                     <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Pendentes</p>
-                    <p className="text-5xl font-bold text-blue-900 mt-3">{statsPendentes.pendentes}</p>
+                    <p className="text-5xl font-bold text-yellow-900 mt-3">{statsPendentes.pendentes}</p>
                   </div>
 
-                  <div className="bg-gray-200 rounded-lg shadow p-6">
+                  <div className="bg-green-100 rounded-lg shadow p-6">
                     <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Aprovados</p>
-                    <p className="text-5xl font-bold text-gray-800 mt-3">{statsPendentes.aprovados}</p>
+                    <p className="text-5xl font-bold text-green-900 mt-3">{statsPendentes.aprovados}</p>
                   </div>
 
-                  <div className="bg-gray-150 rounded-lg shadow p-6">
+                  <div className="bg-red-100 rounded-lg shadow p-6">
                     <p className="text-gray-600 text-sm font-semibold uppercase tracking-wide">Rejeitados</p>
-                    <p className="text-5xl font-bold text-gray-700 mt-3">{statsPendentes.rejeitados}</p>
-                  </div>
-                </div>
-
-                {/* FILTRO PENDENTES */}
-                <div className="bg-white rounded-lg shadow p-6 mb-8">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Filtrar por Status
-                  </label>
-                  <div className="flex gap-2">
-                    {['Todos', 'Pendente', 'Aprovado', 'Rejeitado'].map(status => (
-                      <button
-                        key={status}
-                        onClick={() => {
-                          setFiltroStatusPendente(status);
-                          loadEquipamentosPendentes();
-                        }}
-                        className={`px-4 py-2 rounded font-semibold transition ${
-                          filtroStatusPendente === status
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
+                    <p className="text-5xl font-bold text-red-900 mt-3">{statsPendentes.rejeitados}</p>
                   </div>
                 </div>
 
                 {/* TABELA EQUIPAMENTOS PENDENTES */}
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                   <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-900">Equipamentos para Análise ({equipamentosPendentes.length})</h3>
+                    <h3 className="text-lg font-bold text-gray-900">Equipamentos Pendentes ({equipamentosPendentes.length})</h3>
                   </div>
 
                   {equipamentosPendentes.length === 0 ? (
                     <div className="px-6 py-12 text-center">
-                      <p className="text-gray-600 font-semibold">Nenhum equipamento encontrado</p>
+                      <p className="text-gray-600 font-semibold">Nenhum equipamento pendente</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1283,51 +1192,41 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Usuário</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Ação</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {equipamentosPendentes.map(equipamento => (
-                            <tr key={equipamento.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{equipamento.numero_serie}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.usuario_email || 'N/A'}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.cliente_nome || 'N/A'}</td>
-                              <td className="px-6 py-4 text-sm text-gray-600">{equipamento.numero_contrato || 'N/A'}</td>
+                          {equipamentosPendentes.map((equipamento: any) => (
+                            <tr key={equipamento.id} className="hover:bg-gray-50 transition">
+                              <td className="px-6 py-4 text-sm font-mono font-bold text-black">{equipamento.numero_serie}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{equipamento.usuario_email || '—'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{equipamento.cliente_nome || '—'}</td>
                               <td className="px-6 py-4 text-sm">
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                  equipamento.status === 'Pendente'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : equipamento.status === 'Aprovado'
-                                    ? 'bg-gray-200 text-gray-800'
-                                    : 'bg-gray-200 text-gray-800'
+                                  equipamento.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' :
+                                  equipamento.status === 'Aprovado' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
                                 }`}>
                                   {equipamento.status}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">
-                                {new Date(equipamento.created_at).toLocaleDateString('pt-BR')}
-                              </td>
                               <td className="px-6 py-4 text-sm">
-                                {equipamento.status === 'Pendente' ? (
+                                {equipamento.status === 'Pendente' && (
                                   <div className="flex gap-2">
                                     <button
                                       onClick={() => abrirModalAprovacao(equipamento)}
-                                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition"
+                                      className="text-green-600 hover:text-green-800 font-semibold"
                                     >
                                       Aprovar
                                     </button>
                                     <button
                                       onClick={() => abrirModalRejeicao(equipamento)}
-                                      className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-semibold transition"
+                                      className="text-red-600 hover:text-red-800 font-semibold"
                                     >
                                       Rejeitar
                                     </button>
                                   </div>
-                                ) : (
-                                  <span className="text-gray-500 text-xs">Processado</span>
                                 )}
                               </td>
                             </tr>
@@ -1341,247 +1240,151 @@ export function Dashboard() {
             )}
           </div>
         </div>
-
-        {/* FOOTER */}
-        <div className="bg-gray-900 text-gray-400 text-xs py-4 px-8 border-t border-gray-800">
-          <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
-        </div>
       </div>
 
-      {/* MODAL DE RESPOSTAS ESTRUTURADO */}
+      {/* MODAL DE RESPOSTAS */}
       {showRespostasModal && respostasModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            {/* HEADER */}
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex justify-between items-center">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-96 overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Detalhes da Vistoria</h3>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <h2 className="text-2xl font-bold">Detalhes da Inspeção</h2>
-                <p className="text-blue-100 text-sm mt-1">{formatarData(respostasModal.data_inspecao)}</p>
+                <p className="text-sm text-gray-600"><strong>Data:</strong></p>
+                <p className="text-gray-900">{formatarData(respostasModal.data_inspecao)}</p>
               </div>
-              <button
-                onClick={() => setShowRespostasModal(false)}
-                className="text-white hover:bg-blue-700 rounded-full p-2 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* INFORMAÇÕES DO EQUIPAMENTO */}
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Informações do Equipamento</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white p-3 rounded border border-gray-200">
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Cliente</p>
-                  <p className="text-lg font-bold text-gray-900">{respostasModal.contrato_equipamentos?.contratos?.nome_cliente || '—'}</p>
-                </div>
-                <div className="bg-white p-3 rounded border border-gray-200">
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Contrato</p>
-                  <p className="text-lg font-bold text-gray-900">{respostasModal.contrato_equipamentos?.contratos?.numero_contrato || '—'}</p>
-                </div>
-                <div className="bg-white p-3 rounded border border-gray-200">
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Número de Série</p>
-                  <p className="text-lg font-mono font-bold text-black">{respostasModal.contrato_equipamentos?.numero_serie || '—'}</p>
-                </div>
-                <div className="bg-white p-3 rounded border border-gray-200">
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Modelo</p>
-                  <p className="text-lg font-bold text-gray-900">{respostasModal.contrato_equipamentos?.modelo || '—'}</p>
-                </div>
-                <div className="bg-white p-3 rounded border border-gray-200">
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Tipo</p>
-                  <p className="text-lg font-bold text-gray-900">{respostasModal.equipment_type || '—'}</p>
-                </div>
-                <div className="bg-white p-3 rounded border border-gray-200">
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Status Geral</p>
-                  <p className={`text-lg font-bold ${
-                    Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Não')
-                      ? 'text-red-600'
-                      : 'text-green-600'
-                  }`}>
-                    {Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Não') ? 'Com Avaria' : 'OK'}
-                  </p>
-                </div>
+              <div>
+                <p className="text-sm text-gray-600"><strong>Cliente:</strong></p>
+                <p className="text-gray-900">{respostasModal.contrato_equipamentos?.contratos?.nome_cliente || '—'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600"><strong>Série:</strong></p>
+                <p className="text-gray-900 font-mono">{respostasModal.contrato_equipamentos?.numero_serie || '—'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600"><strong>Modelo:</strong></p>
+                <p className="text-gray-900">{respostasModal.contrato_equipamentos?.modelo || '—'}</p>
               </div>
             </div>
 
-            {/* RESPOSTAS ESTRUTURADAS */}
-            <div className="px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Respostas da Inspeção</h3>
-              <div className="space-y-3">
-                {Object.entries(respostasModal.respostas || {}).map(([pergunta, resposta]: [string, any]) => {
-                  const isOk = resposta === true || resposta === 'Sim';
-                  const isFaltando = resposta === false || resposta === 'Não';
-                  
-                  return (
-                    <div key={pergunta} className={`p-4 rounded-lg border-2 ${
-                      isOk 
-                        ? 'bg-green-50 border-green-200' 
-                        : isFaltando
-                        ? 'bg-red-50 border-red-200'
-                        : 'bg-gray-50 border-gray-200'
-                    }`}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-700 capitalize">{pergunta.replace(/_/g, ' ')}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isOk && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-                              ✓ OK
-                            </span>
-                          )}
-                          {isFaltando && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
-                              ✕ Faltando
-                            </span>
-                          )}
-                          {!isOk && !isFaltando && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
-                              ℹ {resposta}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 font-semibold mb-2"><strong>Respostas:</strong></p>
+              <div className="bg-gray-50 p-4 rounded max-h-48 overflow-y-auto">
+                {Object.entries(respostasModal.respostas || {}).map(([key, value]: [string, any]) => (
+                  <div key={key} className="mb-2 pb-2 border-b border-gray-200 last:border-b-0">
+                    <p className="text-sm text-gray-700"><strong>{key}:</strong> {String(value)}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* OBSERVAÇÕES */}
             {respostasModal.observacoes && (
-              <div className="px-6 py-4 bg-blue-50 border-t border-blue-200">
-                <h3 className="text-sm font-bold text-blue-900 mb-2">Observações</h3>
-                <p className="text-sm text-blue-800">{respostasModal.observacoes}</p>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600"><strong>Observações:</strong></p>
+                <p className="text-gray-900">{respostasModal.observacoes}</p>
               </div>
             )}
 
-            {/* FOOTER DO MODAL */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={() => setShowRespostasModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-semibold"
-              >
-                Fechar
-              </button>
-            </div>
+            <button
+              onClick={() => setShowRespostasModal(false)}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              Fechar
+            </button>
           </div>
         </div>
       )}
 
-      {/* MODAL DE DECISÃO */}
+      {/* MODAL DE APROVAÇÃO */}
       {equipamentoSelecionado && modoAprovacao === 'aprovar' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-96 overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">Aprovar Equipamento</h3>
 
-            {/* INFO DO EQUIPAMENTO */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Série</p>
-                  <p className="text-lg font-bold text-gray-900">{equipamentoSelecionado.numero_serie}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Usuário</p>
-                  <p className="text-sm text-gray-900">{equipamentoSelecionado.usuario_email || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Cliente</p>
-                  <p className="text-sm text-gray-900">{equipamentoSelecionado.cliente_nome || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Data</p>
-                  <p className="text-sm text-gray-900">{new Date(equipamentoSelecionado.created_at).toLocaleDateString('pt-BR')}</p>
-                </div>
-              </div>
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <p className="text-sm text-gray-600">
+                <strong>Série:</strong> {equipamentoSelecionado.numero_serie}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Usuário:</strong> {equipamentoSelecionado.usuario_email || 'N/A'}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Cliente:</strong> {equipamentoSelecionado.cliente_nome || 'N/A'}
+              </p>
             </div>
 
-            {/* CAMPOS DE APROVAÇÃO */}
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Contrato *
-                </label>
-                <select
-                  value={contratoSelecionado}
-                  onChange={(e) => setContratoSelecionado(e.target.value)}
-                  disabled={atualizando}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">Selecione um contrato</option>
-                  {contratos.map(contrato => (
-                    <option key={contrato.id} value={contrato.id}>
-                      {contrato.numero_contrato} - {(contrato as any).nome_cliente || 'Sem cliente'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Modelo *
+              </label>
+              <input
+                type="text"
+                value={modelo}
+                onChange={(e) => setModelo(e.target.value)}
+                disabled={atualizando}
+                placeholder="Ex: Dell Optiplex 7090"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Modelo *
-                </label>
-                <input
-                  type="text"
-                  value={modelo}
-                  onChange={(e) => setModelo(e.target.value)}
-                  disabled={atualizando}
-                  placeholder="Ex: POSITIVO MASTER D610 SS81T0ANEB150VCN-1"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                SKU *
+              </label>
+              <input
+                type="text"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                disabled={atualizando}
+                placeholder="Ex: SKU-001"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  SKU *
-                </label>
-                <input
-                  type="text"
-                  value={sku}
-                  onChange={(e) => setSku(e.target.value)}
-                  disabled={atualizando}
-                  placeholder="Ex: 1304788"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Tipo de Material *
+              </label>
+              <input
+                type="text"
+                value={tipoMaterial}
+                onChange={(e) => setTipoMaterial(e.target.value)}
+                disabled={atualizando}
+                placeholder="Ex: Desktop"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tipo de Equipamento *
-                </label>
-                <select
-                  value={tipoMaterial}
-                  onChange={(e) => setTipoMaterial(e.target.value)}
-                  disabled={atualizando}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">Selecione um tipo</option>
-                  <option value="Desktop">Desktop</option>
-                  <option value="Monitor">Monitor</option>
-                  <option value="Notebook">Notebook</option>
-                  <option value="MiniPro">MiniPro</option>
-                  <option value="All in One">All in One</option>
-                  <option value="Duo">Duo</option>
-                  <option value="Tablet">Tablet</option>
-                  <option value="Chromebook">Chromebook</option>
-                  <option value="Máquina de pagamento">Máquina de pagamento</option>
-                  <option value="Diversos">Diversos</option>
-                  <option value="Celular">Celular</option>
-                </select>
-              </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Contrato *
+              </label>
+              <select
+                value={contratoSelecionado}
+                onChange={(e) => setContratoSelecionado(e.target.value)}
+                disabled={atualizando}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">Selecione um contrato</option>
+                {contratos.map((contrato) => (
+                  <option key={contrato.id} value={contrato.id}>
+                    {contrato.numero_contrato} - {contrato.nome_cliente}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Notas da Análise
-                </label>
-                <textarea
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  disabled={atualizando}
-                  placeholder="Digite suas notas aqui..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-20"
-                />
-              </div>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Notas
+              </label>
+              <textarea
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                disabled={atualizando}
+                placeholder="Adicione notas adicionais..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-20"
+              />
             </div>
 
             <div className="flex gap-3">
