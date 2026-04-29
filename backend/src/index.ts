@@ -27,6 +27,8 @@ app.use('/api/clientes', clientesRoutes);
 app.use('/api/confirmacoes', confirmacoeRoutes);
 app.use('/api/inspecao', inspecaoRoutes);
 app.use('/api/cron', cronAnaliseRouter);
+app.use('/api/usuario', usuarioRoutes);
+
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
