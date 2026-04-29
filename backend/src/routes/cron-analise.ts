@@ -18,7 +18,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
  */
-router.post('/analise-fotos', async (req: any, res: any ) => {
+router.post('/analise-fotos', async (req: any, res: any  ) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
@@ -143,9 +143,17 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
         // ✅ Fazer parse do JSON
         let resultado;
         try {
-          resultado = JSON.parse(geminiContent);
+          // ✅ Remover blocos de código markdown se existirem
+          let jsonContent = geminiContent;
+          if (geminiContent.includes('```')) {
+            console.log('[CRON] Removendo blocos de código markdown da resposta...');
+            jsonContent = geminiContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+          }
+          
+          resultado = JSON.parse(jsonContent);
         } catch (parseError) {
           console.error(`[CRON] Erro ao fazer parse da resposta JSON:`, parseError);
+          console.error(`[CRON] Conteúdo bruto:`, geminiContent);
           erros++;
           continue;
         }
