@@ -145,11 +145,14 @@ export function Dashboard() {
       setLoadingPortal(true);
       console.log('[Dashboard] Carregando vistorias do portal...');
       
-      const response = await fetch(`${API_BASE_URL}/inspecao/portal/listar`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/inspecao/portal/listar`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+     },
+  });
+
 
       if (!response.ok) {
         throw new Error(`Erro ao carregar vistorias do portal: ${response.status}`);
