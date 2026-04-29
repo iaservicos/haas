@@ -216,7 +216,7 @@ Analise o estado do equipamento na imagem e responda em JSON com a seguinte estr
 
 Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Chamar Gemini Pro com URL da imagem (SEM base64)
+    // ✅ Chamar Gemini Pro com URL da imagem (usando file_data)
     console.log('[Gemini] Enviando para API do Gemini (usando URL)...');
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
@@ -228,9 +228,9 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
                 text: prompt,
               },
               {
-                inline_data: {
+                file_data: {
                   mime_type: 'image/jpeg',
-                  data: fotoUrl, // ✅ MUDANÇA: Enviar URL em vez de base64
+                  file_uri: fotoUrl, // ✅ CORRETO: Usar file_uri para URLs
                 },
               },
             ],
