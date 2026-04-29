@@ -361,60 +361,6 @@ router.get('/analises/:numeroSerie', async (req: any, res: any) => {
 });
 
 /**
- * ✅ GET /api/inspecao/portal/listar
- * Retorna todas as vistorias do portal com suas análises
- */
-router.get('/portal/listar', async (req: any, res: any) => {
-  try {
-    console.log('[inspecao.ts] Carregando vistorias do portal...');
-
-    // Buscar todas as análises de fotos com seus dados relacionados
-    const { data, error } = await supabase
-      .from('analises_fotos')
-      .select(`
-        *,
-        fotos_vistoria (
-          id,
-          foto_url,
-          foto_nome
-        ),
-        contrato_equipamentos (
-          id,
-          numero_serie,
-          tipo_material,
-          contratos (
-            id,
-            numero_contrato,
-            nome_cliente
-          )
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[inspecao.ts] Erro ao buscar vistorias do portal:', error);
-      return res.status(500).json({
-        error: 'Erro ao buscar vistorias do portal',
-        details: error.message
-      });
-    }
-
-    console.log('[inspecao.ts] Vistorias do portal carregadas:', data?.length || 0);
-
-    res.json({
-      success: true,
-      data: data || [],
-    });
-  } catch (error) {
-    console.error('[inspecao.ts] Erro ao buscar vistorias do portal:', error);
-    res.status(500).json({
-      error: 'Erro ao buscar vistorias do portal',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
-  }
-});
-
-/**
  * GET /api/inspecao/:vistoriaId
  * Retorna as respostas de uma inspeção específica
  */
