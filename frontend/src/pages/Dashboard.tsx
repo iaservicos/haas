@@ -989,32 +989,28 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm text-gray-900">
                                   {(() => {
                                     try {
-                                      const resultado = JSON.parse(vistoria.resultado_gptmaker || '{}');
-                                      const descricao = resultado.descricao || '';
-                                      const status = resultado.status || 'pendente';
+                                      const analise = vistoria.analise_ia;
+                                      
+                                      if (!analise) {
+                                        return <span className="text-gray-500">—</span>;
+                                      }
+                                      
+                                      const status = analise.status || 'pendente';
+                                      const descricao = analise.descricao || '';
                                       
                                       let statusDisplay = '';
-                                      let corClass = 'bg-gray-100 text-gray-800';
                                       
                                       if (status === 'OK') {
-                                        corClass = 'bg-green-100 text-green-800';
-                                        statusDisplay = descricao || 'OK - Sem problemas';
+                                        statusDisplay = 'OK - Sem problemas';
                                       } else if (status === 'AVARIA') {
-                                        corClass = 'bg-red-100 text-red-800';
-                                        statusDisplay = descricao || 'AVARIA - Danos detectados';
+                                        statusDisplay = descricao.substring(0, 80) + (descricao.length > 80 ? '...' : '');
                                       } else if (status === 'pendente') {
-                                        corClass = 'bg-yellow-100 text-yellow-800';
                                         statusDisplay = 'PENDENTE';
                                       } else if (status === 'ERRO') {
-                                        corClass = 'bg-gray-100 text-gray-800';
                                         statusDisplay = 'ERRO - Análise falhou';
                                       }
                                       
-                                      return (
-                                        <div className={`px-3 py-1 rounded text-xs font-semibold ${corClass}`}>
-                                          {statusDisplay || '—'}
-                                        </div>
-                                      );
+                                      return <span className="text-gray-900">{statusDisplay || '—'}</span>;
                                     } catch (e) {
                                       return <span className="text-gray-500">—</span>;
                                     }
