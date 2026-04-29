@@ -1,8 +1,14 @@
 import express from 'express';
 import axios from 'axios';
-import { supabase } from '../config/database';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_ANON_KEY || ''
+);
 
 const router = express.Router();
+
 
 // ✅ Configuração do Gemini Pro
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
