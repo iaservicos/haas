@@ -135,18 +135,26 @@ router.post('/', async (req: Request, res: Response) => {
 
 /**
  * GET /api/inspecao/portal/listar
- * Retorna todas as análises de fotos do portal
+ * Retorna todas as inspeções (respostas) do portal com dados relacionados
  */
 router.get('/portal/listar', async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
-      .from('analises_fotos')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from('inspecao_respostas')
+      .select(`
+        *,
+        contrato_equipamentos (
+          id,
+          numero_serie,
+          tipo_material,
+          modelo
+        )
+      `)
+      .order('data_inspecao', { ascending: false });
 
     if (error) {
-      console.error('[inspecao] Erro ao buscar análises:', error);
-      return res.status(500).json({ error: 'Erro ao buscar análises' });
+      console.error('[inspecao] Erro ao buscar inspeções do portal:', error);
+      return res.status(500).json({ error: 'Erro ao buscar inspeções' });
     }
 
     res.json({
@@ -155,7 +163,7 @@ router.get('/portal/listar', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('[inspecao] Erro:', error);
-    res.status(500).json({ error: 'Erro ao buscar análises' });
+    res.status(500).json({ error: 'Erro ao buscar inspeções' });
   }
 });
 
