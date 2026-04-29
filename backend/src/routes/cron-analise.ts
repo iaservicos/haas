@@ -11,7 +11,7 @@ const router = express.Router();
 
 // ✅ Configuração do Gemini Pro
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 /**
  * ✅ POST /api/cron/analise-fotos
@@ -32,7 +32,7 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
       .from('analises_fotos')
       .select('*')
       .eq('status', 'pendente')
-      .limit(5); // Processar no máximo 5 por vez para evitar timeout
+      .limit(1); // Processar 1 por vez para evitar rate limit
 
     if (fetchError) {
       console.error('[CRON] Erro ao buscar análises pendentes:', fetchError);
