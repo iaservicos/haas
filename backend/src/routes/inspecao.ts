@@ -166,13 +166,24 @@ router.post('/salvar', async (req, res) => {
 async function imagemParaBase64(fotoUrl: string): Promise<string> {
   try {
     console.log('[Gemini] Baixando imagem para base64...');
+    console.log('[Gemini] URL da imagem:', fotoUrl);
+    
     const response = await axios.get(fotoUrl, {
       responseType: 'arraybuffer',
-      timeout: 30000,
+      timeout: 15000, // 15 segundos
+      maxContentLength: 10 * 1024 * 1024, // 10MB
     });
+    
+    console.log('[Gemini] Imagem baixada:', response.data.length, 'bytes');
     
     const base64 = Buffer.from(response.data).toString('base64');
     console.log('[Gemini] Imagem convertida para base64:', base64.length, 'caracteres');
+    
+    // Limitar tamanho do base64 a 5MB
+    if (base64.length > 5 * 1024 * 1024) {
+      console.warn('[Gemini] Base64 muito grande, truncando...');
+      return base64.substring(0, 5 * 1024 * 1024);
+    }
     
     return base64;
   } catch (error) {
@@ -220,6 +231,8 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
 
     // ✅ Chamar Gemini Pro com inline_data (base64)
     console.log('[Gemini] Enviando para API do Gemini...');
+    console.log('[Gemini] Tamanho do payload:', base64.length + prompt.length, 'caracteres');
+    
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
@@ -243,9 +256,13 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 120000, // 2 minutos
+        timeout: 60000, // 60 segundos
+        maxContentLength: 10 * 1024 * 1024,
+        maxBodyLength: 10 * 1024 * 1024,
       }
     );
+    
+    console.log('[Gemini] Resposta recebida do Gemini');
 
     // ✅ Processar resposta do Gemini
     const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
