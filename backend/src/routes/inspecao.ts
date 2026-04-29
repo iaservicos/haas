@@ -361,6 +361,50 @@ router.get('/analises/:numeroSerie', async (req: any, res: any) => {
 });
 
 /**
+ * ✅ GET /api/inspecao/portal/listar
+ * Retorna todas as inspeções (respostas) do portal com dados relacionados
+ */
+router.get('/portal/listar', async (req: any, res: any) => {
+  try {
+    console.log('[inspecao.ts] Carregando inspeções do portal...');
+
+    const { data, error } = await supabase
+      .from('inspecao_respostas')
+      .select(`
+        *,
+        contrato_equipamentos (
+          id,
+          numero_serie,
+          tipo_material,
+          modelo
+        )
+      `)
+      .order('data_inspecao', { ascending: false });
+
+    if (error) {
+      console.error('[inspecao.ts] Erro ao buscar inspeções do portal:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao buscar inspeções do portal',
+        details: error.message
+      });
+    }
+
+    console.log(`[inspecao.ts] Inspeções do portal carregadas: ${data?.length || 0}`);
+
+    res.json({
+      success: true,
+      data: data || [],
+    });
+  } catch (error) {
+    console.error('[inspecao.ts] Erro ao buscar inspeções do portal:', error);
+    res.status(500).json({
+      error: 'Erro ao buscar inspeções do portal',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+/**
  * GET /api/inspecao/:vistoriaId
  * Retorna as respostas de uma inspeção específica
  */
