@@ -1,164 +1,72 @@
-import express from 'express';
+import express, { RequestHandler } from 'express';
 import multer from 'multer';
 import axios from 'axios';
-import type { EquipmentType } from '../config/equipmentQuestions.js';
-import { supabase } from '../config/database.js';
-import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
+import { createClient } from '@supabase/supabase-js';
 
 const router = express.Router();
 
-// ✅ Configurar multer para upload de arquivos
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
-  },
-});
+// ✅ Configuração do Supabase
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ✅ Configuração do Gemini (substituindo GPTMaker)
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+// ✅ Configuração do Gemini
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
-// ✅ Configuração do Supabase Storage
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const STORAGE_BUCKET = 'fotos';
+// ✅ Configuração do Multer
+const upload = multer({ storage: multer.memoryStorage() });
+
+// ✅ Fila de processamento (em memória)
+interface QueueItem {
+  fotoId: number;
+  vistoriaId: string;
+  numeroSerie: string;
+  fotoUrl: string;
+  timestamp: number;
+}
+
+const processingQueue: QueueItem[] = [];
+let isProcessing = false;
 
 /**
- * GET /api/inspecao/equipamento/:equipamentoId
- * Retorna o tipo de equipamento pelo ID
+ * ✅ Função para processar a fila de análises
  */
-router.get('/equipamento/:equipamentoId', async (req, res ) => {
-  try {
-    const { equipamentoId } = req.params;
-
-    const { data, error } = await supabase
-      .from('contrato_equipamentos')
-      .select('tipo_material, numero_serie, modelo')
-      .eq('id', equipamentoId)
-      .single();
-
-    if (error || !data) {
-      return res.status(404).json({ error: 'Equipamento não encontrado' });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        id: equipamentoId,
-        tipo_material: data.tipo_material,
-        numero_serie: data.numero_serie,
-        modelo: data.modelo,
-      },
-    });
-  } catch (error) {
-    console.error('Erro ao buscar equipamento:', error);
-    res.status(500).json({ error: 'Erro ao buscar equipamento' });
+async function processQueue() {
+  if (isProcessing || processingQueue.length === 0) {
+    return;
   }
-});
 
-/**
- * GET /api/inspecao/perguntas/:equipmentType
- * Retorna as perguntas para um tipo de equipamento específico
- */
-router.get('/perguntas/:equipmentType', async (req, res) => {
-  try {
-    const { equipmentType } = req.params;
-    
-    // Validar tipo de equipamento
-    const validTypes = [
-      'Desktop', 'Monitor', 'Notebook', 'MiniPro', 'All in One',
-      'Duo', 'Tablet', 'Chromebook', 'Máquina de pagamento', 'Diversos', 'Celular'
-    ];
-    
-    if (!validTypes.includes(equipmentType)) {
-      return res.status(400).json({ 
-        error: 'Tipo de equipamento inválido',
-        validTypes 
-      });
-    }
+  isProcessing = true;
 
-    const questions = getQuestionsByEquipmentType(equipmentType as EquipmentType);
+  while (processingQueue.length > 0) {
+    const item = processingQueue.shift();
+    if (!item) break;
 
-    res.json({
-      equipmentType,
-      questions,
-      totalQuestions: questions.length,
-    });
-  } catch (error) {
-    console.error('Erro ao buscar perguntas:', error);
-    res.status(500).json({ error: 'Erro ao buscar perguntas' });
-  }
-});
-
-/**
- * POST /api/inspecao/salvar
- * Salva as respostas da inspeção com equipamento_id
- */
-router.post('/salvar', async (req, res) => {
-  try {
-    const { vistoriaId, equipmentType, answers, observacoes, equipamento_id } = req.body;
-
-    if (!vistoriaId || !equipmentType || !answers) {
-      return res.status(400).json({ 
-        error: 'Dados incompletos: vistoriaId, equipmentType e answers são obrigatórios' 
-      });
-    }
-
-    // Construir objeto de inserção
-    const insertData: any = {
-      vistoria_id: vistoriaId,
-      equipment_type: equipmentType,
-      respostas: answers,
-      observacoes: observacoes || null,
-      data_inspecao: new Date().toISOString(),
-    };
-
-    // Adicionar equipamento_id se fornecido
-    if (equipamento_id) {
-      insertData.equipamento_id = equipamento_id;
-      console.log(`[inspecao.ts] Salvando inspeção com equipamento_id: ${equipamento_id}`);
-    }
-
-    // Salvar respostas no banco de dados
-    const { data, error } = await supabase
-      .from('inspecao_respostas')
-      .insert(insertData)
-      .select();
-
-    if (error) {
-      console.error('Erro ao salvar respostas:', error);
-      return res.status(500).json({ 
-        error: 'Erro ao salvar respostas',
-        details: error.message 
-      });
-    }
-
-    console.log('[inspecao.ts] Inspeção salva com sucesso:', data[0]);
-
-    // Atualizar status da vistoria (se existir)
     try {
+      console.log(`[Fila] Processando foto ${item.fotoId}...`);
+      await analisarFotoComGemini(item);
+      console.log(`[Fila] Foto ${item.fotoId} processada com sucesso`);
+    } catch (error) {
+      console.error(`[Fila] Erro ao processar foto ${item.fotoId}:`, error);
+      // Registrar erro no banco
       await supabase
-        .from('vistorias')
-        .update({ status: 'inspecionada' })
-        .eq('id', vistoriaId);
-    } catch (updateError) {
-      console.log('[inspecao.ts] Aviso: Não foi possível atualizar status da vistoria', updateError);
+        .from('analises_fotos')
+        .insert({
+          foto_id: item.fotoId,
+          vistoria_id: item.vistoriaId,
+          numero_serie: item.numeroSerie,
+          status: 'erro',
+          resultado_gptmaker: JSON.stringify({ erro: 'Falha ao processar' }),
+        });
     }
 
-    res.json({
-      success: true,
-      message: 'Inspeção salva com sucesso',
-      data: data[0],
-    });
-  } catch (error) {
-    console.error('Erro ao salvar inspeção:', error);
-    res.status(500).json({ 
-      error: 'Erro ao salvar inspeção',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
+    // Aguardar 3 segundos entre requisições para evitar rate limit
+    await new Promise((resolve) => setTimeout(resolve, 3000));
   }
-});
+
+  isProcessing = false;
+}
 
 /**
  * ✅ Função para converter imagem para base64
@@ -166,25 +74,24 @@ router.post('/salvar', async (req, res) => {
 async function imagemParaBase64(fotoUrl: string): Promise<string> {
   try {
     console.log('[Gemini] Baixando imagem para base64...');
-    console.log('[Gemini] URL da imagem:', fotoUrl);
-    
+
     const response = await axios.get(fotoUrl, {
       responseType: 'arraybuffer',
-      timeout: 15000, // 15 segundos
-      maxContentLength: 10 * 1024 * 1024, // 10MB
+      timeout: 15000,
+      maxContentLength: 10 * 1024 * 1024,
     });
-    
+
     console.log('[Gemini] Imagem baixada:', response.data.length, 'bytes');
-    
+
     const base64 = Buffer.from(response.data).toString('base64');
     console.log('[Gemini] Imagem convertida para base64:', base64.length, 'caracteres');
-    
+
     // Limitar tamanho do base64 a 5MB
     if (base64.length > 5 * 1024 * 1024) {
       console.warn('[Gemini] Base64 muito grande, truncando...');
       return base64.substring(0, 5 * 1024 * 1024);
     }
-    
+
     return base64;
   } catch (error) {
     console.error('[Gemini] Erro ao converter imagem para base64:', error);
@@ -193,46 +100,31 @@ async function imagemParaBase64(fotoUrl: string): Promise<string> {
 }
 
 /**
- * ✅ Função para analisar foto com Gemini (usando inline_data com base64)
+ * ✅ Função para analisar foto com Gemini (ASSÍNCRONA)
  */
-async function analisarFotoComGemini(
-  fotoId: number,
-  numeroSerie: string,
-  vistoriaId: string,
-  fotoUrl: string,
-  fotoNome: string
-) {
+async function analisarFotoComGemini(item: QueueItem): Promise<void> {
   try {
-    console.log(`[Gemini] Iniciando análise da foto ${fotoId}...`);
-
-    if (!GEMINI_API_KEY) {
-      console.error('[Gemini] GEMINI_API_KEY não configurada');
-      return;
-    }
-
     // ✅ Converter imagem para base64
-    const base64 = await imagemParaBase64(fotoUrl);
+    const base64 = await imagemParaBase64(item.fotoUrl);
 
-    // ✅ Prompt para análise
-    const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
+    const prompt = `Você é um especialista em análise de equipamentos para vistorias técnicas.
 
-Número de série: ${numeroSerie}
-Nome da foto: ${fotoNome}
+Analise a foto do equipamento e forneça:
+1. Status: "OK" se o equipamento está em bom estado, "AVARIA" se há problemas
+2. Danos: Lista de danos identificados (se houver)
+3. Descrição: Descrição detalhada do estado do equipamento
+4. Recomendação: Recomendação de ação (reparo, substituição, etc.)
 
-Analise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:
+Responda APENAS com JSON válido, sem explicações:
 {
   "status": "OK" ou "AVARIA",
-  "danos": ["lista de danos encontrados, ou [] se nenhum"],
-  "descricao": "descrição detalhada do estado do equipamento",
+  "danos": ["lista", "de", "danos"],
+  "descricao": "descrição detalhada",
   "recomendacao": "recomendação de ação"
-}
+}`;
 
-Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
-
-    // ✅ Chamar Gemini Pro com inline_data (base64)
     console.log('[Gemini] Enviando para API do Gemini...');
-    console.log('[Gemini] Tamanho do payload:', base64.length + prompt.length, 'caracteres');
-    
+
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
@@ -245,7 +137,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
               {
                 inline_data: {
                   mime_type: 'image/jpeg',
-                  data: base64, // ✅ CORRETO: base64 em inline_data
+                  data: base64,
                 },
               },
             ],
@@ -256,213 +148,166 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 60000, // 60 segundos
+        timeout: 60000,
         maxContentLength: 10 * 1024 * 1024,
         maxBodyLength: 10 * 1024 * 1024,
       }
     );
-    
+
     console.log('[Gemini] Resposta recebida do Gemini');
 
     // ✅ Processar resposta do Gemini
     const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+
     if (!responseText) {
-      throw new Error('Resposta vazia do Gemini');
+      throw new Error('Nenhuma resposta do Gemini');
     }
 
-    console.log('[Gemini] Resposta recebida:', responseText.substring(0, 100));
+    console.log('[Gemini] Resposta:', responseText);
 
-    // ✅ Parsear JSON da resposta
-    let resultado;
-    try {
-      resultado = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('[Gemini] Erro ao parsear JSON:', parseError);
-      resultado = {
-        status: 'ERRO',
-        danos: [],
-        descricao: 'Erro ao processar resposta do Gemini',
-        recomendacao: 'Tente novamente',
-      };
-    }
+    // ✅ Parse JSON
+    const resultado = JSON.parse(responseText);
 
     // ✅ Salvar resultado no Supabase
-    console.log('[Supabase] Salvando resultado da análise...');
-    
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('analises_fotos')
       .insert({
-        numero_serie: numeroSerie,
-        foto_id: fotoId,
-        vistoria_id: vistoriaId,
-        prompt_enviado: prompt,
+        foto_id: item.fotoId,
+        vistoria_id: item.vistoriaId,
+        numero_serie: item.numeroSerie,
+        status: resultado.status === 'OK' ? 'ok' : 'avaria',
         resultado_gptmaker: JSON.stringify(resultado),
-        status: resultado.status || 'pendente',
       });
 
     if (error) {
-      console.error('[Supabase] Erro ao salvar análise:', error);
+      console.error('[Supabase] Erro ao salvar resultado:', error);
       throw error;
     }
 
-    console.log('[Supabase] Análise salva com sucesso');
+    console.log('[Supabase] Resultado salvo com sucesso');
   } catch (error) {
     console.error('[Gemini] Erro na análise:', error);
-    
-    // ✅ Salvar erro no Supabase
-    try {
-      await supabase
-        .from('analises_fotos')
-        .insert({
-          numero_serie: numeroSerie,
-          foto_id: fotoId,
-          vistoria_id: vistoriaId,
-          prompt_enviado: '',
-          resultado_gptmaker: JSON.stringify({
-            status: 'ERRO',
-            danos: [],
-            descricao: String(error),
-            recomendacao: 'Tente novamente',
-          }),
-          status: 'erro',
-        });
-    } catch (dbError) {
-      console.error('[Supabase] Erro ao salvar erro:', dbError);
-    }
+    throw error;
   }
 }
 
 /**
  * ✅ POST /api/inspecao/upload-foto
- * 1. Salva foto no Supabase Storage (bucket 'fotos')
- * 2. Obtém URL pública
- * 3. Envia para Gemini analisar em background
+ * Cliente faz upload da foto (retorna imediatamente)
  */
-router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
+const uploadFotoHandler: RequestHandler = async (req, res) => {
   try {
     console.log('[inspecao.ts] Iniciando upload de foto...');
 
-    const { vistoria_id, foto_nome, foto_tipo, numero_serie } = req.body;
+    const { vistoria_id, numero_serie, foto_tipo } = req.body;
     const file = req.file;
 
-    // Validar dados obrigatórios
-    if (!vistoria_id || !file) {
-      return res.status(400).json({
-        error: 'Dados incompletos: vistoria_id e arquivo são obrigatórios'
-      });
+    if (!file || !vistoria_id || !numero_serie) {
+      return res.status(400).json({ erro: 'Dados incompletos' });
     }
 
     console.log('[inspecao.ts] vistoria_id:', vistoria_id);
-    console.log('[inspecao.ts] foto_nome:', foto_nome);
+    console.log('[inspecao.ts] foto_nome:', file.originalname);
     console.log('[inspecao.ts] numero_serie:', numero_serie);
     console.log('[inspecao.ts] tamanho_bytes:', file.size);
 
     // ✅ Salvar foto no Supabase Storage
-    const fileName = `${vistoria_id}/${Date.now()}-${foto_nome || file.originalname}`;
-
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from(STORAGE_BUCKET)
+    const fileName = `${vistoria_id}/${Date.now()}-${file.originalname}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('fotos')
       .upload(fileName, file.buffer, {
         contentType: file.mimetype,
-        upsert: false,
       });
 
     if (uploadError) {
-      console.error('[inspecao.ts] Erro ao fazer upload no storage:', uploadError);
-      return res.status(500).json({
-        error: 'Erro ao fazer upload da foto',
-        details: uploadError.message
-      });
+      console.error('[inspecao.ts] Erro ao salvar no storage:', uploadError);
+      return res.status(500).json({ erro: 'Erro ao salvar foto' });
     }
 
     console.log('[inspecao.ts] Foto salva no storage:', uploadData);
 
-    // ✅ Obter URL pública da foto
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${fileName}`;
+    // ✅ Gerar URL pública
+    const { data: urlData } = supabase.storage
+      .from('fotos')
+      .getPublicUrl(uploadData.path);
 
-    console.log('[inspecao.ts] URL pública:', publicUrl);
+    const fotoUrl = urlData.publicUrl;
+    console.log('[inspecao.ts] URL pública:', fotoUrl);
 
-    // ✅ Salvar registro no banco de dados com URL pública
-    const { data, error } = await supabase
+    // ✅ Salvar foto no banco de dados
+    const { data: fotoData, error: fotoError } = await supabase
       .from('fotos_vistoria')
       .insert({
-        vistoria_id: vistoria_id,
-        foto_url: publicUrl,
-        foto_nome: foto_nome || file.originalname,
-        foto_tipo: foto_tipo || file.mimetype,
+        vistoria_id,
+        foto_nome: file.originalname,
+        foto_tipo: foto_tipo || 'equipamento',
         tamanho_bytes: file.size,
+        foto_url: fotoUrl,
       })
       .select();
 
-    if (error) {
-      console.error('[inspecao.ts] Erro ao salvar foto no banco:', error);
-      return res.status(500).json({
-        error: 'Erro ao salvar foto',
-        details: error.message
-      });
+    if (fotoError || !fotoData || fotoData.length === 0) {
+      console.error('[inspecao.ts] Erro ao salvar no banco:', fotoError);
+      return res.status(500).json({ erro: 'Erro ao salvar foto' });
     }
 
-    console.log('[inspecao.ts] Foto salva no banco com sucesso:', data[0]);
+    const fotoId = fotoData[0].id;
+    console.log('[inspecao.ts] Foto salva no banco com sucesso:', fotoData[0]);
 
-    // ✅ Enviar para Gemini analisar em background
-    if (numero_serie) {
-      setImmediate(() => {
-        analisarFotoComGemini(
-          data[0].id,
-          numero_serie,
-          vistoria_id,
-          publicUrl,
-          foto_nome || file.originalname
-        ).catch(err => console.error('[inspecao.ts] Erro em background:', err));
-      });
-    }
+    // ✅ Adicionar à fila de processamento
+    processingQueue.push({
+      fotoId,
+      vistoriaId: vistoria_id,
+      numeroSerie: numero_serie,
+      fotoUrl,
+      timestamp: Date.now(),
+    });
 
-    // ✅ Responder ao cliente imediatamente (SEM mostrar análise)
-    res.json({
-      success: true,
-      message: 'Foto enviada com sucesso',
-      id: data[0].id,
-      data: {
-        id: data[0].id,
-        foto_url: publicUrl,
-        foto_nome: data[0].foto_nome,
-      },
+    console.log('[Fila] Foto adicionada à fila. Tamanho da fila:', processingQueue.length);
+
+    // ✅ Iniciar processamento da fila (em background)
+    setImmediate(() => processQueue());
+
+    // ✅ Retornar imediatamente (sem esperar análise)
+    res.status(200).json({
+      id: fotoId,
+      foto_url: fotoUrl,
+      foto_nome: file.originalname,
+      mensagem: 'Foto enviada com sucesso. Análise em progresso.',
     });
   } catch (error) {
-    console.error('[inspecao.ts] Erro ao fazer upload de foto:', error);
-    res.status(500).json({
-      error: 'Erro ao fazer upload de foto',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
+    console.error('[inspecao.ts] Erro na análise, mas continuando:', error);
+    res.status(500).json({ erro: 'Erro ao processar foto' });
   }
-});
+};
+
+router.post('/upload-foto', upload.single('foto'), uploadFotoHandler);
 
 /**
- * GET /api/inspecao/:vistoriaId
- * Retorna as respostas de uma inspeção específica
+ * ✅ GET /api/inspecao/analises/:vistoriaId
+ * Analista consulta resultados das análises
  */
-router.get('/:vistoriaId', async (req, res) => {
+const getAnalisesHandler: RequestHandler = async (req, res) => {
   try {
     const { vistoriaId } = req.params;
 
     const { data, error } = await supabase
-      .from('inspecao_respostas')
+      .from('analises_fotos')
       .select('*')
-      .eq('vistoria_id', vistoriaId)
-      .single();
+      .eq('vistoria_id', vistoriaId);
 
     if (error) {
-      console.error('Erro ao buscar inspeção:', error);
-      return res.status(404).json({ error: 'Inspeção não encontrada' });
+      console.error('[inspecao.ts] Erro ao buscar análises:', error);
+      return res.status(500).json({ erro: 'Erro ao buscar análises' });
     }
 
-    res.json(data);
+    res.status(200).json(data);
   } catch (error) {
-    console.error('Erro ao buscar inspeção:', error);
-    res.status(500).json({ error: 'Erro ao buscar inspeção' });
+    console.error('[inspecao.ts] Erro:', error);
+    res.status(500).json({ erro: 'Erro ao buscar análises' });
   }
-});
+};
+
+router.get('/analises/:vistoriaId', getAnalisesHandler);
 
 export default router;
