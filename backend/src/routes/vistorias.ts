@@ -133,4 +133,30 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/inspecao/portal/listar
+ * Retorna todas as análises de fotos do portal
+ */
+router.get('/portal/listar', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('analises_fotos')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[inspecao] Erro ao buscar análises:', error);
+      return res.status(500).json({ error: 'Erro ao buscar análises' });
+    }
+
+    res.json({
+      success: true,
+      data: data || [],
+    });
+  } catch (error) {
+    console.error('[inspecao] Erro:', error);
+    res.status(500).json({ error: 'Erro ao buscar análises' });
+  }
+});
+
 export default router;
