@@ -179,7 +179,7 @@ router.post('/salvar', async (req, res) => {
 
 /**
  * ✅ NOVO: Função para analisar foto com Gemini Pro
- * Versão simples SEM dependências externas
+ * Usa URL da imagem diretamente (sem base64)
  */
 async function analisarFotoComGemini(
   fotoId: number,
@@ -200,25 +200,6 @@ async function analisarFotoComGemini(
     // ✅ Aguardar intervalo para evitar rate limit
     await aguardarIntervalo();
 
-    // ✅ Baixar imagem
-    console.log('[Gemini] Baixando imagem...');
-    const imageResponse = await axios.get(fotoUrl, {
-      responseType: 'arraybuffer',
-      timeout: 30000,
-      maxContentLength: 50 * 1024 * 1024, // 50MB max
-    });
-
-    const imageBase64 = Buffer.from(imageResponse.data).toString('base64');
-    console.log(`[Gemini] Imagem convertida para base64: ${imageBase64.length} caracteres`);
-
-    // ✅ Se imagem muito grande, truncar para 1MB de base64 (aproximadamente 750KB de dados)
-    const maxBase64Length = 1024 * 1024; // 1MB
-    let finalBase64 = imageBase64;
-    if (imageBase64.length > maxBase64Length) {
-      console.log(`[Gemini] Imagem muito grande (${imageBase64.length} chars), truncando...`);
-      finalBase64 = imageBase64.substring(0, maxBase64Length);
-    }
-
     // ✅ Prompt para análise de equipamento
     const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
 
@@ -235,8 +216,8 @@ Analise o estado do equipamento na imagem e responda em JSON com a seguinte estr
 
 Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Chamar Gemini Pro
-    console.log('[Gemini] Enviando para API do Gemini...');
+    // ✅ Chamar Gemini Pro com URL da imagem (SEM base64)
+    console.log('[Gemini] Enviando para API do Gemini (usando URL)...');
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
@@ -248,8 +229,8 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
               },
               {
                 inline_data: {
-                  mime_type: imageResponse.headers['content-type'] || 'image/jpeg',
-                  data: finalBase64,
+                  mime_type: 'image/jpeg',
+                  data: fotoUrl, // ✅ MUDANÇA: Enviar URL em vez de base64
                 },
               },
             ],
@@ -299,6 +280,21 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
     }
 
     console.log(`[Gemini] Análise concluída para foto ${fotoId}:`, analiseResultado);
+
+    // ✅ Truncar base64 para salvar no banco (se necessário)
+    let base64Truncado = '';
+    try {
+      const imageResponse = await axios.get(fotoUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+      });
+      base64Truncado = Buffer.from(imageResponse.data).toString('base64');
+      if (base64Truncado.length > 100000) {
+        base64Truncado = base64Truncado.substring(0, 100000) + '...truncado';
+      }
+    } catch (error) {
+      console.log('[Gemini] Aviso: Não foi possível baixar imagem para truncar', error);
+    }
 
     // ✅ Salvar resultado no Supabase
     const { error: insertError } = await supabase
@@ -352,7 +348,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
  * ✅ ATUALIZADO: POST /api/inspecao/upload-foto
  * 1. Salva foto no Supabase Storage (bucket 'fotos')
  * 2. Obtém URL pública
- * 3. Analisa com Gemini Pro (com rate limit)
+ * 3. Analisa com Gemini Pro (usando URL da imagem)
  * 4. Salva resultado no Supabase
  */
 router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
@@ -422,7 +418,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
 
     console.log('[inspecao.ts] Foto salva no banco com sucesso:', data[0]);
 
-    // ✅ NOVO: Analisar foto com Gemini Pro (síncrono com rate limit)
+    // ✅ NOVO: Analisar foto com Gemini Pro (usando URL)
     let analiseResultado = null;
     if (numero_serie) {
       try {
