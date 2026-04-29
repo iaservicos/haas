@@ -361,13 +361,16 @@ router.get('/analises/:numeroSerie', async (req: any, res: any) => {
 });
 
 /**
+ /**
  * ✅ GET /api/inspecao/portal/listar
  * Retorna todas as inspeções (respostas) do portal com dados relacionados
+ * Enriquecido com: equipamento, contrato e cliente
  */
 router.get('/portal/listar', async (req: any, res: any) => {
   try {
     console.log('[inspecao.ts] Carregando inspeções do portal...');
 
+    // 1. Buscar todas as inspeções com equipamento
     const { data, error } = await supabase
       .from('inspecao_respostas')
       .select(`
@@ -376,7 +379,8 @@ router.get('/portal/listar', async (req: any, res: any) => {
           id,
           numero_serie,
           tipo_material,
-          modelo
+          modelo,
+          contrato_id
         )
       `)
       .order('data_inspecao', { ascending: false });
@@ -389,11 +393,47 @@ router.get('/portal/listar', async (req: any, res: any) => {
       });
     }
 
-    console.log(`[inspecao.ts] Inspeções do portal carregadas: ${data?.length || 0}`);
+    // 2. Enriquecer com dados do contrato
+    const enrichedData = await Promise.all(
+      (data || []).map(async (inspecao: any) => {
+        try {
+          if (!inspecao.contrato_equipamentos || !inspecao.contrato_equipamentos.contrato_id) {
+            return inspecao;
+          }
+
+          // Buscar dados do contrato
+          const { data: contrato, error: contratoError } = await supabase
+            .from('contratos')
+            .select('id, numero_contrato, nome_cliente')
+            .eq('id', inspecao.contrato_equipamentos.contrato_id)
+            .single();
+
+          if (contratoError) {
+            console.warn(`[inspecao.ts] Contrato não encontrado para equipamento:`, contratoError);
+            return inspecao;
+          }
+
+          // Adicionar contrato aos dados do equipamento
+          return {
+            ...inspecao,
+            contrato_equipamentos: {
+              ...inspecao.contrato_equipamentos,
+              contratos: contrato,
+            },
+          };
+        } catch (enrichError) {
+          console.error(`[inspecao.ts] Erro ao enriquecer inspeção:`, enrichError);
+          return inspecao;
+        }
+      })
+    );
+
+    console.log(`[inspecao.ts] Inspeções do portal carregadas: ${enrichedData?.length || 0}`);
 
     res.json({
       success: true,
-      data: data || [],
+      data: enrichedData || [],
+      total: enrichedData?.length || 0,
     });
   } catch (error) {
     console.error('[inspecao.ts] Erro ao buscar inspeções do portal:', error);
