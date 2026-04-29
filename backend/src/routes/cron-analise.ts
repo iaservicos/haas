@@ -1,6 +1,6 @@
 import express from 'express';
 import axios from 'axios';
-import { supabase } from '../config/database.js';
+import { supabase } from '../config/database';
 
 const router = express.Router();
 
