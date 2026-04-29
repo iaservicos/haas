@@ -1,7 +1,6 @@
 import express from 'express';
 import multer from 'multer';
 import axios from 'axios';
-import sharp from 'sharp';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
@@ -27,7 +26,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 
 // ✅ Sistema de fila para evitar rate limit
 let ultimaRequisicaoGemini = 0;
-const INTERVALO_MINIMO = 2000; // 2 segundos entre requisições
+const INTERVALO_MINIMO = 3000; // 3 segundos entre requisições
 
 async function aguardarIntervalo() {
   const agora = Date.now();
@@ -179,33 +178,8 @@ router.post('/salvar', async (req, res) => {
 });
 
 /**
- * ✅ NOVO: Função para comprimir imagem
- * Reduz tamanho de 2MB para ~300KB
- */
-async function comprimirImagem(buffer: Buffer): Promise<Buffer> {
-  try {
-    console.log(`[Gemini] Tamanho original: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`);
-    
-    const imagemComprimida = await sharp(buffer)
-      .resize(800, 600, {
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .jpeg({ quality: 70, progressive: true })
-      .toBuffer();
-    
-    console.log(`[Gemini] Tamanho comprimido: ${(imagemComprimida.length / 1024).toFixed(2)}KB`);
-    return imagemComprimida;
-  } catch (error) {
-    console.error('[Gemini] Erro ao comprimir imagem:', error);
-    // Se falhar, retorna buffer original
-    return buffer;
-  }
-}
-
-/**
  * ✅ NOVO: Função para analisar foto com Gemini Pro
- * Usa a API oficial do Google Gemini com imagem comprimida
+ * Versão simples SEM dependências externas
  */
 async function analisarFotoComGemini(
   fotoId: number,
@@ -226,7 +200,7 @@ async function analisarFotoComGemini(
     // ✅ Aguardar intervalo para evitar rate limit
     await aguardarIntervalo();
 
-    // ✅ Baixar imagem e comprimir
+    // ✅ Baixar imagem
     console.log('[Gemini] Baixando imagem...');
     const imageResponse = await axios.get(fotoUrl, {
       responseType: 'arraybuffer',
@@ -234,10 +208,16 @@ async function analisarFotoComGemini(
       maxContentLength: 50 * 1024 * 1024, // 50MB max
     });
 
-    // ✅ Comprimir imagem
-    const imagemComprimida = await comprimirImagem(imageResponse.data);
-    const imageBase64 = imagemComprimida.toString('base64');
+    const imageBase64 = Buffer.from(imageResponse.data).toString('base64');
     console.log(`[Gemini] Imagem convertida para base64: ${imageBase64.length} caracteres`);
+
+    // ✅ Se imagem muito grande, truncar para 1MB de base64 (aproximadamente 750KB de dados)
+    const maxBase64Length = 1024 * 1024; // 1MB
+    let finalBase64 = imageBase64;
+    if (imageBase64.length > maxBase64Length) {
+      console.log(`[Gemini] Imagem muito grande (${imageBase64.length} chars), truncando...`);
+      finalBase64 = imageBase64.substring(0, maxBase64Length);
+    }
 
     // ✅ Prompt para análise de equipamento
     const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
@@ -255,7 +235,7 @@ Analise o estado do equipamento na imagem e responda em JSON com a seguinte estr
 
 Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Chamar Gemini Pro com a imagem comprimida
+    // ✅ Chamar Gemini Pro
     console.log('[Gemini] Enviando para API do Gemini...');
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
@@ -268,8 +248,8 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
               },
               {
                 inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: imageBase64,
+                  mime_type: imageResponse.headers['content-type'] || 'image/jpeg',
+                  data: finalBase64,
                 },
               },
             ],
@@ -372,7 +352,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
  * ✅ ATUALIZADO: POST /api/inspecao/upload-foto
  * 1. Salva foto no Supabase Storage (bucket 'fotos')
  * 2. Obtém URL pública
- * 3. Analisa com Gemini Pro (com compressão de imagem)
+ * 3. Analisa com Gemini Pro (com rate limit)
  * 4. Salva resultado no Supabase
  */
 router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
@@ -442,7 +422,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
 
     console.log('[inspecao.ts] Foto salva no banco com sucesso:', data[0]);
 
-    // ✅ NOVO: Analisar foto com Gemini Pro (síncrono com compressão)
+    // ✅ NOVO: Analisar foto com Gemini Pro (síncrono com rate limit)
     let analiseResultado = null;
     if (numero_serie) {
       try {

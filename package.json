@@ -7,14 +7,12 @@
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
     "pg": "^8.20.0",
-    "sharp": "^0.34.5",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
     "@types/multer": "^2.1.0",
     "@types/pg": "^8.20.0",
-    "@types/sharp": "^0.31.1",
     "terser": "^5.46.1"
   }
 }
