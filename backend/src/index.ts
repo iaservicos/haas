@@ -23,7 +23,6 @@ app.options('*', corsOptions);
 app.use('/api/auth', authRoutes);
 app.use('/api/componentes', componentesRoutes);
 app.use('/api/fotos', fotosRoutes);
-app.use('/api/usuario', usuarioRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/confirmacoes', confirmacoeRoutes);
 app.use('/api/inspecao', inspecaoRoutes);

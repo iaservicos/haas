@@ -1,0 +1,10 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/analise-fotos",
+      "schedule": "* * * * *"
+    }
+  ],
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install"
+}
