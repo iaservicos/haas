@@ -11,6 +11,7 @@ import clientesRoutes from './routes/clientesroutes.js';
 import confirmacoeRoutes from './routes/confirmacoes.js';
 import inspecaoRoutes from './routes/inspecao.js';
 import cronAnaliseRouter from './routes/cron-analise.js';
+import vistoriasRoutes from './routes/vistorias.js';
 
 const app = express();
 
@@ -28,6 +29,8 @@ app.use('/api/confirmacoes', confirmacoeRoutes);
 app.use('/api/inspecao', inspecaoRoutes);
 app.use('/api/cron', cronAnaliseRouter);
 app.use('/api/usuario', usuarioRoutes);
+app.use('/api/vistorias', vistoriasRoutes);
+
 
 
 app.get('/health', (req, res) => {
