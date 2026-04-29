@@ -393,12 +393,15 @@ router.get('/portal/listar', async (req: any, res: any) => {
       });
     }
 
-    // 2. Enriquecer com dados do contrato
+    // 2. Enriquecer com dados do contrato E ANÁLISE DA IA
     const enrichedData = await Promise.all(
       (data || []).map(async (inspecao: any) => {
         try {
           if (!inspecao.contrato_equipamentos || !inspecao.contrato_equipamentos.contrato_id) {
-            return inspecao;
+            return {
+              ...inspecao,
+              analise_ia: null,
+            };
           }
 
           // Buscar dados do contrato
@@ -410,20 +413,52 @@ router.get('/portal/listar', async (req: any, res: any) => {
 
           if (contratoError) {
             console.warn(`[inspecao.ts] Contrato não encontrado para equipamento:`, contratoError);
-            return inspecao;
+            return {
+              ...inspecao,
+              contrato_equipamentos: {
+                ...inspecao.contrato_equipamentos,
+                contratos: null,
+              },
+              analise_ia: null,
+            };
           }
 
-          // Adicionar contrato aos dados do equipamento
+          // 3. Buscar análise da IA da tabela analises_fotos
+          const { data: analiseData, error: analiseError } = await supabase
+            .from('analises_fotos')
+            .select('resultado_gptmaker')
+            .eq('vistoria_id', inspecao.vistoria_id)
+            .order('id', { ascending: false })
+            .limit(1)
+            .single();
+
+          let analise_ia = null;
+          if (!analiseError && analiseData) {
+            try {
+              analise_ia = typeof analiseData.resultado_gptmaker === 'string' 
+                ? JSON.parse(analiseData.resultado_gptmaker) 
+                : analiseData.resultado_gptmaker;
+            } catch (parseError) {
+              console.warn(`[inspecao.ts] Erro ao fazer parse da análise:`, parseError);
+              analise_ia = null;
+            }
+          }
+
+          // Adicionar contrato e análise aos dados do equipamento
           return {
             ...inspecao,
             contrato_equipamentos: {
               ...inspecao.contrato_equipamentos,
               contratos: contrato,
             },
+            analise_ia: analise_ia,
           };
         } catch (enrichError) {
           console.error(`[inspecao.ts] Erro ao enriquecer inspeção:`, enrichError);
-          return inspecao;
+          return {
+            ...inspecao,
+            analise_ia: null,
+          };
         }
       })
     );
