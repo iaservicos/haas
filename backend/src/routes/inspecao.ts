@@ -1,6 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import axios from 'axios';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
@@ -19,8 +18,6 @@ const upload = multer({
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const STORAGE_BUCKET = 'fotos';
-
-// Configuração removida - análise será feita por cron job externo
 
 /**
  * GET /api/inspecao/equipamento/:equipamentoId
@@ -159,177 +156,12 @@ router.post('/salvar', async (req, res) => {
 });
 
 /**
- * ✅ Função para iniciar análise (será chamada por cron job externo)
- */
-async function iniciarAnalise(
-  fotoId: number,
-  numeroSerie: string,
-  vistoriaId: string | null,
-  fotoUrl: string,
-  fotoNome: string
-) {
-  try {
-    console.log(`[Gemini] Iniciando análise da foto ${fotoId}...`);
-    console.log(`[Gemini] URL da foto: ${fotoUrl}`);
-
-    if (!GEMINI_API_KEY) {
-      console.error('[Gemini] GEMINI_API_KEY não configurada');
-      throw new Error('GEMINI_API_KEY não configurada');
-    }
-
-    // ✅ Aguardar intervalo para evitar rate limit
-    await aguardarIntervalo();
-
-    // ✅ Prompt para análise de equipamento
-    const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
-
-Número de série: ${numeroSerie}
-Nome da foto: ${fotoNome}
-
-Analise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:
-{
-  "status": "OK" ou "AVARIA",
-  "danos": ["lista de danos encontrados, ou [] se nenhum"],
-  "descricao": "descrição detalhada do estado do equipamento",
-  "recomendacao": "recomendação de ação"
-}
-
-Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
-
-    // ✅ Chamar Gemini Pro com URL da imagem (usando file_data)
-    console.log('[Gemini] Enviando para API do Gemini (usando URL)...');
-    const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-      {
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-              {
-                file_data: {
-                  mime_type: 'image/jpeg',
-                  file_uri: fotoUrl, // ✅ CORRETO: Usar file_uri para URLs
-                },
-              },
-            ],
-          },
-        ],
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 120000, // 120 segundos
-      }
-    );
-
-    console.log(`[Gemini] Resposta recebida para foto ${fotoId}`);
-
-    // ✅ Extrair resposta do Gemini
-    let responseText = '';
-    if (response.data && response.data.candidates && response.data.candidates.length > 0) {
-      const content = response.data.candidates[0].content;
-      if (content && content.parts && content.parts.length > 0) {
-        responseText = content.parts[0].text || '';
-      }
-    }
-
-    console.log('[Gemini] Resposta bruta:', responseText.substring(0, 200));
-
-    // ✅ Tentar fazer parse do JSON
-    let analiseResultado;
-    try {
-      // Procurar por JSON na resposta
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analiseResultado = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('Nenhum JSON encontrado na resposta');
-      }
-    } catch (parseError) {
-      console.error('[Gemini] Erro ao fazer parse da resposta:', parseError);
-      // Se falhar, criar resposta padrão
-      analiseResultado = {
-        status: 'OK',
-        danos: [],
-        descricao: 'Análise concluída (formato padrão)',
-        recomendacao: 'Equipamento aparenta estar em bom estado',
-      };
-    }
-
-    console.log(`[Gemini] Análise concluída para foto ${fotoId}:`, analiseResultado);
-
-    // ✅ Truncar base64 para salvar no banco (se necessário)
-    let base64Truncado = '';
-    try {
-      const imageResponse = await axios.get(fotoUrl, {
-        responseType: 'arraybuffer',
-        timeout: 30000,
-      });
-      base64Truncado = Buffer.from(imageResponse.data).toString('base64');
-      if (base64Truncado.length > 100000) {
-        base64Truncado = base64Truncado.substring(0, 100000) + '...truncado';
-      }
-    } catch (error) {
-      console.log('[Gemini] Aviso: Não foi possível baixar imagem para truncar', error);
-    }
-
-    // ✅ Salvar resultado no Supabase
-    const { error: insertError } = await supabase
-      .from('analises_fotos')
-      .insert({
-        numero_serie: numeroSerie,
-        foto_id: fotoId,
-        vistoria_id: vistoriaId,
-        prompt_enviado: prompt.substring(0, 500),
-        resultado_gptmaker: JSON.stringify(analiseResultado),
-        status: analiseResultado.status === 'OK' ? 'ok' : 'avaria',
-      });
-
-    if (insertError) {
-      console.error('[Gemini] Erro ao salvar resultado:', insertError);
-      throw insertError;
-    }
-
-    console.log(`[Gemini] Resultado salvo para foto ${fotoId}`);
-    return analiseResultado;
-
-  } catch (error) {
-    console.error('[Gemini] Erro ao analisar foto:', error);
-
-    // ✅ Registrar erro na tabela
-    try {
-      await supabase
-        .from('analises_fotos')
-        .insert({
-          numero_serie: numeroSerie,
-          foto_id: fotoId,
-          vistoria_id: vistoriaId,
-          resultado_gptmaker: JSON.stringify({ 
-            status: 'ERRO', 
-            erro: error instanceof Error ? error.message : 'Erro desconhecido',
-            danos: [],
-            descricao: 'Erro ao processar análise',
-            recomendacao: 'Tente novamente',
-          }),
-          status: 'erro',
-        });
-    } catch (insertError) {
-      console.error('[Gemini] Erro ao registrar erro de análise:', insertError);
-    }
-
-    throw error;
-  }
-}
-
-/**
- * ✅ ATUALIZADO: POST /api/inspecao/upload-foto
+ * ✅ POST /api/inspecao/upload-foto
  * 1. Salva foto no Supabase Storage (bucket 'fotos')
  * 2. Obtém URL pública
- * 3. Analisa com Gemini Pro (usando URL da imagem)
- * 4. Salva resultado no Supabase
+ * 3. Cria registro com status "pendente"
+ * 4. Vincula via numero_serie (equipamento)
+ * 5. Retorna imediatamente (SEM fazer análise)
  */
 router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
   try {
@@ -339,9 +171,9 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
     const file = req.file;
 
     // Validar dados obrigatórios
-    if (!vistoria_id || !file) {
+    if (!file || !numero_serie) {
       return res.status(400).json({
-        error: 'Dados incompletos: vistoria_id e arquivo são obrigatórios'
+        error: 'Dados incompletos: arquivo e numero_serie são obrigatórios'
       });
     }
 
@@ -351,7 +183,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
     console.log('[inspecao.ts] tamanho_bytes:', file.size);
 
     // ✅ Salvar foto no Supabase Storage
-    const fileName = `${vistoria_id}/${Date.now()}-${foto_nome || file.originalname}`;
+    const fileName = `${vistoria_id || 'sem-vistoria'}/${Date.now()}-${foto_nome || file.originalname}`;
 
     const { data: uploadData, error: uploadError } = await supabase
       .storage
@@ -380,7 +212,7 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
     const { data, error } = await supabase
       .from('fotos_vistoria')
       .insert({
-        vistoria_id: vistoria_id,
+        vistoria_id: vistoria_id || null,
         foto_url: publicUrl,
         foto_nome: foto_nome || file.originalname,
         foto_tipo: foto_tipo || file.mimetype,
@@ -398,27 +230,35 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
 
     console.log('[inspecao.ts] Foto salva no banco com sucesso:', data[0]);
 
-    // ✅ NOVO: Analisar foto com Gemini Pro (usando URL)
-    let analiseResultado = null;
-    if (numero_serie) {
-      try {
-        analiseResultado = await analisarFotoComGemini(
-          data[0].id,
-          numero_serie,
-          vistoria_id,
-          publicUrl,
-          foto_nome || file.originalname
-        );
-      } catch (analysisError) {
-        console.error('[inspecao.ts] Erro na análise, mas continuando:', analysisError);
-        // Continuar mesmo se análise falhar
-      }
+    // ✅ Criar registro na tabela analises_fotos com status "pendente"
+    // Vinculado via numero_serie (equipamento) + foto_id
+    // vistoria_id é opcional agora (pode ser null)
+    const { error: analiseError } = await supabase
+      .from('analises_fotos')
+      .insert({
+        numero_serie: numero_serie,
+        foto_id: data[0].id,
+        vistoria_id: vistoria_id || null,
+        status: 'pendente',
+        prompt_enviado: null,
+        resultado_gptmaker: JSON.stringify({ 
+          status: 'pendente', 
+          descricao: 'Análise em progresso...' 
+        }),
+      });
+
+    if (analiseError) {
+      console.error('[inspecao.ts] Erro ao criar análise:', analiseError);
+      // Não bloqueia o upload se análise falhar
+      console.log('[inspecao.ts] Aviso: Análise não foi criada, mas foto foi salva com sucesso');
+    } else {
+      console.log(`[inspecao.ts] Análise criada com status "pendente" para foto ${data[0].id}`);
     }
 
-    // ✅ Responder ao cliente imediatamente (SEM mostrar análise)
+    // ✅ Responder ao cliente imediatamente (SEM fazer análise)
     res.json({
       success: true,
-      message: 'Foto enviada com sucesso',
+      message: 'Foto enviada com sucesso. Análise em progresso.',
       id: data[0].id,
       data: {
         id: data[0].id,
@@ -430,6 +270,91 @@ router.post('/upload-foto', (upload.single('file') as any), async (req: any, res
     console.error('[inspecao.ts] Erro ao fazer upload de foto:', error);
     res.status(500).json({
       error: 'Erro ao fazer upload de foto',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+/**
+ * ✅ POST /api/inspecao/analises/resultado
+ * Webhook para receber resultado da análise (de um cron job externo)
+ * Atualiza a análise com o resultado do Gemini
+ */
+router.post('/analises/resultado', async (req: any, res: any) => {
+  try {
+    const { foto_id, numero_serie, resultado, status } = req.body;
+
+    if (!foto_id || !resultado || !status) {
+      return res.status(400).json({ 
+        error: 'Dados incompletos: foto_id, resultado e status são obrigatórios' 
+      });
+    }
+
+    console.log('[inspecao.ts] Recebendo resultado da análise para foto:', foto_id);
+
+    // ✅ Atualizar análise com resultado
+    const { error } = await supabase
+      .from('analises_fotos')
+      .update({
+        status: status,
+        resultado_gptmaker: JSON.stringify(resultado),
+      })
+      .eq('foto_id', foto_id);
+
+    if (error) {
+      console.error('[inspecao.ts] Erro ao salvar resultado:', error);
+      return res.status(500).json({
+        error: 'Erro ao salvar resultado',
+        details: error.message
+      });
+    }
+
+    console.log('[inspecao.ts] Resultado salvo com sucesso para foto:', foto_id);
+
+    res.json({
+      success: true,
+      message: 'Resultado salvo com sucesso',
+    });
+  } catch (error) {
+    console.error('[inspecao.ts] Erro ao processar resultado:', error);
+    res.status(500).json({
+      error: 'Erro ao processar resultado',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+/**
+ * ✅ GET /api/inspecao/analises/:numeroSerie
+ * Retorna as análises de um equipamento (via numero_serie)
+ * Apenas para analista consultar
+ */
+router.get('/analises/:numeroSerie', async (req: any, res: any) => {
+  try {
+    const { numeroSerie } = req.params;
+
+    const { data, error } = await supabase
+      .from('analises_fotos')
+      .select('*')
+      .eq('numero_serie', numeroSerie)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[inspecao.ts] Erro ao buscar análises:', error);
+      return res.status(500).json({
+        error: 'Erro ao buscar análises',
+        details: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      data: data,
+    });
+  } catch (error) {
+    console.error('[inspecao.ts] Erro ao buscar análises:', error);
+    res.status(500).json({
+      error: 'Erro ao buscar análises',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
   }
