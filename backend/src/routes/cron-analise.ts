@@ -9,7 +9,6 @@ const supabase = createClient(
 
 const router = express.Router();
 
-
 // ✅ Configuração do Gemini Pro
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -19,7 +18,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
  */
-router.post('/analise-fotos', async (req: any, res: any) => {
+router.post('/analise-fotos', async (req: any, res: any ) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
@@ -62,7 +61,7 @@ router.post('/analise-fotos', async (req: any, res: any) => {
         // Buscar foto para obter URL
         const { data: foto, error: fotoError } = await supabase
           .from('fotos_vistoria')
-          .select('foto_url, foto_nome')
+          .select('foto_url, foto_nome, foto_tipo')
           .eq('id', analise.foto_id)
           .single();
 
@@ -98,17 +97,20 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
           timeout: 30000,
         });
 
-        const base64 = Buffer.from(imageResponse.data).toString('base64');
+        let base64 = Buffer.from(imageResponse.data).toString('base64');
         console.log(`[CRON] Imagem convertida para base64: ${base64.length} caracteres`);
 
-        // Truncar se muito grande
-        let base64Truncado = base64;
-        if (base64.length > 5000000) {
-          base64Truncado = base64.substring(0, 5000000);
-          console.log(`[CRON] Base64 truncado para 5MB`);
+        // ✅ Truncar se muito grande (máximo 4MB)
+        if (base64.length > 4000000) {
+          base64 = base64.substring(0, 4000000);
+          console.log(`[CRON] Base64 truncado para 4MB`);
         }
 
         console.log(`[CRON] Enviando para Gemini Pro...`);
+
+        // ✅ Detectar mime type correto
+        const mimeType = foto.foto_tipo || 'image/jpeg';
+        console.log(`[CRON] Usando mime type: ${mimeType}`);
 
         const response = await axios.post(
           `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
@@ -121,8 +123,8 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
                   },
                   {
                     inline_data: {
-                      mime_type: 'image/jpeg',
-                      data: base64Truncado,
+                      mime_type: mimeType,
+                      data: base64,
                     },
                   },
                 ],
