@@ -162,7 +162,7 @@ router.post('/salvar', async (req, res) => {
 
 /**
  * ✅ NOVO: Função para analisar foto com Gemini Pro
- * Usa a API oficial do Google Gemini
+ * Usa a API oficial do Google Gemini com imagem em base64
  */
 async function analisarFotoComGemini(
   fotoId: number,
@@ -173,11 +173,23 @@ async function analisarFotoComGemini(
 ) {
   try {
     console.log(`[Gemini] Iniciando análise da foto ${fotoId}...`);
+    console.log(`[Gemini] URL da foto: ${fotoUrl}`);
 
     if (!GEMINI_API_KEY) {
       console.error('[Gemini] GEMINI_API_KEY não configurada');
       throw new Error('GEMINI_API_KEY não configurada');
     }
+
+    // ✅ Baixar imagem e converter para base64 (com limite de tamanho)
+    console.log('[Gemini] Baixando imagem...');
+    const imageResponse = await axios.get(fotoUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000,
+      maxContentLength: 5 * 1024 * 1024, // 5MB max
+    });
+
+    const imageBase64 = Buffer.from(imageResponse.data).toString('base64');
+    console.log(`[Gemini] Imagem convertida para base64: ${imageBase64.length} caracteres`);
 
     // ✅ Prompt para análise de equipamento
     const prompt = `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.
@@ -195,7 +207,8 @@ Analise o estado do equipamento na imagem e responda em JSON com a seguinte estr
 
 Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`;
 
-    // ✅ Chamar Gemini Pro com a imagem
+    // ✅ Chamar Gemini Pro com a imagem em base64
+    console.log('[Gemini] Enviando para API do Gemini...');
     const response = await axios.post(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
@@ -207,10 +220,8 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
               },
               {
                 inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: await fetch(fotoUrl)
-                    .then(res => res.arrayBuffer())
-                    .then(buffer => Buffer.from(buffer).toString('base64')),
+                  mime_type: imageResponse.headers['content-type'] || 'image/jpeg',
+                  data: imageBase64,
                 },
               },
             ],
@@ -221,7 +232,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 60000, // 60 segundos
+        timeout: 120000, // 120 segundos
       }
     );
 
@@ -236,7 +247,7 @@ Seja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicaçõe
       }
     }
 
-    console.log('[Gemini] Resposta bruta:', responseText);
+    console.log('[Gemini] Resposta bruta:', responseText.substring(0, 200));
 
     // ✅ Tentar fazer parse do JSON
     let analiseResultado;
