@@ -99,6 +99,7 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
 
         // ✅ Enviar para Gemini Pro
         console.log('[CRON] Enviando para Gemini Pro...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
         const geminiResponse = await axios.post(
           `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
           {
