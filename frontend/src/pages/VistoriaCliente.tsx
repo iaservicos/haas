@@ -117,17 +117,14 @@ export const VistoriaCliente: React.FC = () => {
     navigate('/dashboard-cliente');
   };
 
-  // Calcular progresso (0%, 50%, 100%)
-  const progress = !checklistSalvo ? 0 : fotoUploadada ? 100 : 50;
-
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* SIDEBAR - MANTÉM O PADRÃO */}
-      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
+      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col shadow-2xl`}>
         <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-400 hover:text-white"
+            className="text-gray-400 hover:text-white text-xl"
           >
             ☰
           </button>
@@ -155,59 +152,45 @@ export const VistoriaCliente: React.FC = () => {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER - MANTÉM O PADRÃO */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
+        <div className="bg-white border-b border-gray-300 px-6 py-4 flex justify-between items-center shadow-lg">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Vistoria de Equipamento</h1>
-            <p className="text-sm text-gray-600">Número de Série: <strong>{numeroSerie}</strong></p>
+            <h1 className="text-3xl font-bold text-gray-900">Vistoria de Equipamento</h1>
+            <p className="text-sm text-gray-600 mt-1">Série: <strong className="text-blue-600">{numeroSerie}</strong></p>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')}</p>
           </div>
         </div>
 
-        {/* PROGRESS BAR */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-700">Progresso da Vistoria</p>
-            <p className="text-sm font-semibold text-blue-600">{progress}%</p>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* CONTENT */}
-        <div className="flex-1 overflow-auto p-8">
+        {/* CONTENT - FULL WIDTH */}
+        <div className="flex-1 overflow-auto p-6 bg-gradient-to-br from-slate-50 to-slate-100">
           {confirmacaoData && equipmentType && vistoriaId ? (
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="w-full space-y-6">
               {/* STEP 1: CHECKLIST */}
-              <div className={`bg-white rounded-xl shadow-md border-2 transition-all duration-300 ${
+              <div className={`w-full rounded-2xl shadow-xl border-l-8 transition-all duration-300 ${
                 checklistSalvo 
-                  ? 'border-green-300 bg-gradient-to-r from-green-50 to-white' 
-                  : 'border-blue-300 bg-gradient-to-r from-blue-50 to-white'
+                  ? 'border-l-green-500 bg-gradient-to-r from-green-50 to-white' 
+                  : 'border-l-blue-500 bg-gradient-to-r from-blue-50 to-white'
               }`}>
                 <div className="p-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
+                  <div className="flex items-start justify-between mb-8">
+                    <div className="flex items-center gap-6">
+                      <div className={`flex-shrink-0 w-16 h-16 rounded-xl flex items-center justify-center font-bold text-2xl shadow-lg ${
                         checklistSalvo 
-                          ? 'bg-green-200 text-green-700' 
-                          : 'bg-blue-200 text-blue-700'
+                          ? 'bg-gradient-to-br from-green-400 to-green-600 text-white' 
+                          : 'bg-gradient-to-br from-blue-400 to-blue-600 text-white'
                       }`}>
                         1
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">Checklist de Vistoria</h2>
-                        <p className="text-sm text-gray-600 mt-1">Preencha as informações do equipamento</p>
+                        <h2 className="text-2xl font-bold text-gray-900">Checklist de Vistoria</h2>
+                        <p className="text-gray-600 mt-2">Preencha as informações do equipamento</p>
                       </div>
                     </div>
                     {checklistSalvo && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-200 rounded-lg">
-                        <span className="text-lg font-bold text-green-700">✓</span>
-                        <span className="text-sm font-semibold text-green-700">Concluído</span>
+                      <div className="flex items-center gap-3 px-6 py-3 bg-green-100 rounded-xl border-2 border-green-300">
+                        <span className="text-2xl font-bold text-green-600">✓</span>
+                        <span className="font-semibold text-green-700">Concluído</span>
                       </div>
                     )}
                   </div>
@@ -222,49 +205,49 @@ export const VistoriaCliente: React.FC = () => {
               </div>
 
               {/* STEP 2: UPLOAD DE FOTO */}
-              <div className={`rounded-xl shadow-md border-2 transition-all duration-300 ${
+              <div className={`w-full rounded-2xl shadow-xl border-l-8 transition-all duration-300 ${
                 !checklistSalvo
-                  ? 'bg-gray-50 border-gray-300 opacity-50'
+                  ? 'border-l-gray-400 bg-gradient-to-r from-gray-100 to-gray-50 opacity-60'
                   : fotoUploadada
-                  ? 'bg-gradient-to-r from-green-50 to-white border-green-300'
-                  : 'bg-gradient-to-r from-amber-50 to-white border-amber-300'
+                  ? 'border-l-green-500 bg-gradient-to-r from-green-50 to-white'
+                  : 'border-l-amber-500 bg-gradient-to-r from-amber-50 to-white'
               }`}>
                 <div className="p-8">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg ${
+                  <div className="flex items-start justify-between mb-8">
+                    <div className="flex items-center gap-6">
+                      <div className={`flex-shrink-0 w-16 h-16 rounded-xl flex items-center justify-center font-bold text-2xl shadow-lg ${
                         !checklistSalvo
                           ? 'bg-gray-300 text-gray-600'
                           : fotoUploadada
-                          ? 'bg-green-200 text-green-700'
-                          : 'bg-amber-200 text-amber-700'
+                          ? 'bg-gradient-to-br from-green-400 to-green-600 text-white'
+                          : 'bg-gradient-to-br from-amber-400 to-amber-600 text-white'
                       }`}>
                         2
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">Upload de Foto</h2>
-                        <p className="text-sm text-gray-600 mt-1">Tire uma foto clara do equipamento para análise IA</p>
+                        <h2 className="text-2xl font-bold text-gray-900">Upload de Foto</h2>
+                        <p className="text-gray-600 mt-2">Tire uma foto clara do equipamento para análise IA</p>
                       </div>
                     </div>
                     {fotoUploadada && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-green-200 rounded-lg">
-                        <span className="text-lg font-bold text-green-700">✓</span>
-                        <span className="text-sm font-semibold text-green-700">Concluído</span>
+                      <div className="flex items-center gap-3 px-6 py-3 bg-green-100 rounded-xl border-2 border-green-300">
+                        <span className="text-2xl font-bold text-green-600">✓</span>
+                        <span className="font-semibold text-green-700">Concluído</span>
                       </div>
                     )}
                   </div>
 
                   {!checklistSalvo ? (
-                    <div className="flex items-start gap-3 p-4 bg-amber-100 border border-amber-400 rounded-lg">
-                      <span className="text-xl font-bold text-amber-700 flex-shrink-0">⚠</span>
+                    <div className="flex items-start gap-4 p-6 bg-amber-100 border-2 border-amber-400 rounded-xl">
+                      <span className="text-3xl font-bold text-amber-700 flex-shrink-0">⚠</span>
                       <div>
-                        <p className="font-semibold text-amber-900">Passo anterior necessário</p>
-                        <p className="text-sm text-amber-800 mt-1">Complete o checklist de vistoria antes de fazer upload de fotos.</p>
+                        <p className="font-bold text-amber-900 text-lg">Passo anterior necessário</p>
+                        <p className="text-amber-800 mt-2">Complete o checklist de vistoria antes de fazer upload de fotos.</p>
                       </div>
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-gray-600 mb-4">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
+                      <p className="text-gray-700 mb-6 text-lg">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
                       
                       <UploadFoto
                         confirmacaoId={vistoriaId}
@@ -277,10 +260,10 @@ export const VistoriaCliente: React.FC = () => {
               </div>
 
               {/* BOTÕES DE AÇÃO */}
-              <div className="flex gap-4 justify-end pt-4">
+              <div className="flex gap-4 justify-end pt-6">
                 <button
                   onClick={handleCancelar}
-                  className="px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-900 rounded-lg font-semibold transition-colors"
+                  className="px-8 py-4 bg-gray-400 hover:bg-gray-500 text-white rounded-xl font-bold text-lg transition-colors shadow-lg"
                 >
                   Cancelar
                 </button>
@@ -289,8 +272,8 @@ export const VistoriaCliente: React.FC = () => {
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-blue-600 mx-auto"></div>
-                <p className="mt-6 text-gray-600 font-medium">Carregando informações do equipamento...</p>
+                <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-300 border-t-blue-600 mx-auto"></div>
+                <p className="mt-8 text-gray-700 font-semibold text-lg">Carregando informações do equipamento...</p>
               </div>
             </div>
           )}
@@ -299,26 +282,26 @@ export const VistoriaCliente: React.FC = () => {
 
       {/* MODAL DE SUCESSO */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
-            <div className="flex justify-center mb-6">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-10 text-center">
+            <div className="flex justify-center mb-8">
               <div className="relative">
-                <div className="absolute inset-0 bg-green-200 rounded-full animate-pulse"></div>
-                <div className="relative w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-5xl font-bold text-green-600">✓</span>
+                <div className="absolute inset-0 bg-green-300 rounded-full animate-pulse"></div>
+                <div className="relative w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-6xl font-bold text-green-600">✓</span>
                 </div>
               </div>
             </div>
             
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Importação Resolvida!</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-3xl font-bold text-gray-900 mb-3">Importação Resolvida!</h3>
+            <p className="text-gray-700 mb-8 text-lg">
               A vistoria foi processada com sucesso. Você será redirecionado em breve.
             </p>
             
             <div className="flex gap-3">
               <button
                 onClick={() => navigate('/dashboard-cliente')}
-                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                className="flex-1 px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white rounded-xl font-bold text-lg transition-all shadow-lg"
               >
                 Voltar ao Dashboard
               </button>
