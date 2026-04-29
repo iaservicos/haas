@@ -98,8 +98,10 @@ router.post('/analise-fotos', async (req: any, res: any ) => {
         console.log(`[CRON] Usando mime type: ${mimeType}`);
 
         // ✅ Enviar para Gemini Pro
-        console.log('[CRON] Enviando para Gemini Pro...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // ✅ Aguardar 5 segundos para evitar rate limit
+        console.log('[CRON] Aguardando 5 segundos para evitar rate limit...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
         const geminiResponse = await axios.post(
           `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
           {
