@@ -647,7 +647,7 @@ export const Confirmacoes: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        placeholder="Ex: NF-123456"
+                        placeholder="Ex: 123456"
                         value={notaFiscal}
                         onChange={(e) => setNotaFiscal(e.target.value)}
                         disabled={salvando}
