@@ -280,7 +280,7 @@ export const VistoriaCliente: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL DE SUCESSO - SEM EMOJI */}
+      {/* MODAL DE SUCESSO */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-none shadow-2xl max-w-md w-full p-12 text-center border-t-4 border-t-green-600">
