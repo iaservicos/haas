@@ -112,8 +112,8 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
       required: true,
     },
     {
-      id: 'notebook_carregador',
-      text: 'Carregador Original está OK?',
+      id: 'notebook_adaptador',
+      text: 'Adaptador de Energia presente?',
       type: 'yes_no',
       required: true,
     },
@@ -125,7 +125,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'notebook_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
@@ -139,13 +139,13 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'minipro_perifericos',
-      text: 'Periféricos (Mouse/Teclado) estão OK?',
+      text: 'Periféricos (Mouse/Teclado) presentes?',
       type: 'yes_no',
       required: true,
     },
     {
-      id: 'minipro_suporte',
-      text: 'Suporte/Base está OK?',
+      id: 'minipro_adaptador',
+      text: 'Adaptador de Energia presente?',
       type: 'yes_no',
       required: true,
     },
@@ -157,7 +157,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'minipro_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
@@ -254,7 +254,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'tablet_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
@@ -286,7 +286,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'chromebook_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
@@ -318,7 +318,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'pagamento_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
@@ -344,7 +344,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'diversos_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
@@ -376,7 +376,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'celular_observacoes',
-      text: 'Observações',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
       type: 'text',
       required: false,
     },
