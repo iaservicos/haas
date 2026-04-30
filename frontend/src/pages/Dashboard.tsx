@@ -996,14 +996,15 @@ export function Dashboard() {
                                       }
                                       
                                       const status = analise.status || 'pendente';
-                                      const descricao = analise.descricao || '';
+                                      const categoria = analise.categoria || '';
+                                      const tipo_dano = analise.tipo_dano || '';
                                       
                                       let statusDisplay = '';
                                       
                                       if (status === 'OK') {
                                         statusDisplay = 'OK - Sem problemas';
                                       } else if (status === 'AVARIA') {
-                                        statusDisplay = descricao.substring(0, 80) + (descricao.length > 80 ? '...' : '');
+                                        statusDisplay = `AVARIA - ${categoria} - ${tipo_dano}`;
                                       } else if (status === 'pendente') {
                                         statusDisplay = 'PENDENTE';
                                       } else if (status === 'ERRO') {
