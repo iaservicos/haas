@@ -1,6 +1,10 @@
 /**
  * Estrutura de perguntas dinâmicas para cada tipo de equipamento
  * Cada pergunta tem um ID único, texto, tipo de resposta e observações
+ * 
+ * LÓGICA CLARA:
+ * - Sim = OK (equipamento bom)
+ * - Não = NOK (equipamento com problema)
  */
 
 export type EquipmentType = 
@@ -31,24 +35,27 @@ export interface EquipmentQuestions {
 
 /**
  * Perguntas genéricas para cada tipo de equipamento
-  */
+ * IMPORTANTE: Todas as perguntas devem ser formuladas para que:
+ * - Sim = OK (equipamento está bom)
+ * - Não = NOK (equipamento tem problema)
+ */
 export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Desktop': [
     {
       id: 'desktop_lacres',
-      text: 'Lacres de Garantia',
+      text: 'Lacres de Garantia estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'desktop_cabos',
-      text: 'Cabos (Vídeo/Energia)',
+      text: 'Cabos (Vídeo/Energia) estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'desktop_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -62,25 +69,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Monitor': [
     {
       id: 'monitor_tela',
-      text: 'Tela/Display',
+      text: 'Tela/Display está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'monitor_cabos',
-      text: 'Cabos de Conexão',
+      text: 'Cabos de Conexão estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'monitor_suporte',
-      text: 'Suporte/Base',
+      text: 'Suporte/Base está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'monitor_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -94,25 +101,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Notebook': [
     {
       id: 'notebook_tela',
-      text: 'Tela',
+      text: 'Tela está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'notebook_teclado',
-      text: 'Teclado',
+      text: 'Teclado está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'notebook_carregador',
-      text: 'Carregador Original',
+      text: 'Carregador Original está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'notebook_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -126,25 +133,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'MiniPro': [
     {
       id: 'minipro_painel',
-      text: 'Painel Traseiro (Portas)',
+      text: 'Painel Traseiro (Portas) está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'minipro_perifericos',
-      text: 'Periféricos (Mouse/Teclado)',
+      text: 'Periféricos (Mouse/Teclado) estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'minipro_suporte',
-      text: 'Suporte/Base',
+      text: 'Suporte/Base está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'minipro_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -158,25 +165,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'All in One': [
     {
       id: 'allinone_painel',
-      text: 'Painel Traseiro (Portas)',
+      text: 'Painel Traseiro (Portas) está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'allinone_perifericos',
-      text: 'Periféricos (Mouse/Teclado)',
+      text: 'Periféricos (Mouse/Teclado) estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'allinone_suporte',
-      text: 'Suporte/Base',
+      text: 'Suporte/Base está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'allinone_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -190,25 +197,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Duo': [
     {
       id: 'duo_tela',
-      text: 'Telas/Displays',
+      text: 'Telas/Displays estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'duo_articulacao',
-      text: 'Articulação/Dobradiça',
+      text: 'Articulação/Dobradiça está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'duo_carregador',
-      text: 'Carregador Original',
+      text: 'Carregador Original está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'duo_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -222,13 +229,13 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Tablet': [
     {
       id: 'tablet_sensibilidade',
-      text: 'Sensibilidade do Touch',
+      text: 'Sensibilidade do Touch está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'tablet_adaptador',
-      text: 'Adaptador energia',
+      text: 'Adaptador de Energia está OK?',
       type: 'yes_no',
       required: true,
     },
@@ -241,7 +248,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'tablet_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -255,25 +262,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Chromebook': [
     {
       id: 'chromebook_tela',
-      text: 'Tela',
+      text: 'Tela está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'chromebook_teclado',
-      text: 'Teclado',
+      text: 'Teclado está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'chromebook_carregador',
-      text: 'Carregador Original',
+      text: 'Carregador Original está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'chromebook_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -287,25 +294,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Máquina de pagamento': [
     {
       id: 'pagamento_tela',
-      text: 'Tela',
+      text: 'Tela está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'pagamento_botoes',
-      text: 'Botões',
+      text: 'Botões estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'pagamento_leitor',
-      text: 'Leitor de Cartão',
+      text: 'Leitor de Cartão está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'pagamento_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -331,7 +338,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'diversos_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
@@ -345,25 +352,25 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
   'Celular': [
     {
       id: 'celular_tela',
-      text: 'Tela/Display',
+      text: 'Tela/Display está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'celular_bateria',
-      text: 'Saúde da Bateria',
+      text: 'Saúde da Bateria está OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'celular_acessorios',
-      text: 'Acessórios',
+      text: 'Acessórios estão OK?',
       type: 'yes_no',
       required: true,
     },
     {
       id: 'celular_danos',
-      text: 'Existem danos físicos visíveis?',
+      text: 'Sem danos físicos visíveis?',
       type: 'yes_no',
       required: true,
     },
