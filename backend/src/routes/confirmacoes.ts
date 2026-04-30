@@ -4,10 +4,10 @@ import { supabase } from '../config/database.js';
 const router = Router();
 
 /**
- * GET /api/confirmacoes-clientes
+ * GET /confirmacoes/clientes
  * Listar todos os clientes únicos com seus contratos
  */
-router.get('/confirmacoes-clientes', async (req: Request, res: Response) => {
+router.get('/clientes', async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('contratos')
@@ -34,10 +34,10 @@ router.get('/confirmacoes-clientes', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/confirmacoes-contratos/:nomeCliente
+ * GET /confirmacoes/contratos/:nomeCliente
  * Listar contratos de um cliente específico
  */
-router.get('/confirmacoes-contratos/:nomeCliente', async (req: Request, res: Response) => {
+router.get('/contratos/:nomeCliente', async (req: Request, res: Response) => {
   try {
     const { nomeCliente } = req.params;
     const decodedNome = decodeURIComponent(nomeCliente);
@@ -61,10 +61,10 @@ router.get('/confirmacoes-contratos/:nomeCliente', async (req: Request, res: Res
 });
 
 /**
- * GET /api/confirmacoes-equipamentos/:contratoId
+ * GET /confirmacoes/equipamentos/:contratoId
  * Listar equipamentos de um contrato com suas confirmações
  */
-router.get('/confirmacoes-equipamentos/:contratoId', async (req: Request, res: Response) => {
+router.get('/equipamentos/:contratoId', async (req: Request, res: Response) => {
   try {
     const { contratoId } = req.params;
 
@@ -106,10 +106,10 @@ router.get('/confirmacoes-equipamentos/:contratoId', async (req: Request, res: R
 });
 
 /**
- * POST /api/confirmacoes-salvar
+ * POST /confirmacoes/salvar
  * Salvar confirmações para múltiplos equipamentos
  */
-router.post('/confirmacoes-salvar', async (req: Request, res: Response) => {
+router.post('/salvar', async (req: Request, res: Response) => {
   try {
     const { equipamentos, nota_fiscal, destino } = req.body;
 
@@ -184,11 +184,11 @@ router.post('/confirmacoes-salvar', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/confirmacoes-importar
+ * POST /confirmacoes/importar
  * Importar confirmações em massa via dados parseados do frontend
  * O frontend faz o parse do Excel/CSV e envia os dados como array
  */
-router.post('/confirmacoes-importar', async (req: Request, res: Response) => {
+router.post('/importar', async (req: Request, res: Response) => {
   try {
     const { dados } = req.body;
 
@@ -282,6 +282,67 @@ router.post('/confirmacoes-importar', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[confirmacoes] Erro ao importar confirmações:', error);
     res.status(500).json({ error: 'Erro ao importar confirmações' });
+  }
+});
+
+/**
+ * PUT /confirmacoes/atualizar/:id
+ * Atualizar uma confirmação existente
+ */
+router.put('/atualizar/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { nota_fiscal, destino } = req.body;
+
+    if (!nota_fiscal || !destino) {
+      return res.status(400).json({ error: 'nota_fiscal e destino são obrigatórios' });
+    }
+
+    const { data, error } = await supabase
+      .from('equipamento_confirmacoes')
+      .update({
+        nota_fiscal,
+        destino,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Confirmação atualizada com sucesso',
+      data: data[0],
+    });
+  } catch (error) {
+    console.error('[confirmacoes] Erro ao atualizar confirmação:', error);
+    res.status(500).json({ error: 'Erro ao atualizar confirmação' });
+  }
+});
+
+/**
+ * DELETE /confirmacoes/deletar/:id
+ * Deletar uma confirmação
+ */
+router.delete('/deletar/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('equipamento_confirmacoes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Confirmação deletada com sucesso',
+    });
+  } catch (error) {
+    console.error('[confirmacoes] Erro ao deletar confirmação:', error);
+    res.status(500).json({ error: 'Erro ao deletar confirmação' });
   }
 });
 

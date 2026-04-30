@@ -83,7 +83,7 @@ export const Confirmacoes: React.FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/confirmacoes-clientes`, {
+      const response = await fetch(`${API_BASE_URL}/confirmacoes/clientes`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -106,7 +106,7 @@ export const Confirmacoes: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/confirmacoes-contratos/${encodeURIComponent(nomeCliente)}`,
+        `${API_BASE_URL}/confirmacoes/contratos/${encodeURIComponent(nomeCliente)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -129,7 +129,7 @@ export const Confirmacoes: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/confirmacoes-equipamentos/${contratoId}`,
+        `${API_BASE_URL}/confirmacoes/equipamentos/${contratoId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -178,7 +178,7 @@ export const Confirmacoes: React.FC = () => {
       if (editandoId) {
         // Modo edição - atualizar uma confirmação
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/confirmacoes-atualizar/${editandoId}`, {
+        const response = await fetch(`${API_BASE_URL}/confirmacoes/atualizar/${editandoId}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -197,7 +197,7 @@ export const Confirmacoes: React.FC = () => {
         const equipamentosSelecionados = equipamentos.filter(e => selecionados.has(e.id));
 
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/confirmacoes-salvar`, {
+        const response = await fetch(`${API_BASE_URL}/confirmacoes/salvar`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -253,7 +253,7 @@ export const Confirmacoes: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/confirmacoes-deletar/${confirmacaoId}`, {
+      const response = await fetch(`${API_BASE_URL}/confirmacoes/deletar/${confirmacaoId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -333,7 +333,7 @@ export const Confirmacoes: React.FC = () => {
 
           // Enviar dados parseados para o backend
           const token = localStorage.getItem('token');
-          const response = await fetch(`${API_BASE_URL}/confirmacoes-importar`, {
+          const response = await fetch(`${API_BASE_URL}/confirmacoes/importar`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
