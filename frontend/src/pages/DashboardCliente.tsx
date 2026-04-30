@@ -124,14 +124,32 @@ export function DashboardCliente() {
       }
 
       console.log('Equipamentos encontrados:', equipamentosData?.length, 'registros');
-      setEquipamentos(equipamentosData || []);
+
+      // 4. Buscar IDs de equipamentos que já têm vistoria concluída
+      const { data: vistoriasData, error: vistoriasError } = await supabase
+        .from('inspecao_respostas')
+        .select('equipamento_id');
+
+      if (vistoriasError) {
+        console.error('Erro ao buscar vistorias:', vistoriasError);
+      }
+
+      const equipamentosComVistoria = new Set(vistoriasData?.map((v: any) => v.equipamento_id) || []);
+
+      // 5. Calcular status baseado em se existe vistoria
+      const equipamentosComStatus = (equipamentosData || []).map((eq: any) => ({
+        ...eq,
+        status: equipamentosComVistoria.has(eq.id) ? 'Concluído' : 'Pendente'
+      }));
+
+      setEquipamentos(equipamentosComStatus);
 
       // Contar checklists pendentes
-      const pendentes = equipamentosData?.filter((e: any) => e.status === 'Pendente').length || 0;
+      const pendentes = equipamentosComStatus.filter((e: any) => e.status === 'Pendente').length || 0;
 
       setStats({
         totalContratos: contratosData?.length || 0,
-        totalEquipamentos: equipamentosData?.length || 0,
+        totalEquipamentos: equipamentosComStatus.length || 0,
         checklistsPendentes: pendentes,
       });
     } catch (error) {
