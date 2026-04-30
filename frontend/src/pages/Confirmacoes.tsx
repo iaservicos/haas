@@ -191,7 +191,7 @@ export const Confirmacoes: React.FC = () => {
         });
 
         if (!response.ok) throw new Error('Erro ao atualizar confirmação');
-        alert('✅ Confirmação atualizada com sucesso!');
+        alert('Confirmação atualizada com sucesso!');
       } else {
         // Modo criação - salvar múltiplas
         const equipamentosSelecionados = equipamentos.filter(e => selecionados.has(e.id));
@@ -216,7 +216,7 @@ export const Confirmacoes: React.FC = () => {
         if (!response.ok) throw new Error('Erro ao salvar confirmações');
 
         const result = await response.json();
-        alert(`✅ ${result.salvos} equipamento(s) confirmado(s)!`);
+        alert(`${result.salvos} equipamento(s) confirmado(s)!`);
       }
 
       setShowModal(false);
@@ -263,7 +263,7 @@ export const Confirmacoes: React.FC = () => {
 
       if (!response.ok) throw new Error('Erro ao deletar confirmação');
 
-      alert('✅ Confirmação deletada com sucesso!');
+      alert('Confirmação deletada com sucesso!');
       if (filtroContrato) {
         await loadEquipamentos(filtroContrato);
       }
@@ -273,7 +273,7 @@ export const Confirmacoes: React.FC = () => {
     }
   };
 
-  // Carregar XLSX do CDN (como em GerenciarEquipamentos)
+  // Carregar XLSX do CDN
   const loadXLSXLibrary = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if ((window as any).XLSX) {
@@ -312,17 +312,15 @@ export const Confirmacoes: React.FC = () => {
     setMensagemUpload('');
 
     try {
-      // Carregar biblioteca XLSX do CDN
       await loadXLSXLibrary();
 
       const XLSX = (window as any).XLSX;
       if (!XLSX) {
-        setMensagemUpload('❌ Biblioteca XLSX não carregou. Tente novamente.');
+        setMensagemUpload('Biblioteca XLSX não carregou. Tente novamente.');
         setUploadando(false);
         return;
       }
 
-      // Ler arquivo
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
@@ -331,7 +329,6 @@ export const Confirmacoes: React.FC = () => {
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
           const dados = XLSX.utils.sheet_to_json(worksheet);
 
-          // Enviar dados parseados para o backend
           const token = localStorage.getItem('token');
           const response = await fetch(`${API_BASE_URL}/confirmacoes/importar`, {
             method: 'POST',
@@ -346,9 +343,9 @@ export const Confirmacoes: React.FC = () => {
 
           const result = await response.json();
 
-          let msg = `✅ ${result.processados} equipamento(s) processado(s)!`;
+          let msg = `${result.processados} equipamento(s) processado(s)!`;
           if (result.erros > 0) {
-            msg += `\n\n❌ ${result.erros} erro(s):\n`;
+            msg += `\n\n${result.erros} erro(s):\n`;
             result.detalhesErros.forEach((e: any) => {
               msg += `- ${e.serial || `Linha ${e.linha}`}: ${e.erro}\n`;
             });
@@ -356,13 +353,12 @@ export const Confirmacoes: React.FC = () => {
 
           setMensagemUpload(msg);
 
-          // Recarregar equipamentos
           if (filtroContrato) {
             await loadEquipamentos(filtroContrato);
           }
         } catch (error) {
           console.error('[Confirmacoes] Erro ao processar arquivo:', error);
-          setMensagemUpload('❌ Erro ao processar arquivo');
+          setMensagemUpload('Erro ao processar arquivo');
         } finally {
           setUploadando(false);
         }
@@ -371,7 +367,7 @@ export const Confirmacoes: React.FC = () => {
       reader.readAsArrayBuffer(file);
     } catch (error) {
       console.error('[Confirmacoes] Erro ao carregar XLSX:', error);
-      setMensagemUpload('❌ Erro ao carregar biblioteca XLSX');
+      setMensagemUpload('Erro ao carregar biblioteca XLSX');
       setUploadando(false);
     }
 
@@ -384,7 +380,7 @@ export const Confirmacoes: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50">
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
         <div className="p-4 border-b border-gray-700">
@@ -467,7 +463,7 @@ export const Confirmacoes: React.FC = () => {
                     <select
                       value={filtroCliente}
                       onChange={(e) => setFiltroCliente(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     >
                       <option value="">Selecione um cliente</option>
                       {clientes.map(c => (
@@ -486,7 +482,7 @@ export const Confirmacoes: React.FC = () => {
                       value={filtroContrato}
                       onChange={(e) => setFiltroContrato(e.target.value)}
                       disabled={!filtroCliente}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100"
                     >
                       <option value="">Selecione um contrato</option>
                       {contratos.map(c => (
@@ -505,13 +501,13 @@ export const Confirmacoes: React.FC = () => {
                   <button
                     onClick={() => setShowModal(true)}
                     disabled={selecionados.size === 0}
-                    className="px-6 py-2 bg-blue-950 hover:bg-black text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Confirmar Selecionados ({selecionados.size})
                   </button>
 
-                  <label className="px-6 py-2 bg-blue-950 hover:bg-black text-white rounded-lg font-semibold transition cursor-pointer">
-                    📥 Importar em Massa
+                  <label className="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg font-semibold transition cursor-pointer">
+                    Importar em Massa
                     <input
                       type="file"
                       accept=".xlsx,.xls,.csv"
@@ -525,7 +521,7 @@ export const Confirmacoes: React.FC = () => {
 
               {/* MENSAGEM UPLOAD */}
               {mensagemUpload && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8 whitespace-pre-wrap text-sm text-blue-800">
+                <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 mb-8 whitespace-pre-wrap text-sm text-gray-700">
                   {mensagemUpload}
                 </div>
               )}
@@ -561,13 +557,13 @@ export const Confirmacoes: React.FC = () => {
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Modelo</th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Nota Fiscal</th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Destino</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ação</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Acao</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {equipamentos.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-6 py-4 text-center text-gray-600">
+                            <td colSpan={6} className="px-6 py-4 text-center text-gray-600">
                               Nenhum equipamento encontrado
                             </td>
                           </tr>
@@ -591,20 +587,20 @@ export const Confirmacoes: React.FC = () => {
                                   <>
                                     <button
                                       onClick={() => handleEditarConfirmacao(eq)}
-                                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                                      className="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-800 transition text-xs"
                                     >
                                       Editar
                                     </button>
                                     <button
                                       onClick={() => handleDeletarConfirmacao(eq.confirmacao!.id)}
-                                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                                      className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 transition text-xs"
                                     >
                                       Deletar
                                     </button>
                                   </>
                                 ) : (
                                   <span className="text-gray-400">—</span>
-                                )}
+                                )}\
                               </td>
                             </tr>
                           ))
@@ -620,7 +616,7 @@ export const Confirmacoes: React.FC = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                   <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                     <h3 className="text-xl font-bold mb-4">
-                      {editandoId ? 'Editar Confirmação' : `Confirmar ${selecionados.size} Equipamento(s)`}
+                      {editandoId ? 'Editar Confirmacao' : `Confirmar ${selecionados.size} Equipamento(s)`}
                     </h3>
 
                     <div className="mb-4">
@@ -633,7 +629,7 @@ export const Confirmacoes: React.FC = () => {
                         value={notaFiscal}
                         onChange={(e) => setNotaFiscal(e.target.value)}
                         disabled={salvando}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100"
                       />
                     </div>
 
@@ -643,11 +639,11 @@ export const Confirmacoes: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        placeholder="Ex: São Paulo - SP"
+                        placeholder="Ex: Sao Paulo - SP"
                         value={destino}
                         onChange={(e) => setDestino(e.target.value)}
                         disabled={salvando}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100"
                       />
                     </div>
 
@@ -667,7 +663,7 @@ export const Confirmacoes: React.FC = () => {
                       <button
                         onClick={handleSalvarConfirmacoes}
                         disabled={salvando}
-                        className="flex-1 px-4 py-2 bg-blue-950 text-white rounded-lg hover:bg-black transition disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition disabled:opacity-50"
                       >
                         {salvando ? 'Salvando...' : 'Salvar'}
                       </button>
