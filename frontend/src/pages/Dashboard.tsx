@@ -1770,7 +1770,6 @@ export function Dashboard() {
                   const link = document.createElement('a');
                   link.href = fotoModalUrl;
                   link.download = fotoModalNome || 'foto.jpg';
-                  link.setAttribute('target', '_blank');
                   document.body.appendChild(link);
                   link.click();
                   document.body.removeChild(link);
