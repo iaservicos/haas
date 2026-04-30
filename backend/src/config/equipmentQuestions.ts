@@ -125,7 +125,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'notebook_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+       text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
@@ -157,7 +157,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'minipro_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
@@ -254,7 +254,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'tablet_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
@@ -286,7 +286,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'chromebook_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
@@ -318,7 +318,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'pagamento_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
@@ -344,7 +344,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'diversos_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
@@ -376,7 +376,7 @@ export const equipmentQuestionsMap: Record<EquipmentType, Question[]> = {
     },
     {
       id: 'celular_observacoes',
-      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela)',
+      text: 'Observações (Ex: Pequeno amassado na lateral, arranhado na tela, falta de parafuso, falta de cabo USB)',
       type: 'text',
       required: false,
     },
