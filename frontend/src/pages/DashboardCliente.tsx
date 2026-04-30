@@ -302,53 +302,51 @@ export function DashboardCliente() {
 
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-          {sidebarOpen && <h1 className="text-xl font-bold">HaaS Portal</h1>}
+        <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-gray-800 rounded-lg transition"
+            className="text-gray-400 hover:text-white"
           >
-            {sidebarOpen ? '←' : '→'}
+            ☰
           </button>
         </div>
 
-        <div className="flex-1 p-4">
-          {sidebarOpen && (
-            <div className="space-y-4">
-              <div className="text-sm text-gray-400">
-                <p className="font-semibold text-gray-300">Usuário</p>
-                <p className="truncate">{usuario?.email}</p>
-              </div>
-              <div className="text-sm text-gray-400">
-                <p className="font-semibold text-gray-300">Contratos</p>
-                <p>{stats.totalContratos}</p>
-              </div>
-              <div className="text-sm text-gray-400">
-                <p className="font-semibold text-gray-300">Equipamentos</p>
-                <p>{stats.totalEquipamentos}</p>
-              </div>
-            </div>
-          )}
-        </div>
+        <nav className="flex-1 p-4 space-y-2">
+          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
+          
+          <a href="#" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
+            {sidebarOpen && <span>Dashboard</span>}
+          </a>
 
-        <div className="p-4 border-t border-gray-800">
           <button
             onClick={handleLogout}
-            className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition text-sm font-semibold"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
           >
-            {sidebarOpen ? 'Logout' : '↓'}
+            {sidebarOpen && <span>Sair</span>}
           </button>
-        </div>
+        </nav>
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* HEADER */}
+        <div className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Portal HaaS - Cliente</h1>
+            <p className="text-sm text-gray-600">Bem-vindo, {usuario?.nome}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')}</p>
+          </div>
+        </div>
+
+        {/* CONTENT */}
+        <div className="flex-1 overflow-auto p-8">
           {loading ? (
-            <div className="flex items-center justify-center h-screen">
+            <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                <p className="text-gray-600">Carregando dados...</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Carregando...</p>
               </div>
             </div>
           ) : (
@@ -356,9 +354,9 @@ export function DashboardCliente() {
               {/* INSTRUÇÕES E VÍDEO */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* INSTRUÇÕES */}
-                <div className="bg-gray-50 border border-gray-300 rounded-lg p-6">
-                  <h2 className="text-lg font-semibold text-gray-700 mb-4">Instruções Importantes</h2>
-                  <div className="space-y-3 text-gray-600 text-sm">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-blue-900 mb-4">Instruções Importantes</h2>
+                  <div className="space-y-3 text-blue-800 text-sm">
                     <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
                     <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
                     <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
@@ -387,15 +385,15 @@ export function DashboardCliente() {
               {/* ESTATÍSTICAS */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-3xl font-bold text-gray-700 mb-2">{stats.totalContratos}</div>
+                  <div className="text-3xl font-bold text-blue-600 mb-2">{stats.totalContratos}</div>
                   <p className="text-gray-600">Contratos Vinculados</p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-3xl font-bold text-gray-700 mb-2">{stats.totalEquipamentos}</div>
+                  <div className="text-3xl font-bold text-green-600 mb-2">{stats.totalEquipamentos}</div>
                   <p className="text-gray-600">Equipamentos</p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-3xl font-bold text-gray-700 mb-2">{stats.checklistsPendentes}</div>
+                  <div className="text-3xl font-bold text-orange-600 mb-2">{stats.checklistsPendentes}</div>
                   <p className="text-gray-600">Checklists Pendentes</p>
                 </div>
               </div>
@@ -412,12 +410,12 @@ export function DashboardCliente() {
                       placeholder="Digite o número de série..."
                       value={filtroSerial}
                       onChange={(e) => setFiltroSerial(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <button
                     onClick={() => setShowAdicionarEquipamento(true)}
-                    className="px-6 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-semibold transition"
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
                   >
                     + Adicionar Equipamento
                   </button>
@@ -440,7 +438,7 @@ export function DashboardCliente() {
                         value={novoSerial}
                         onChange={(e) => setNovoSerial(e.target.value)}
                         disabled={verificando}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:bg-gray-100"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       />
                     </div>
 
@@ -473,7 +471,7 @@ export function DashboardCliente() {
                       <button
                         onClick={verificarEquipamento}
                         disabled={verificando || !novoSerial.trim()}
-                        className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                       >
                         {verificando ? 'Verificando...' : 'Verificar'}
                       </button>
@@ -533,7 +531,7 @@ export function DashboardCliente() {
                                 className={`px-4 py-2 rounded text-sm font-semibold transition ${
                                   equipamento.status === 'Concluído'
                                     ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                    : 'bg-blue-900 hover:bg-blue-950 text-white'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
                                 }`}
                               >
                                 {equipamento.status === 'Concluído' ? 'Vistoria Realizada' : 'Iniciar Vistoria'}
