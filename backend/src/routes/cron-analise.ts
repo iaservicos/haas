@@ -2,6 +2,79 @@ import express from 'express';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
+// ✅ Configuração de retry com backoff exponencial
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 2000; // 2 segundos
+const MAX_RETRY_DELAY = 30000; // 30 segundos
+
+/**
+ * Função para calcular delay com backoff exponencial
+ * Tentativa 1: 2s, Tentativa 2: 4s, Tentativa 3: 8s
+ */
+function getRetryDelay(attempt: number): number {
+  const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
+  return Math.min(delay, MAX_RETRY_DELAY);
+}
+
+/**
+ * Função para verificar se o erro é retentável
+ */
+function isRetryableError(error: any): boolean {
+  if (error.response?.status === 503) return true; // Service Unavailable
+  if (error.response?.status === 429) return true; // Too Many Requests
+  if (error.response?.status === 500) return true; // Internal Server Error
+  if (error.code === 'ECONNRESET') return true; // Connection reset
+  if (error.code === 'ETIMEDOUT') return true; // Timeout
+  if (error.code === 'ENOTFOUND') return true; // DNS error
+  return false;
+}
+
+/**
+ * Função para fazer requisição com retry automático
+ */
+async function makeGeminiRequestWithRetry(
+  url: string,
+  data: any,
+  analysisId: number
+): Promise<any> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} para análise ${analysisId}...`);
+      
+      const response = await axios.post(url, data, {
+        timeout: 120000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log(`[CRON] ✅ Sucesso na tentativa ${attempt}`);
+      return response;
+      
+    } catch (error: any) {
+      lastError = error;
+      const status = error.response?.status || 'N/A';
+      const message = error.message || 'Erro desconhecido';
+      
+      console.log(`[CRON] ❌ Tentativa ${attempt} falhou (Status: ${status}, Erro: ${message})`);
+      
+      // Se não é retentável ou é a última tentativa, lançar erro
+      if (!isRetryableError(error) || attempt === MAX_RETRIES) {
+        throw error;
+      }
+      
+      // Calcular delay e aguardar
+      const delay = getRetryDelay(attempt);
+      console.log(`[CRON] ⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
   process.env.SUPABASE_KEY || ''
@@ -17,6 +90,8 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * ✅ POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
+ * PROMPT ASSERTIVO COM CATEGORIAS ESPECÍFICAS
+ * COM RETRY AUTOMÁTICO E BACKOFF EXPONENCIAL
  */
 router.post('/analise-fotos', async (req: any, res: any  ) => {
   try {
@@ -97,19 +172,80 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
         
         console.log(`[CRON] Usando mime type: ${mimeType}`);
 
-        // ✅ Enviar para Gemini Pro
-        // ✅ Aguardar 5 segundos para evitar rate limit
-        console.log('[CRON] Aguardando 5 segundos para evitar rate limit...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // ✅ Enviar para Gemini Pro COM RETRY AUTOMÁTICO
+        console.log('[CRON] Enviando para Gemini Pro com retry automático...');
 
-        const geminiResponse = await axios.post(
+        const geminiResponse = await makeGeminiRequestWithRetry(
           `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
           {
             contents: [
               {
                 parts: [
                   {
-                    text: `Você é um especialista em inspeção de equipamentos de TI. Analise a foto do equipamento e forneça uma avaliação detalhada.\n\nNúmero de série: ${analise.numero_serie || 'N/A'}\nNome da foto: ${fileName}\n\nAnalise o estado do equipamento na imagem e responda em JSON com a seguinte estrutura exata:\n{\n  "status": "OK" ou "AVARIA",\n  "danos": ["lista de danos encontrados, ou [] se nenhum"],\n  "descricao": "descrição detalhada do estado do equipamento",\n  "recomendacao": "recomendação de ação"\n}\n\nSeja preciso, objetivo e detalhado. Responda APENAS com o JSON, sem explicações adicionais.`,
+                    text: `Você é um especialista em inspeção de equipamentos de TI da Positivo Tecnologia. Analise a foto do equipamento e identifique danos ESPECÍFICOS e ASSERTIVOS.
+
+Número de série: ${analise.numero_serie || 'N/A'}
+Nome da foto: ${fileName}
+
+CATEGORIAS DE AVARIAS ACEITAS (use EXATAMENTE como está):
+
+TELA/DISPLAY:
+- Trincas (pequenas, médias, grandes)
+- Quebras (vidro quebrado)
+- Manchas (pixel morto, mancha de tinta)
+- Desbotamento
+- Linhas horizontais/verticais
+- Vidro solto
+
+CARCAÇA:
+- Amassados
+- Trincas
+- Queimaduras
+- Corrosão
+- Deformação
+- Peças faltando
+
+TECLADO:
+- Teclas faltando
+- Teclas soltas
+- Derramamento de líquido
+
+TOUCHPAD:
+- Trincado
+- Solto
+- Molhado
+
+CONECTORES:
+- USB danificado
+- HDMI danificado
+- Carregador danificado
+- Conectores soltos
+- Conectores quebrados
+
+BATERIA (Notebooks):
+- Inchada
+- Danificada
+- Vazando
+
+OUTROS:
+- Sinais de líquido
+- Oxidação
+
+INSTRUÇÕES:
+1. Se o equipamento está OK (sem danos visíveis), retorne status="OK" e deixe categoria e tipo_dano vazios
+2. Se houver dano, identifique a CATEGORIA e o TIPO_DANO específico
+3. A descrição deve ser RESUMIDA em 1 linhas máximo
+4. Seja ASSERTIVO e ESPECÍFICO
+
+Responda em JSON com EXATAMENTE esta estrutura:
+{
+  "status": "OK" ou "AVARIA",
+  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "TOUCHPAD" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
+  "tipo_dano": "tipo específico encontrado" (ex: "Trincas", "Quebras", "Amassados") (vazio se OK),
+  "descricao": "descrição resumida em 1 linhas",  
+}
+
+Responda APENAS com o JSON, sem explicações adicionais.`,
                   },
                   {
                     inline_data: {
@@ -121,12 +257,7 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
               },
             ],
           },
-          {
-            timeout: 120000,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
+          analise.id
         );
 
         // ✅ Extrair resposta do Gemini
@@ -177,8 +308,10 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
         console.log(`[CRON] Análise ${analise.id} processada com sucesso!`);
         processadas++;
 
-      } catch (error) {
-        console.error(`[CRON] Erro ao processar análise ${analise.id}:`, error);
+      } catch (error: any) {
+        const status = error.response?.status || 'N/A';
+        const message = error.message || 'Erro desconhecido';
+        console.error(`[CRON] ❌ Erro ao processar análise ${analise.id} (Status: ${status}): ${message}`);
 
         // ✅ Registrar erro na análise
         try {
@@ -188,10 +321,12 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
               status: 'erro',
               resultado_gptmaker: JSON.stringify({
                 status: 'ERRO',
-                erro: error instanceof Error ? error.message : 'Erro desconhecido',
-                danos: [],
-                descricao: 'Erro ao processar análise',
-                recomendacao: 'Tente novamente',
+                erro: message,
+                status_code: status,
+                categoria: '',
+                tipo_dano: '',
+                descricao: 'Erro ao processar análise após 3 tentativas',
+                recomendacao: 'Será retentado automaticamente',
               }),
               updated_at: new Date().toISOString(),
             })
@@ -204,7 +339,7 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
       }
     }
 
-    console.log(`[CRON] Processamento concluído: ${processadas} processadas, ${erros} erros`);
+    console.log(`[CRON] ✅ Processamento concluído: ${processadas} processadas, ${erros} erros`);
 
     res.json({
       success: true,
@@ -214,11 +349,13 @@ router.post('/analise-fotos', async (req: any, res: any  ) => {
       total: analisesPendentes.length,
     });
 
-  } catch (error) {
-    console.error('[CRON] Erro geral:', error);
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('[CRON] ❌ Erro geral:', message);
     res.status(500).json({
       error: 'Erro ao processar cron job',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
+      details: message,
+      timestamp: new Date().toISOString()
     });
   }
 });
