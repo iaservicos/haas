@@ -338,7 +338,7 @@ export function DashboardCliente() {
                 alt="Logo Positivo"
                 className="h-10 w-auto"
               />
-              <h1 className="text-2xl font-bold text-gray-900">Portal de Vistoria HaaS</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Sistema de Vistoria HaaS</h1>
             </div>
             <div className="text-right text-sm text-gray-600">
               <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>

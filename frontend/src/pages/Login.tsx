@@ -79,7 +79,7 @@ export function Login() {
               alt="Logo Positivo"
               className="h-16 w-auto mx-auto mb-4 bg-white p-2 rounded-lg"
             />
-            <h1 className="text-2xl font-bold text-white">Portal HaaS</h1>
+            <h1 className="text-2xl font-bold text-white">Sistema de Vistoria HaaS</h1>
           </div>
 
           {/* Formulário */}
