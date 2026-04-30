@@ -53,7 +53,7 @@ export function Login() {
             alt="Logo Positivo"
             className="h-32 w-auto mx-auto mb-8 bg-white p-4 rounded-lg"
           />
-          <h1 className="text-4xl font-bold text-white mb-4">Portal HaaS</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">Sistema de Vistoria HaaS</h1>
           <p className="text-xl text-gray-300 mb-8">Sistema de Vistoria de Equipamentos</p>
           <div className="space-y-4 text-gray-400">
             <p className="flex items-center gap-3">
