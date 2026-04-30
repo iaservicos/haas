@@ -63,7 +63,7 @@ export function Login() {
               <span className="text-blue-400">✓</span> Relatórios em tempo real
             </p>
             <p className="flex items-center gap-3">
-              <span className="text-blue-400">✓</span> Integração com GPTMaker
+              <span className="text-blue-400">✓</span> Integração com Inteligencia Artificial
             </p>
           </div>
         </div>
