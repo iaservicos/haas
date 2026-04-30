@@ -330,14 +330,19 @@ export function DashboardCliente() {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-sm">P</div>
-            <span className="text-sm font-semibold text-gray-600">Positivo</span>
-          </div>
-          <h1 className="text-xl font-bold text-gray-900">HaaS Portal</h1>
-          <div className="text-right">
-            <p className="text-sm font-semibold text-gray-900">{usuario?.nome || 'Cliente'}</p>
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <img
+                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
+                alt="Logo Positivo"
+                className="h-10 w-auto"
+              />
+              <h1 className="text-2xl font-bold text-gray-900">Portal de Vistoria HaaS</h1>
+            </div>
+            <div className="text-right text-sm text-gray-600">
+              <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>
+            </div>
           </div>
         </div>
 
