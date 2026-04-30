@@ -56,17 +56,17 @@ function gerarArquivoExcel() {
     const confirmacoesData = [
       {
         'Serial': '5A4044G3H',
-        'Nota Fiscal': 'NF-123456',
+        'Nota Fiscal': '123456',
         'Destino': 'São Paulo - SP'
       },
       {
         'Serial': '4AF91NQ5F',
-        'Nota Fiscal': 'NF-123457',
+        'Nota Fiscal': '123457',
         'Destino': 'Rio de Janeiro - RJ'
       },
       {
         'Serial': '4AF91NQ4A',
-        'Nota Fiscal': 'NF-123458',
+        'Nota Fiscal': '123458',
         'Destino': 'Belo Horizonte - MG'
       }
     ];
