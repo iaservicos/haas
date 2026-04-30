@@ -341,18 +341,28 @@ export const Confirmacoes: React.FC = () => {
         <nav className="flex-1 p-4 space-y-2">
           <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
 
-          <a
-            href="/dashboard-analista"
-            className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
-          >
+          <a href="/" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
-          <a
-            href="#"
-            className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white"
-          >
-            {sidebarOpen && <span>Confirmações</span>}
+          <a href="/clientes" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Clientes</span>}
+          </a>
+
+          <a href="/contratos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Contratos</span>}
+          </a>
+
+          <a href="/equipamentos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Equipamentos</span>}
+          </a>
+
+          <a href="/confirmacoes" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
+            {sidebarOpen && <span>Confirmacoes</span>}
+          </a>
+
+          <a href="/fotos" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+            {sidebarOpen && <span>Fotos</span>}
           </a>
 
           <button
