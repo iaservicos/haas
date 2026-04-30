@@ -329,17 +329,6 @@ export function DashboardCliente() {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* HEADER */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Portal HaaS - Cliente</h1>
-            <p className="text-sm text-gray-600">Bem-vindo, {usuario?.nome}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-600">{new Date().toLocaleDateString('pt-BR')}</p>
-          </div>
-        </div>
-
         {/* CONTENT */}
         <div className="flex-1 overflow-auto p-8">
           {loading ? (
@@ -354,9 +343,9 @@ export function DashboardCliente() {
               {/* INSTRUÇÕES E VÍDEO */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* INSTRUÇÕES */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <h2 className="text-lg font-semibold text-blue-900 mb-4">Instruções Importantes</h2>
-                  <div className="space-y-3 text-blue-800 text-sm">
+                <div className="bg-gray-50 border border-gray-300 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-gray-700 mb-4">Instruções Importantes</h2>
+                  <div className="space-y-3 text-gray-600 text-sm">
                     <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
                     <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
                     <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
@@ -531,7 +520,7 @@ export function DashboardCliente() {
                                 className={`px-4 py-2 rounded text-sm font-semibold transition ${
                                   equipamento.status === 'Concluído'
                                     ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    : 'bg-blue-900 hover:bg-blue-950 text-white'
                                 }`}
                               >
                                 {equipamento.status === 'Concluído' ? 'Vistoria Realizada' : 'Iniciar Vistoria'}
