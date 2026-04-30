@@ -162,17 +162,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         </div>
       )}
 
-      {/* RESULTADO DA ANÁLISE */}
-      {resultado && (
-        <div className="p-6 bg-green-50 border-l-4 border-green-600 rounded-none">
-          <h4 className="font-bold text-green-900 mb-4 text-lg">Resultado da Análise:</h4>
-          <div className="space-y-3 text-green-800">
-            <p><strong>Status:</strong> {resultado.status}</p>
-            <p><strong>Resultado:</strong> {resultado.resultado}</p>
-            <p><strong>Descrição:</strong> {resultado.descricao}</p>
-          </div>
-        </div>
-      )}
+     
     </div>
   );
 };
