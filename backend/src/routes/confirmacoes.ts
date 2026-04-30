@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
-import * as XLSX from 'xlsx';
 
 const router = Router();
 
@@ -186,7 +185,8 @@ router.post('/confirmacoes-salvar', async (req: Request, res: Response) => {
 
 /**
  * POST /api/confirmacoes-importar
- * Importar confirmações em massa via arquivo Excel/CSV
+ * Importar confirmações em massa via dados parseados do frontend
+ * O frontend faz o parse do Excel/CSV e envia os dados como array
  */
 router.post('/confirmacoes-importar', async (req: Request, res: Response) => {
   try {

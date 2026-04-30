@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import * as XLSX from 'xlsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -216,6 +215,37 @@ export const Confirmacoes: React.FC = () => {
     }
   };
 
+  // Carregar XLSX do CDN (como em GerenciarEquipamentos)
+  const loadXLSXLibrary = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).XLSX) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+
+      script.onload = () => {
+        setTimeout(() => {
+          if ((window as any).XLSX) {
+            resolve();
+          } else {
+            reject(new Error('XLSX não carregou'));
+          }
+        }, 100);
+      };
+
+      script.onerror = () => {
+        reject(new Error('Erro ao carregar XLSX do CDN'));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
+
   const handleImportarMassa = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -224,46 +254,70 @@ export const Confirmacoes: React.FC = () => {
     setMensagemUpload('');
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const dados = XLSX.utils.sheet_to_json(worksheet);
+      // Carregar biblioteca XLSX do CDN
+      await loadXLSXLibrary();
 
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/confirmacoes-importar`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ dados }),
-      });
-
-      if (!response.ok) throw new Error('Erro ao importar');
-
-      const result = await response.json();
-
-      let msg = `✅ ${result.processados} equipamento(s) processado(s)!`;
-      if (result.erros > 0) {
-        msg += `\n\n❌ ${result.erros} erro(s):\n`;
-        result.detalhesErros.forEach((e: any) => {
-          msg += `- ${e.serial || `Linha ${e.linha}`}: ${e.erro}\n`;
-        });
+      const XLSX = (window as any).XLSX;
+      if (!XLSX) {
+        setMensagemUpload('❌ Biblioteca XLSX não carregou. Tente novamente.');
+        setUploadando(false);
+        return;
       }
 
-      setMensagemUpload(msg);
+      // Ler arquivo
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = e.target?.result as ArrayBuffer;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const dados = XLSX.utils.sheet_to_json(worksheet);
 
-      // Recarregar equipamentos
-      if (filtroContrato) {
-        await loadEquipamentos(filtroContrato);
-      }
+          // Enviar dados parseados para o backend
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/confirmacoes-importar`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ dados }),
+          });
+
+          if (!response.ok) throw new Error('Erro ao importar');
+
+          const result = await response.json();
+
+          let msg = `✅ ${result.processados} equipamento(s) processado(s)!`;
+          if (result.erros > 0) {
+            msg += `\n\n❌ ${result.erros} erro(s):\n`;
+            result.detalhesErros.forEach((e: any) => {
+              msg += `- ${e.serial || `Linha ${e.linha}`}: ${e.erro}\n`;
+            });
+          }
+
+          setMensagemUpload(msg);
+
+          // Recarregar equipamentos
+          if (filtroContrato) {
+            await loadEquipamentos(filtroContrato);
+          }
+        } catch (error) {
+          console.error('[Confirmacoes] Erro ao processar arquivo:', error);
+          setMensagemUpload('❌ Erro ao processar arquivo');
+        } finally {
+          setUploadando(false);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
     } catch (error) {
-      console.error('[Confirmacoes] Erro ao importar:', error);
-      setMensagemUpload('❌ Erro ao processar arquivo');
-    } finally {
+      console.error('[Confirmacoes] Erro ao carregar XLSX:', error);
+      setMensagemUpload('❌ Erro ao carregar biblioteca XLSX');
       setUploadando(false);
-      event.target.value = '';
     }
+
+    event.target.value = '';
   };
 
   const handleLogout = () => {
