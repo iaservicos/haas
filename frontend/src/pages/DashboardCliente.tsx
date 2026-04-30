@@ -514,12 +514,12 @@ export function DashboardCliente() {
                             <td className="px-6 py-4 text-sm text-gray-600">{equipamento.destino || '—'}</td>
                             <td className="px-6 py-4 text-sm text-gray-600">{equipamento.nota_fiscal || '—'}</td>
                             <td className="px-6 py-4 text-sm">
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              <span className={`px-2 py-1 text-xs font-medium border border-gray-300 rounded ${
                                 equipamento.status === 'Pendente'
-                                  ? 'bg-yellow-100 text-yellow-800'
+                                  ? 'text-gray-700 bg-gray-50'
                                   : equipamento.status === 'Concluído'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-800'
+                                  ? 'text-gray-800 bg-white'
+                                  : 'text-gray-600 bg-gray-50'
                               }`}>
                                 {equipamento.status}
                               </span>
