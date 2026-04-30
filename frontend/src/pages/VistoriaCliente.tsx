@@ -280,25 +280,32 @@ export const VistoriaCliente: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL DE SUCESSO - PROFISSIONAL E MINIMALISTA */}
+      {/* MODAL DE SUCESSO - SEM EMOJI */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-none shadow-lg max-w-md w-full p-10">
-            <h3 className="text-2xl font-bold text-gray-900 mb-3">Vistoria Concluida</h3>
-            <p className="text-gray-600 mb-8 text-base leading-relaxed">
-              A vistoria foi processada com sucesso. Voce sera redirecionado automaticamente.
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-none shadow-2xl max-w-md w-full p-12 text-center border-t-4 border-t-green-600">
+            <div className="flex justify-center mb-8">
+              <div className="w-20 h-20 bg-green-600 rounded-none flex items-center justify-center">
+                <span className="text-5xl font-bold text-white">✓</span>
+              </div>
+            </div>
+            
+            <h3 className="text-3xl font-bold text-gray-900 mb-4 uppercase tracking-wide">Importação Resolvida!</h3>
+            <p className="text-gray-700 mb-8 text-lg">
+              A vistoria foi processada com sucesso. Você será redirecionado em breve.
             </p>
             
             <div className="flex gap-3">
               <button
                 onClick={() => navigate('/dashboard-cliente')}
-                className="flex-1 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-none font-semibold text-sm transition-colors"
+                className="flex-1 px-6 py-4 bg-gray-900 hover:bg-gray-800 text-white rounded-none font-bold text-lg transition-colors uppercase tracking-wide"
               >
                 Voltar ao Dashboard
               </button>
             </div>
           </div>
         </div>
-      )}    </div>
+      )}
+    </div>
   );
 };
