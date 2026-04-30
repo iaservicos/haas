@@ -1,14 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../services/supabase';
 import * as XLSX from 'xlsx';
 
-interface Equipamento {
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+interface Cliente {
   id: number;
-  numero_serie: string;
-  modelo: string;
-  contrato_id: number;
+  nome_cliente: string;
 }
 
 interface Contrato {
@@ -17,32 +16,33 @@ interface Contrato {
   nome_cliente: string;
 }
 
-interface Confirmacao {
+interface Equipamento {
   id: number;
-  equipamento_id: number;
   numero_serie: string;
-  nota_fiscal: string | null;
-  destino: string | null;
+  modelo: string;
+  tipo_material: string;
+  confirmacao: {
+    id: number;
+    nota_fiscal: string | null;
+    destino: string | null;
+  } | null;
 }
 
-export function Confirmacoes() {
+export const Confirmacoes: React.FC = () => {
   const navigate = useNavigate();
-  const { usuario, logout } = useAuth();
+  const { logout } = useAuth();
+
+  // STATE
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
 
   // FILTROS
   const [filtroCliente, setFiltroCliente] = useState('');
   const [filtroContrato, setFiltroContrato] = useState('');
-
-  // DADOS
-  const [clientes, setClientes] = useState<Contrato[]>([]);
-  const [contratos, setContratos] = useState<Contrato[]>([]);
-  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
-  const [confirmacoes, setConfirmacoes] = useState<Confirmacao[]>([]);
-
-  // SELEÇÃO
-  const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
 
   // MODAL
   const [showModal, setShowModal] = useState(false);
@@ -54,108 +54,100 @@ export function Confirmacoes() {
   const [uploadando, setUploadando] = useState(false);
   const [mensagemUpload, setMensagemUpload] = useState('');
 
-  // CARREGAR DADOS INICIAIS
+  // CARREGAR CLIENTES
   useEffect(() => {
-    loadDados();
+    loadClientes();
   }, []);
 
-  // FILTRAR CONTRATOS QUANDO CLIENTE MUDA
+  // CARREGAR CONTRATOS QUANDO CLIENTE MUDA
   useEffect(() => {
     if (filtroCliente) {
-      const clienteSelecionado = clientes.find(c => c.nome_cliente === filtroCliente);
-      if (clienteSelecionado) {
-        loadContratos(clienteSelecionado.id);
-      }
+      loadContratos(filtroCliente);
     } else {
       setContratos([]);
       setFiltroContrato('');
+      setEquipamentos([]);
     }
   }, [filtroCliente]);
 
-  // FILTRAR EQUIPAMENTOS QUANDO CONTRATO MUDA
+  // CARREGAR EQUIPAMENTOS QUANDO CONTRATO MUDA
   useEffect(() => {
     if (filtroContrato) {
-      loadEquipamentos(parseInt(filtroContrato));
+      loadEquipamentos(filtroContrato);
     } else {
       setEquipamentos([]);
     }
   }, [filtroContrato]);
 
-  const loadDados = async () => {
+  const loadClientes = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/confirmacoes-clientes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      // Buscar clientes únicos
-      const { data: contratosData, error: contratosError } = await supabase
-        .from('contratos')
-        .select('id, numero_contrato, nome_cliente')
-        .order('nome_cliente');
+      if (!response.ok) throw new Error('Erro ao buscar clientes');
 
-      if (contratosError) throw contratosError;
-
-      const clientesUnicos = Array.from(
-        new Map(
-          (contratosData || []).map(c => [c.nome_cliente, c])
-        ).values()
-      );
-
-      setClientes(clientesUnicos);
-
-      // Buscar confirmações existentes
-      const { data: confirmacoesData, error: confirmacoesError } = await supabase
-        .from('equipamento_confirmacoes')
-        .select('*');
-
-      if (confirmacoesError) throw confirmacoesError;
-      setConfirmacoes(confirmacoesData || []);
+      const result = await response.json();
+      setClientes(result.data || []);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      alert('Erro ao carregar dados');
+      console.error('[Confirmacoes] Erro ao carregar clientes:', error);
+      alert('Erro ao carregar clientes');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadContratos = async (clienteId: number) => {
+  const loadContratos = async (nomeCliente: string) => {
     try {
-      const { data, error } = await supabase
-        .from('contratos')
-        .select('id, numero_contrato, nome_cliente')
-        .eq('nome_cliente', clientes.find(c => c.id === clienteId)?.nome_cliente || '')
-        .order('numero_contrato');
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE_URL}/confirmacoes-contratos/${encodeURIComponent(nomeCliente)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (error) throw error;
-      setContratos(data || []);
+      if (!response.ok) throw new Error('Erro ao buscar contratos');
+
+      const result = await response.json();
+      setContratos(result.data || []);
     } catch (error) {
-      console.error('Erro ao carregar contratos:', error);
+      console.error('[Confirmacoes] Erro ao carregar contratos:', error);
+      alert('Erro ao carregar contratos');
     }
   };
 
-  const loadEquipamentos = async (contratoId: number) => {
+  const loadEquipamentos = async (contratoId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('contrato_equipamentos')
-        .select('id, numero_serie, modelo')
-        .eq('contrato_id', contratoId)
-        .order('numero_serie');
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE_URL}/confirmacoes-equipamentos/${contratoId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (error) throw error;
-      setEquipamentos(data || []);
+      if (!response.ok) throw new Error('Erro ao buscar equipamentos');
+
+      const result = await response.json();
+      setEquipamentos(result.data || []);
       setSelecionados(new Set());
     } catch (error) {
-      console.error('Erro ao carregar equipamentos:', error);
+      console.error('[Confirmacoes] Erro ao carregar equipamentos:', error);
+      alert('Erro ao carregar equipamentos');
     }
   };
-
-  const equipamentosFiltrados = useMemo(() => {
-    return equipamentos.map(eq => {
-      const confirmacao = confirmacoes.find(c => c.equipamento_id === eq.id);
-      return {
-        ...eq,
-        confirmacao,
-      };
-    });
-  }, [equipamentos, confirmacoes]);
 
   const handleSelecionarTodos = () => {
     if (selecionados.size === equipamentos.length) {
@@ -185,47 +177,39 @@ export function Confirmacoes() {
     try {
       const equipamentosSelecionados = equipamentos.filter(e => selecionados.has(e.id));
 
-      for (const eq of equipamentosSelecionados) {
-        const confirmacaoExistente = confirmacoes.find(c => c.equipamento_id === eq.id);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/confirmacoes-salvar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          equipamentos: equipamentosSelecionados.map(e => ({
+            equipamento_id: e.id,
+            numero_serie: e.numero_serie,
+          })),
+          nota_fiscal: notaFiscal,
+          destino: destino,
+        }),
+      });
 
-        if (confirmacaoExistente) {
-          // Atualizar
-          const { error } = await supabase
-            .from('equipamento_confirmacoes')
-            .update({
-              nota_fiscal: notaFiscal,
-              destino: destino,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', confirmacaoExistente.id);
+      if (!response.ok) throw new Error('Erro ao salvar confirmações');
 
-          if (error) throw error;
-        } else {
-          // Inserir
-          const { error } = await supabase
-            .from('equipamento_confirmacoes')
-            .insert({
-              equipamento_id: eq.id,
-              numero_serie: eq.numero_serie,
-              nota_fiscal: notaFiscal,
-              destino: destino,
-            });
+      const result = await response.json();
+      alert(`✅ ${result.salvos} equipamento(s) confirmado(s)!`);
 
-          if (error) throw error;
-        }
-      }
-
-      alert(`✅ ${equipamentosSelecionados.length} equipamento(s) confirmado(s)!`);
       setShowModal(false);
       setNotaFiscal('');
       setDestino('');
       setSelecionados(new Set());
-      await loadDados();
+
+      // Recarregar equipamentos
       if (filtroContrato) {
-        await loadEquipamentos(parseInt(filtroContrato));
+        await loadEquipamentos(filtroContrato);
       }
     } catch (error) {
-      console.error('Erro ao salvar:', error);
+      console.error('[Confirmacoes] Erro ao salvar:', error);
       alert('Erro ao salvar confirmações');
     } finally {
       setSalvando(false);
@@ -245,75 +229,36 @@ export function Confirmacoes() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const dados = XLSX.utils.sheet_to_json(worksheet);
 
-      let sucessos = 0;
-      let erros: string[] = [];
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/confirmacoes-importar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dados }),
+      });
 
-      for (const linha of dados) {
-        const serial = (linha['Serial'] || linha['serial'] || '').toString().trim();
-        const nf = (linha['Nota Fiscal'] || linha['nota_fiscal'] || '').toString().trim();
-        const dest = (linha['Destino'] || linha['destino'] || '').toString().trim();
+      if (!response.ok) throw new Error('Erro ao importar');
 
-        if (!serial) {
-          erros.push('Linha sem Serial');
-          continue;
-        }
+      const result = await response.json();
 
-        // Buscar equipamento pelo serial
-        const { data: equipData, error: equipError } = await supabase
-          .from('contrato_equipamentos')
-          .select('id')
-          .eq('numero_serie', serial)
-          .single();
-
-        if (equipError || !equipData) {
-          erros.push(`Serial não encontrado: ${serial}`);
-          continue;
-        }
-
-        // Verificar se já existe confirmação
-        const { data: confirmData } = await supabase
-          .from('equipamento_confirmacoes')
-          .select('id')
-          .eq('equipamento_id', equipData.id)
-          .single();
-
-        if (confirmData) {
-          // Atualizar
-          await supabase
-            .from('equipamento_confirmacoes')
-            .update({
-              nota_fiscal: nf,
-              destino: dest,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', confirmData.id);
-        } else {
-          // Inserir
-          await supabase
-            .from('equipamento_confirmacoes')
-            .insert({
-              equipamento_id: equipData.id,
-              numero_serie: serial,
-              nota_fiscal: nf,
-              destino: dest,
-            });
-        }
-
-        sucessos++;
-      }
-
-      let msg = `✅ ${sucessos} equipamento(s) processado(s)!`;
-      if (erros.length > 0) {
-        msg += `\n\n❌ ${erros.length} erro(s):\n${erros.join('\n')}`;
+      let msg = `✅ ${result.processados} equipamento(s) processado(s)!`;
+      if (result.erros > 0) {
+        msg += `\n\n❌ ${result.erros} erro(s):\n`;
+        result.detalhesErros.forEach((e: any) => {
+          msg += `- ${e.serial || `Linha ${e.linha}`}: ${e.erro}\n`;
+        });
       }
 
       setMensagemUpload(msg);
-      await loadDados();
+
+      // Recarregar equipamentos
       if (filtroContrato) {
-        await loadEquipamentos(parseInt(filtroContrato));
+        await loadEquipamentos(filtroContrato);
       }
     } catch (error) {
-      console.error('Erro ao importar:', error);
+      console.error('[Confirmacoes] Erro ao importar:', error);
       setMensagemUpload('❌ Erro ao processar arquivo');
     } finally {
       setUploadando(false);
@@ -341,12 +286,18 @@ export function Confirmacoes() {
 
         <nav className="flex-1 p-4 space-y-2">
           <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
-          
-          <a href="/dashboard" className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition">
+
+          <a
+            href="/dashboard-analista"
+            className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
+          >
             {sidebarOpen && <span>Dashboard</span>}
           </a>
 
-          <a href="#" className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white">
+          <a
+            href="#"
+            className="flex items-center gap-3 px-4 py-3 bg-blue-600 rounded text-white"
+          >
             {sidebarOpen && <span>Confirmações</span>}
           </a>
 
@@ -362,19 +313,14 @@ export function Confirmacoes() {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img
-                src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
-                alt="Logo Positivo"
-                className="h-10 w-auto"
-              />
-              <h1 className="text-2xl font-bold text-gray-900">Sistema de Vistoria HaaS</h1>
-            </div>
-            <div className="text-right text-sm text-gray-600">
-              <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>
-            </div>
+        <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img
+              src="https://raw.githubusercontent.com/iaservicos/IMAGENS/refs/heads/main/Logo_Positivo_Tecnologia_Prote%C3%A7%C3%A3o_Preto-3-(1)%20(1).png"
+              alt="Logo Positivo"
+              className="h-10 w-auto"
+            />
+            <h1 className="text-2xl font-bold text-gray-900">Sistema de Vistoria HaaS</h1>
           </div>
         </div>
 
@@ -496,14 +442,14 @@ export function Confirmacoes() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {equipamentosFiltrados.length === 0 ? (
+                        {equipamentos.length === 0 ? (
                           <tr>
                             <td colSpan={5} className="px-6 py-4 text-center text-gray-600">
                               Nenhum equipamento encontrado
                             </td>
                           </tr>
                         ) : (
-                          equipamentosFiltrados.map(eq => (
+                          equipamentos.map(eq => (
                             <tr key={eq.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4">
                                 <input
@@ -589,4 +535,4 @@ export function Confirmacoes() {
       </div>
     </div>
   );
-}
+};
