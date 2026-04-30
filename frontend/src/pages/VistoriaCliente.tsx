@@ -306,6 +306,6 @@ export const VistoriaCliente: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+          </div>
   );
 };

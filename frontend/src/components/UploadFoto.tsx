@@ -101,38 +101,76 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
   };
 
   return (
-    <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h3>Upload de Foto</h3>
+    <div className="space-y-6">
+      {/* INPUT FILE COM LABEL CUSTOMIZADO */}
+      <div className="flex flex-col gap-3">
+        <label className="block">
+          <span className="sr-only">Escolher foto</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFotoChange}
+            disabled={loading}
+            className="block w-full text-sm text-gray-700
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-none file:border-0
+              file:text-sm file:font-semibold
+              file:bg-gray-900 file:text-white
+              hover:file:bg-gray-800
+              file:cursor-pointer file:transition-colors
+              disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+        </label>
+      </div>
 
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFotoChange}
-        disabled={loading}
-      />
-
+      {/* PREVIEW DA IMAGEM */}
       {preview && (
-        <div style={{ marginTop: '10px' }}>
-          <img src={preview} alt="Preview" style={{ maxWidth: '200px', maxHeight: '200px' }} />
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold text-gray-900">Prévia da foto:</p>
+          <div className="border-2 border-gray-300 rounded-none p-4 bg-gray-50 inline-block">
+            <img 
+              src={preview} 
+              alt="Preview" 
+              className="max-w-xs max-h-64 rounded-none"
+            />
+          </div>
         </div>
       )}
 
-      <button
-        onClick={handleUpload}
-        disabled={!foto || loading}
-        style={{ marginTop: '10px', padding: '10px 20px' }}
-      >
-        {loading ? 'Enviando...' : 'Enviar Foto'}
-      </button>
+      {/* BOTÃO ENVIAR FOTO - TAMANHO PADRÃO */}
+      <div className="flex gap-3 pt-4">
+        <button
+          onClick={handleUpload}
+          disabled={!foto || loading}
+          className="px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-none font-bold text-base transition-colors uppercase tracking-wide"
+        >
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <span className="inline-block animate-spin">⟳</span>
+              Enviando...
+            </span>
+          ) : (
+            'Enviar Foto'
+          )}
+        </button>
+      </div>
 
-      {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
+      {/* MENSAGEM DE ERRO */}
+      {erro && (
+        <div className="p-4 bg-red-50 border-l-4 border-red-600 rounded-none">
+          <p className="text-red-700 font-semibold">{erro}</p>
+        </div>
+      )}
 
+      {/* RESULTADO DA ANÁLISE */}
       {resultado && (
-        <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
-          <h4>Resultado da Análise:</h4>
-          <p><strong>Status:</strong> {resultado.status}</p>
-          <p><strong>Resultado:</strong> {resultado.resultado}</p>
-          <p><strong>Descrição:</strong> {resultado.descricao}</p>
+        <div className="p-6 bg-green-50 border-l-4 border-green-600 rounded-none">
+          <h4 className="font-bold text-green-900 mb-4 text-lg">Resultado da Análise:</h4>
+          <div className="space-y-3 text-green-800">
+            <p><strong>Status:</strong> {resultado.status}</p>
+            <p><strong>Resultado:</strong> {resultado.resultado}</p>
+            <p><strong>Descrição:</strong> {resultado.descricao}</p>
+          </div>
         </div>
       )}
     </div>
