@@ -1765,13 +1765,20 @@ export function Dashboard() {
               >
                 Fechar
               </button>
-              <a
-                href={fotoModalUrl}
-                download={fotoModalNome}
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = fotoModalUrl;
+                  link.download = fotoModalNome || 'foto.jpg';
+                  link.setAttribute('target', '_blank');
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
                 Baixar
-              </a>
+              </button>
             </div>
           </div>
         </div>
