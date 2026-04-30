@@ -520,7 +520,7 @@ export function DashboardCliente() {
                                 className={`px-4 py-2 rounded text-sm font-semibold transition ${
                                   equipamento.status === 'Concluído'
                                     ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                    : 'bg-black hover:bg-gray-900 text-white'
+                                    : 'bg-blue-950 hover:bg-black text-white'
                                 }`}
                               >
                                 {equipamento.status === 'Concluído' ? 'Vistoria Realizada' : 'Iniciar Vistoria'}
