@@ -2,24 +2,6 @@ import express from 'express';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_KEY || ''
-);
-
-const router = express.Router();
-
-// ✅ Configuração do Gemini Pro com FALLBACK
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-// ✅ Modelos em ordem de preferência (fallback)
-const GEMINI_MODELS = [
-  'gemini-3.1-pro-preview',  // Novo, mais estável
-  'gemini-1.5-flash',         // Estável, rápido
-  'gemini-2.5-flash',         // Fallback (pode estar instável)
-];
-
 // ✅ Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000; // 2 segundos
@@ -48,10 +30,9 @@ function isRetryableError(error: any): boolean {
 }
 
 /**
- * Função para fazer requisição com retry automático para um modelo específico
+ * Função para fazer requisição com retry automático
  */
 async function makeGeminiRequestWithRetry(
-  model: string,
   url: string,
   data: any,
   analysisId: number
@@ -60,7 +41,7 @@ async function makeGeminiRequestWithRetry(
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com modelo ${model} para análise ${analysisId}...`);
+      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} para análise ${analysisId}...`);
       
       const response = await axios.post(url, data, {
         timeout: 120000,
@@ -69,7 +50,7 @@ async function makeGeminiRequestWithRetry(
         },
       });
       
-      console.log(`[CRON] ✅ Sucesso na tentativa ${attempt} com modelo ${model}`);
+      console.log(`[CRON] ✅ Sucesso na tentativa ${attempt}`);
       return response;
       
     } catch (error: any) {
@@ -77,7 +58,7 @@ async function makeGeminiRequestWithRetry(
       const status = error.response?.status || 'N/A';
       const message = error.message || 'Erro desconhecido';
       
-      console.log(`[CRON] ❌ Tentativa ${attempt} falhou (Modelo: ${model}, Status: ${status}, Erro: ${message})`);
+      console.log(`[CRON] ❌ Tentativa ${attempt} falhou (Status: ${status}, Erro: ${message})`);
       
       // Se não é retentável ou é a última tentativa, lançar erro
       if (!isRetryableError(error) || attempt === MAX_RETRIES) {
@@ -94,54 +75,25 @@ async function makeGeminiRequestWithRetry(
   throw lastError;
 }
 
-/**
- * Função para tentar múltiplos modelos com fallback
- */
-async function makeGeminiRequestWithFallback(
-  data: any,
-  analysisId: number
-): Promise<any> {
-  let lastError: any;
-  
-  for (const model of GEMINI_MODELS) {
-    try {
-      console.log(`[CRON] 🔄 Tentando modelo: ${model}`);
-      
-      const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const response = await makeGeminiRequestWithRetry(
-        model,
-        url,
-        data,
-        analysisId
-      );
-      
-      console.log(`[CRON] ✅ Sucesso com modelo ${model}!`);
-      return response;
-      
-    } catch (error: any) {
-      lastError = error;
-      const status = error.response?.status || 'N/A';
-      const message = error.message || 'Erro desconhecido';
-      
-      console.log(`[CRON] ❌ Modelo ${model} falhou (Status: ${status}): ${message}`);
-      console.log(`[CRON] 🔄 Tentando próximo modelo...`);
-      
-      // Aguardar um pouco antes de tentar o próximo modelo
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  
-  throw lastError;
-}
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_KEY || ''
+);
+
+const router = express.Router();
+
+// ✅ Configuração do Gemini Pro
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 /**
  * ✅ POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
- * COM RETRY AUTOMÁTICO, BACKOFF EXPONENCIAL E FALLBACK DE MODELOS
+ * PROMPT ASSERTIVO COM CATEGORIAS ESPECÍFICAS
+ * COM RETRY AUTOMÁTICO E BACKOFF EXPONENCIAL
  */
-router.post('/analise-fotos', async (req: any, res: any) => {
+router.post('/analise-fotos', async (req: any, res: any  ) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
@@ -220,10 +172,11 @@ router.post('/analise-fotos', async (req: any, res: any) => {
         
         console.log(`[CRON] Usando mime type: ${mimeType}`);
 
-        // ✅ Enviar para Gemini Pro COM FALLBACK E RETRY AUTOMÁTICO
-        console.log('[CRON] Enviando para Gemini Pro com fallback de modelos e retry automático...');
+        // ✅ Enviar para Gemini Pro COM RETRY AUTOMÁTICO
+        console.log('[CRON] Enviando para Gemini Pro com retry automático...');
 
-        const geminiResponse = await makeGeminiRequestWithFallback(
+        const geminiResponse = await makeGeminiRequestWithRetry(
+          `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
           {
             contents: [
               {
@@ -372,7 +325,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
                 status_code: status,
                 categoria: '',
                 tipo_dano: '',
-                descricao: 'Erro ao processar análise após tentar todos os modelos e 3 tentativas',
+                descricao: 'Erro ao processar análise após 3 tentativas',
                 recomendacao: 'Será retentado automaticamente',
               }),
               updated_at: new Date().toISOString(),
