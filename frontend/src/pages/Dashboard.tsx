@@ -961,6 +961,7 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Análise IA</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Foto</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observações</th>
                     
                           </tr>
@@ -1015,6 +1016,50 @@ export function Dashboard() {
                                     } catch (e) {
                                       return <span className="text-gray-500">—</span>;
                                     }
+                                  })()}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {(() => {
+                                    const baixarFoto = async () => {
+                                      try {
+                                        const { data: fotos, error } = await supabase
+                                          .from('fotos_vistoria')
+                                          .select('foto_url, foto_nome')
+                                          .eq('vistoria_id', vistoria.vistoria_id)
+                                          .limit(1);
+
+                                        if (error || !fotos || fotos.length === 0) {
+                                          alert('Nenhuma foto encontrada para esta vistoria');
+                                          return;
+                                        }
+
+                                        const foto = fotos[0];
+                                        if (!foto.foto_url) {
+                                          alert('URL da foto não disponível');
+                                          return;
+                                        }
+
+                                        // Criar link de download
+                                        const link = document.createElement('a');
+                                        link.href = foto.foto_url;
+                                        link.download = foto.foto_nome || 'foto.jpg';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      } catch (error) {
+                                        console.error('Erro ao baixar foto:', error);
+                                        alert('Erro ao baixar foto');
+                                      }
+                                    };
+
+                                    return (
+                                      <button
+                                        onClick={baixarFoto}
+                                        className="text-blue-600 hover:text-blue-800 font-semibold"
+                                      >
+                                        Foto
+                                      </button>
+                                    );
                                   })()}
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
