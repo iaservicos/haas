@@ -404,7 +404,7 @@ export function DashboardCliente() {
                   </div>
                   <button
                     onClick={() => setShowAdicionarEquipamento(true)}
-                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                    className="px-6 py-2 bg-blue-950 hover:bg-black text-white rounded-lg font-semibold transition"
                   >
                     + Adicionar Equipamento
                   </button>
@@ -520,7 +520,7 @@ export function DashboardCliente() {
                                 className={`px-4 py-2 rounded text-sm font-semibold transition ${
                                   equipamento.status === 'Concluído'
                                     ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                    : 'bg-blue-900 hover:bg-blue-950 text-white'
+                                    : 'bg-black hover:bg-gray-900 text-white'
                                 }`}
                               >
                                 {equipamento.status === 'Concluído' ? 'Vistoria Realizada' : 'Iniciar Vistoria'}
