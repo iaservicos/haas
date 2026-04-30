@@ -66,6 +66,39 @@ export function Dashboard() {
   const [showRespostasModal, setShowRespostasModal] = useState(false);
   const [respostasModal, setRespostasModal] = useState<any>(null);
 
+  // MODAL DE FOTO
+  const [showFotoModal, setShowFotoModal] = useState(false);
+  const [fotoModalUrl, setFotoModalUrl] = useState<string>('');
+  const [fotoModalNome, setFotoModalNome] = useState<string>('');
+
+  const abrirModalFoto = async (vistoriaId: string) => {
+    try {
+      const { data: fotos, error } = await supabase
+        .from('fotos_vistoria')
+        .select('foto_url, foto_nome')
+        .eq('vistoria_id', vistoriaId)
+        .limit(1);
+
+      if (error || !fotos || fotos.length === 0) {
+        alert('Nenhuma foto encontrada para esta vistoria');
+        return;
+      }
+
+      const foto = fotos[0];
+      if (!foto.foto_url) {
+        alert('URL da foto nao disponivel');
+        return;
+      }
+
+      setFotoModalUrl(foto.foto_url);
+      setFotoModalNome(foto.foto_nome || 'Foto');
+      setShowFotoModal(true);
+    } catch (error) {
+      console.error('Erro ao abrir foto:', error);
+      alert('Erro ao abrir foto');
+    }
+  }
+
   // EQUIPAMENTOS PENDENTES
   const [equipamentosPendentes, setEquipamentosPendentes] = useState<any[]>([]);
   const [filtroStatusPendente, setFiltroStatusPendente] = useState('Pendente');
@@ -1019,48 +1052,12 @@ export function Dashboard() {
                                   })()}
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
-                                  {(() => {
-                                    const baixarFoto = async () => {
-                                      try {
-                                        const { data: fotos, error } = await supabase
-                                          .from('fotos_vistoria')
-                                          .select('foto_url, foto_nome')
-                                          .eq('vistoria_id', vistoria.vistoria_id)
-                                          .limit(1);
-
-                                        if (error || !fotos || fotos.length === 0) {
-                                          alert('Nenhuma foto encontrada para esta vistoria');
-                                          return;
-                                        }
-
-                                        const foto = fotos[0];
-                                        if (!foto.foto_url) {
-                                          alert('URL da foto não disponível');
-                                          return;
-                                        }
-
-                                        // Criar link de download
-                                        const link = document.createElement('a');
-                                        link.href = foto.foto_url;
-                                        link.download = foto.foto_nome || 'foto.jpg';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                      } catch (error) {
-                                        console.error('Erro ao baixar foto:', error);
-                                        alert('Erro ao baixar foto');
-                                      }
-                                    };
-
-                                    return (
-                                      <button
-                                        onClick={baixarFoto}
-                                        className="text-blue-600 hover:text-blue-800 font-semibold"
-                                      >
-                                        Foto
-                                      </button>
-                                    );
-                                  })()}
+                                  <button
+                                    onClick={() => abrirModalFoto(vistoria.vistoria_id)}
+                                    className="text-blue-600 hover:text-blue-800 font-semibold"
+                                  >
+                                    Foto
+                                  </button>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
                                   <button
@@ -1736,6 +1733,45 @@ export function Dashboard() {
               >
                 {atualizando ? 'Processando...' : 'Rejeitar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE FOTO */}
+      {showFotoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">{fotoModalNome}</h3>
+              <button
+                onClick={() => setShowFotoModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 flex justify-center">
+              <img
+                src={fotoModalUrl}
+                alt={fotoModalNome}
+                className="max-w-full max-h-96 object-contain"
+              />
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowFotoModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+              >
+                Fechar
+              </button>
+              <a
+                href={fotoModalUrl}
+                download={fotoModalNome}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                Baixar
+              </a>
             </div>
           </div>
         </div>
