@@ -48,6 +48,7 @@ export const Confirmacoes: React.FC = () => {
   const [notaFiscal, setNotaFiscal] = useState('');
   const [destino, setDestino] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
 
   // UPLOAD
   const [uploadando, setUploadando] = useState(false);
@@ -174,33 +175,54 @@ export const Confirmacoes: React.FC = () => {
 
     setSalvando(true);
     try {
-      const equipamentosSelecionados = equipamentos.filter(e => selecionados.has(e.id));
+      if (editandoId) {
+        // Modo edição - atualizar uma confirmação
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/confirmacoes-atualizar/${editandoId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            nota_fiscal: notaFiscal,
+            destino: destino,
+          }),
+        });
 
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/confirmacoes-salvar`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          equipamentos: equipamentosSelecionados.map(e => ({
-            equipamento_id: e.id,
-            numero_serie: e.numero_serie,
-          })),
-          nota_fiscal: notaFiscal,
-          destino: destino,
-        }),
-      });
+        if (!response.ok) throw new Error('Erro ao atualizar confirmação');
+        alert('✅ Confirmação atualizada com sucesso!');
+      } else {
+        // Modo criação - salvar múltiplas
+        const equipamentosSelecionados = equipamentos.filter(e => selecionados.has(e.id));
 
-      if (!response.ok) throw new Error('Erro ao salvar confirmações');
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/confirmacoes-salvar`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            equipamentos: equipamentosSelecionados.map(e => ({
+              equipamento_id: e.id,
+              numero_serie: e.numero_serie,
+            })),
+            nota_fiscal: notaFiscal,
+            destino: destino,
+          }),
+        });
 
-      const result = await response.json();
-      alert(`✅ ${result.salvos} equipamento(s) confirmado(s)!`);
+        if (!response.ok) throw new Error('Erro ao salvar confirmações');
+
+        const result = await response.json();
+        alert(`✅ ${result.salvos} equipamento(s) confirmado(s)!`);
+      }
 
       setShowModal(false);
       setNotaFiscal('');
       setDestino('');
+      setEditandoId(null);
       setSelecionados(new Set());
 
       // Recarregar equipamentos
@@ -212,6 +234,42 @@ export const Confirmacoes: React.FC = () => {
       alert('Erro ao salvar confirmações');
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const handleEditarConfirmacao = (equipamento: Equipamento) => {
+    if (equipamento.confirmacao) {
+      setEditandoId(equipamento.confirmacao.id);
+      setNotaFiscal(equipamento.confirmacao.nota_fiscal || '');
+      setDestino(equipamento.confirmacao.destino || '');
+      setShowModal(true);
+    }
+  };
+
+  const handleDeletarConfirmacao = async (confirmacaoId: number) => {
+    if (!confirm('Tem certeza que deseja deletar esta confirmação?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/confirmacoes-deletar/${confirmacaoId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) throw new Error('Erro ao deletar confirmação');
+
+      alert('✅ Confirmação deletada com sucesso!');
+      if (filtroContrato) {
+        await loadEquipamentos(filtroContrato);
+      }
+    } catch (error) {
+      console.error('[Confirmacoes] Erro ao deletar:', error);
+      alert('Erro ao deletar confirmação');
     }
   };
 
@@ -503,6 +561,7 @@ export const Confirmacoes: React.FC = () => {
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Modelo</th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Nota Fiscal</th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Destino</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ação</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -527,6 +586,26 @@ export const Confirmacoes: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-600">{eq.modelo}</td>
                               <td className="px-6 py-4 text-sm text-gray-600">{eq.confirmacao?.nota_fiscal || '—'}</td>
                               <td className="px-6 py-4 text-sm text-gray-600">{eq.confirmacao?.destino || '—'}</td>
+                              <td className="px-6 py-4 text-sm space-x-2">
+                                {eq.confirmacao ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditarConfirmacao(eq)}
+                                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletarConfirmacao(eq.confirmacao!.id)}
+                                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                                    >
+                                      Deletar
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
                             </tr>
                           ))
                         )}
@@ -540,7 +619,9 @@ export const Confirmacoes: React.FC = () => {
               {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                   <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                    <h3 className="text-xl font-bold mb-4">Confirmar {selecionados.size} Equipamento(s)</h3>
+                    <h3 className="text-xl font-bold mb-4">
+                      {editandoId ? 'Editar Confirmação' : `Confirmar ${selecionados.size} Equipamento(s)`}
+                    </h3>
 
                     <div className="mb-4">
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -576,6 +657,7 @@ export const Confirmacoes: React.FC = () => {
                           setShowModal(false);
                           setNotaFiscal('');
                           setDestino('');
+                          setEditandoId(null);
                         }}
                         disabled={salvando}
                         className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"

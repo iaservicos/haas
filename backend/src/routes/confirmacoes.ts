@@ -285,4 +285,65 @@ router.post('/confirmacoes-importar', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * PUT /api/confirmacoes-atualizar/:id
+ * Atualizar uma confirmação existente
+ */
+router.put('/confirmacoes-atualizar/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { nota_fiscal, destino } = req.body;
+
+    if (!nota_fiscal || !destino) {
+      return res.status(400).json({ error: 'nota_fiscal e destino são obrigatórios' });
+    }
+
+    const { data, error } = await supabase
+      .from('equipamento_confirmacoes')
+      .update({
+        nota_fiscal,
+        destino,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Confirmação atualizada com sucesso',
+      data: data[0],
+    });
+  } catch (error) {
+    console.error('[confirmacoes] Erro ao atualizar confirmação:', error);
+    res.status(500).json({ error: 'Erro ao atualizar confirmação' });
+  }
+});
+
+/**
+ * DELETE /api/confirmacoes-deletar/:id
+ * Deletar uma confirmação
+ */
+router.delete('/confirmacoes-deletar/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('equipamento_confirmacoes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Confirmação deletada com sucesso',
+    });
+  } catch (error) {
+    console.error('[confirmacoes] Erro ao deletar confirmação:', error);
+    res.status(500).json({ error: 'Erro ao deletar confirmação' });
+  }
+});
+
 export default router;
