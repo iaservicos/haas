@@ -2,17 +2,6 @@ import express from 'express';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_KEY || ''
-);
-
-const router = express.Router();
-
-// ✅ Configuração do Gemini Pro
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
 // ✅ Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000; // 2 segundos
@@ -85,6 +74,17 @@ async function makeGeminiRequestWithRetry(
   
   throw lastError;
 }
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_KEY || ''
+);
+
+const router = express.Router();
+
+// ✅ Configuração do Gemini Pro
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 /**
  * ✅ POST /api/cron/analise-fotos
