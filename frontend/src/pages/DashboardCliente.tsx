@@ -509,9 +509,14 @@ export function DashboardCliente() {
                             <td className="px-6 py-4 text-sm">
                               <button
                                 onClick={() => handleIniciarChecklist(equipamento)}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition"
+                                disabled={equipamento.status === 'Concluído'}
+                                className={`px-4 py-2 rounded text-sm font-semibold transition ${
+                                  equipamento.status === 'Concluído'
+                                    ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
                               >
-                                Iniciar Vistoria
+                                {equipamento.status === 'Concluído' ? 'Vistoria Realizada' : 'Iniciar Vistoria'}
                               </button>
                             </td>
                           </tr>
