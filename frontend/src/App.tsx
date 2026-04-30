@@ -7,11 +7,11 @@ import { Fotos } from './pages/Fotos';
 import { GerenciarContratos } from './pages/GerenciarContratos';
 import { GerenciarClientes } from './pages/GerenciarClientes';
 import { GerenciarEquipamentos } from './pages/GerenciarEquipamentos';
-import { Confirmacoes } from './pages/Confirmacoes;
+import { Confirmacoes } from './pages/Confirmacoes';
 import { DashboardCliente } from './pages/DashboardCliente';
 import { VistoriaCliente } from './pages/VistoriaCliente';
 import { AnaliseEquipamento } from './pages/AnaliseEquipamento';
-i
+
 
 // ⚡ NOVO: Componente para rotas protegidas com verificação de role
 function ProtectedRoute({ 
