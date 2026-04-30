@@ -112,9 +112,9 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
             onChange={handleFotoChange}
             disabled={loading}
             className="block w-full text-sm text-gray-700
-              file:mr-4 file:py-3 file:px-6
+              file:mr-4 file:py-2 file:px-4
               file:rounded-none file:border-0
-              file:text-sm file:font-bold
+              file:text-sm file:font-semibold
               file:bg-gray-900 file:text-white
               hover:file:bg-gray-800
               file:cursor-pointer file:transition-colors
@@ -137,12 +137,12 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         </div>
       )}
 
-      {/* BOTÃO ENVIAR FOTO - COM ESTILO ESCURO */}
+      {/* BOTÃO ENVIAR FOTO - TAMANHO PADRÃO */}
       <div className="flex gap-3 pt-4">
         <button
           onClick={handleUpload}
           disabled={!foto || loading}
-          className="px-8 py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-none font-bold text-lg transition-colors uppercase tracking-wide shadow-md hover:shadow-lg"
+          className="px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-none font-bold text-base transition-colors uppercase tracking-wide"
         >
           {loading ? (
             <span className="flex items-center gap-2">
