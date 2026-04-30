@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { gerarTemplateConfirmacoes } from '../utils/gerarTemplateConfirmacoes';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -326,8 +327,22 @@ export const Confirmacoes: React.FC = () => {
         try {
           const data = e.target?.result as ArrayBuffer;
           const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+          // Procurar pela aba 'Confirmacoes'
+          let worksheet = workbook.Sheets['Confirmacoes'];
+          if (!worksheet) {
+            // Se não encontrar, usar a primeira aba
+            worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          }
+
           const dados = XLSX.utils.sheet_to_json(worksheet);
+
+          // Validar dados antes de enviar
+          if (!dados || dados.length === 0) {
+            setMensagemUpload('Arquivo vazio ou sem dados válidos');
+            setUploadando(false);
+            return;
+          }
 
           const token = localStorage.getItem('token');
           const response = await fetch(`${API_BASE_URL}/confirmacoes/importar`, {
@@ -506,6 +521,13 @@ export const Confirmacoes: React.FC = () => {
                     Confirmar Selecionados ({selecionados.size})
                   </button>
 
+                  <button
+                    onClick={() => gerarTemplateConfirmacoes()}
+                    className="px-6 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-semibold transition"
+                  >
+                    Baixar Template
+                  </button>
+
                   <label className="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg font-semibold transition cursor-pointer">
                     Importar em Massa
                     <input
@@ -600,7 +622,7 @@ export const Confirmacoes: React.FC = () => {
                                   </>
                                 ) : (
                                   <span className="text-gray-400">—</span>
-                                )}\
+                                )}
                               </td>
                             </tr>
                           ))
