@@ -10,7 +10,7 @@ const GPTMakerWidget = () => {
   useEffect(() => {
     // Carregar o script do GPTMaker
     const script = document.createElement('script');
-    script.src = 'https://app.gptmaker.ai/widget/3F29F50CC366720CCAED0G4C5998413F/float.js';
+    script.src = 'https://app.gptmaker.ai/widget/3F29F50CC366720CCAED064C5998413F/float.js';
     script.async = true;
     document.body.appendChild(script);
 
@@ -38,11 +38,10 @@ interface Equipamento {
   modelo: string;
   tipo: string;
   tipo_material?: string;
-  destino?: string | null;
-  nota_fiscal?: string | null;
+  destino?: string;
+  nota_fiscal?: string;
   status: string;
   contrato_id: number;
-  confirmacoes?: any[];
 }
 
 export function DashboardCliente() {
@@ -132,17 +131,11 @@ export function DashboardCliente() {
       console.log('Contratos encontrados:', contratosData);
       setContratos(contratosData || []);
 
-      // 3. Buscar TODOS os equipamentos de TODOS os contratos COM CONFIRMAÇÕES
+      // 3. Buscar TODOS os equipamentos de TODOS os contratos
       console.log('Buscando equipamentos para contratos:', contratoIds);
       const { data: equipamentosData, error: equipError } = await supabase
         .from('contrato_equipamentos')
-        .select(`
-          *,
-          confirmacoes:equipamento_confirmacoes(
-            nota_fiscal,
-            destino
-          )
-        `)
+        .select('*')
         .in('contrato_id', contratoIds);
 
       if (equipError) {
@@ -164,19 +157,10 @@ export function DashboardCliente() {
       const equipamentosComVistoria = new Set(vistoriasData?.map((v: any) => v.equipamento_id) || []);
 
       // 5. Calcular status baseado em se existe vistoria
-      const equipamentosComStatus = (equipamentosData || []).map((eq: any) => {
-        // Extrair dados de confirmação (pega o primeiro registro se houver múltiplos)
-        const confirmacao = Array.isArray(eq.confirmacoes) && eq.confirmacoes.length > 0 
-          ? eq.confirmacoes[0] 
-          : null;
-        
-        return {
-          ...eq,
-          nota_fiscal: confirmacao?.nota_fiscal || eq.nota_fiscal || null,
-          destino: confirmacao?.destino || eq.destino || null,
-          status: equipamentosComVistoria.has(eq.id) ? 'Concluído' : 'Pendente'
-        };
-      });
+      const equipamentosComStatus = (equipamentosData || []).map((eq: any) => ({
+        ...eq,
+        status: equipamentosComVistoria.has(eq.id) ? 'Concluído' : 'Pendente'
+      }));
 
       setEquipamentos(equipamentosComStatus);
 
@@ -374,7 +358,7 @@ export function DashboardCliente() {
                 alt="Logo Positivo"
                 className="h-10 w-auto"
               />
-              <h1 className="text-2xl font-bold text-gray-900">Sistema de Vistoria HaaS</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Portal de Vistoria HaaS</h1>
             </div>
             <div className="text-right text-sm text-gray-600">
               <p>Bem-vindo, <span className="font-semibold text-gray-900">{usuario?.nome || 'Carregando...'}</span></p>
