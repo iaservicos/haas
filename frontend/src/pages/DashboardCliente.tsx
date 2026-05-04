@@ -5,6 +5,26 @@ import { supabase } from '../services/supabase';
 import { NotificationToast } from '../components/NotificationToast';
 import { usePendingEquipmentNotifications } from '../hooks/usePendingEquipmentNotifications';
 
+// Componente para carregar o GPTMaker WebChat
+const GPTMakerWidget = () => {
+  useEffect(() => {
+    // Carregar o script do GPTMaker
+    const script = document.createElement('script');
+    script.src = 'https://app.gptmaker.ai/widget/3F29F50CC366720CCAED0G4C5998413F/float.js';
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      // Limpar o script quando componente desmontar
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, []);
+
+  return null; // O script cria seu próprio widget
+};
+
 interface Contrato {
   id: number;
   nome: string;
@@ -570,6 +590,9 @@ export function DashboardCliente() {
           )}
         </div>
       </div>
+
+      {/* GPTMaker WebChat Widget - Botão flutuante no canto inferior direito */}
+      {usuario && <GPTMakerWidget />}
     </div>
   );
 }
