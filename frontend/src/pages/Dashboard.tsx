@@ -488,7 +488,7 @@ export function Dashboard() {
       vistoriasExportacao.flatMap((v: any) => Object.keys(v.respostas || {}))
     )).sort();
 
-    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', ...itensUnicos, 'Observações'];
+    const headers = ['Data', 'Cliente', 'Série', 'Modelo', 'Tipo', 'Contrato', 'Status', 'Análise IA', ...itensUnicos, 'Observações'];
     
     const rows = vistoriasExportacao.map((v: any) => {
       const respostas = v.respostas || {};
@@ -502,6 +502,29 @@ export function Dashboard() {
         return 'Sem resposta';
       });
       
+      // Formatar análise da IA
+      let analiseIADisplay = '—';
+      if (v.analise_ia) {
+        const analise = v.analise_ia;
+        if (typeof analise === 'object') {
+          const status = analise.status || 'pendente';
+          const categoria = analise.categoria || '';
+          const tipo_dano = analise.tipo_dano || '';
+          
+          if (status === 'OK') {
+            analiseIADisplay = 'OK - Sem problemas';
+          } else if (status === 'AVARIA') {
+            analiseIADisplay = `AVARIA - ${categoria}${tipo_dano ? ' - ' + tipo_dano : ''}`;
+          } else if (status === 'pendente') {
+            analiseIADisplay = 'PENDENTE';
+          } else if (status === 'ERRO') {
+            analiseIADisplay = 'ERRO';
+          }
+        } else if (typeof analise === 'string') {
+          analiseIADisplay = analise;
+        }
+      }
+      
       return [
         formatarData(v.data_inspecao),
         v.contrato_equipamentos?.contratos?.nome_cliente || '—',
@@ -510,6 +533,7 @@ export function Dashboard() {
         v.equipment_type || '—',
         v.contrato_equipamentos?.contratos?.numero_contrato || '—',
         statusGeral,
+        analiseIADisplay,
         ...respostasIndividuais,
         v.observacoes || '—',
       ];
@@ -526,11 +550,13 @@ export function Dashboard() {
         'Status': row[6],
       };
       
+      obj['Análise IA'] = row[7];
+      
       itensUnicos.forEach((item, idx) => {
-        obj[item] = row[7 + idx];
+        obj[item] = row[8 + idx];
       });
       
-      obj['Observacoes'] = row[7 + itensUnicos.length];
+      obj['Observacoes'] = row[8 + itensUnicos.length];
       return obj;
     });
 
@@ -538,7 +564,7 @@ export function Dashboard() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vistorias');
     
-    const colWidths = [15, 20, 15, 25, 15, 20, 12, ...itensUnicos.map(() => 15), 30];
+    const colWidths = [15, 20, 15, 25, 15, 20, 12, 35, ...itensUnicos.map(() => 15), 30];
     ws['!cols'] = colWidths.map(w => ({ wch: w }));
     
     XLSX.writeFile(wb, `relatorio_vistorias_portal_${new Date().toISOString().split('T')[0]}.xlsx`);
