@@ -933,9 +933,7 @@ export function Dashboard() {
                   };
 
                   const obterCorStatusResposta = (status: string) => {
-                    if (status === 'OK') return 'bg-green-100 text-green-800 font-semibold';
-                    if (status === 'Faltando') return 'bg-red-100 text-red-800 font-semibold';
-                    return 'bg-gray-100 text-gray-800';
+                    return 'bg-gray-50 text-gray-800';
                   };
 
                   return (
@@ -975,9 +973,7 @@ export function Dashboard() {
                                     <span className="text-xs text-gray-500">{formatarData(vistoria.data_inspecao)}</span>
                                   </div>
                                 </td>
-                                <td className={`px-4 py-3 text-center font-semibold border-r border-gray-300 ${
-                                  temAvaria ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                }`}>
+                                <td className="px-4 py-3 text-center font-semibold border-r border-gray-300 bg-gray-50 text-gray-800">
                                   {statusGeral}
                                 </td>
                                 {itensUnicos.map((item) => {
