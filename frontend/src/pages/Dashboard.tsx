@@ -1079,7 +1079,7 @@ export function Dashboard() {
                                         statusDisplay = 'OK - Sem problemas';
                                       } else if (status === 'AVARIA') {
                                         const fullText = `AVARIA${categoria ? ' - ' + categoria : ''}${tipo_dano ? ' - ' + tipo_dano : ''}`;
-                                        statusDisplay = fullText.length > 30 ? fullText.substring(0, 30) + '...' : fullText;
+                                        statusDisplay = fullText.length > 45 ? fullText.substring(0, 45) + '...' : fullText;
                                       } else if (status === 'pendente') {
                                         statusDisplay = 'PENDENTE';
                                       } else if (status === 'ERRO') {
