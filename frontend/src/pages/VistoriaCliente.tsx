@@ -247,7 +247,7 @@ export const VistoriaCliente: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      <p className="text-gray-700 mb-6 text-lg">Tire uma foto clara do equipamento. A análise será feita automaticamente.</p>
+                      <p className="text-gray-700 mb-6 text-lg">Tire uma foto nítida do equipamento, incluindo cabos, fontes, periféricos e outros itens que o compõem.</p>
                       
                       <UploadFoto
                         confirmacaoId={vistoriaId}

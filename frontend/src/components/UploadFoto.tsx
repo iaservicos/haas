@@ -18,7 +18,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [resultado, setResultado] = useState<any>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [erro, setErro] = useState<string>('');
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,6 +31,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
       };
       reader.readAsDataURL(file);
       setErro('');
+      setUploadSuccess(false);
     }
   };
 
@@ -42,6 +43,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
 
     setLoading(true);
     setErro('');
+    setUploadSuccess(false);
 
     try {
       // ✅ CORRIGIDO: Usar FormData para enviar o arquivo como multipart
@@ -79,13 +81,8 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
       const data = await response.json();
       console.log('[UploadFoto] Upload bem-sucedido:', data);
 
-      // ✅ Extrair análise da resposta
-      setResultado(data.data?.analise || data.analise || {
-        status: 'Análise em progresso',
-        resultado: 'pendente',
-        descricao: 'A análise será feita em background'
-      });
-      
+      // ✅ Marcar como sucesso
+      setUploadSuccess(true);
       setFoto(null);
       setPreview('');
 
@@ -162,15 +159,10 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         </div>
       )}
 
-      {/* RESULTADO DA ANÁLISE */}
-      {resultado && (
-        <div className="p-6 bg-green-50 border-l-4 border-green-600 rounded-none">
-          <h4 className="font-bold text-green-900 mb-4 text-lg">Resultado da Análise:</h4>
-          <div className="space-y-3 text-green-800">
-            <p><strong>Status:</strong> {resultado.status}</p>
-            <p><strong>Resultado:</strong> {resultado.resultado}</p>
-            <p><strong>Descrição:</strong> {resultado.descricao}</p>
-          </div>
+      {/* MENSAGEM DE SUCESSO - SEM DETALHES DA ANÁLISE */}
+      {uploadSuccess && (
+        <div className="p-4 bg-green-50 border-l-4 border-green-600 rounded-none">
+          <p className="text-green-700 font-semibold">✓ Importação realizada com sucesso!</p>
         </div>
       )}
     </div>
