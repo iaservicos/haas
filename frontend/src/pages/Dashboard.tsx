@@ -244,7 +244,13 @@ export function Dashboard() {
       });
     }
 
+    // Contar com prioridade para análise da IA
     const temAvaria = filtered.filter((v: any) => {
+      // Verificar análise da IA primeiro
+      if (v.analise_ia && typeof v.analise_ia === 'object' && v.analise_ia.status === 'AVARIA') {
+        return true;
+      }
+      // Se não tem IA ou IA não detectou avaria, verificar respostas
       const respostas = v.respostas || {};
       return Object.values(respostas).some((r: any) => r === false || r === 'Não');
     }).length;
