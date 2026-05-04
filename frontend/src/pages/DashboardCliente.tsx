@@ -38,10 +38,11 @@ interface Equipamento {
   modelo: string;
   tipo: string;
   tipo_material?: string;
-  destino?: string;
-  nota_fiscal?: string;
+  destino?: string | null;
+  nota_fiscal?: string | null;
   status: string;
   contrato_id: number;
+  confirmacoes?: any[];
 }
 
 export function DashboardCliente() {
@@ -131,11 +132,17 @@ export function DashboardCliente() {
       console.log('Contratos encontrados:', contratosData);
       setContratos(contratosData || []);
 
-      // 3. Buscar TODOS os equipamentos de TODOS os contratos
+      // 3. Buscar TODOS os equipamentos de TODOS os contratos COM CONFIRMAÇÕES
       console.log('Buscando equipamentos para contratos:', contratoIds);
       const { data: equipamentosData, error: equipError } = await supabase
         .from('contrato_equipamentos')
-        .select('*')
+        .select(`
+          *,
+          confirmacoes:equipamento_confirmacoes(
+            nota_fiscal,
+            destino
+          )
+        `)
         .in('contrato_id', contratoIds);
 
       if (equipError) {
@@ -157,10 +164,19 @@ export function DashboardCliente() {
       const equipamentosComVistoria = new Set(vistoriasData?.map((v: any) => v.equipamento_id) || []);
 
       // 5. Calcular status baseado em se existe vistoria
-      const equipamentosComStatus = (equipamentosData || []).map((eq: any) => ({
-        ...eq,
-        status: equipamentosComVistoria.has(eq.id) ? 'Concluído' : 'Pendente'
-      }));
+      const equipamentosComStatus = (equipamentosData || []).map((eq: any) => {
+        // Extrair dados de confirmação (pega o primeiro registro se houver múltiplos)
+        const confirmacao = Array.isArray(eq.confirmacoes) && eq.confirmacoes.length > 0 
+          ? eq.confirmacoes[0] 
+          : null;
+        
+        return {
+          ...eq,
+          nota_fiscal: confirmacao?.nota_fiscal || eq.nota_fiscal || null,
+          destino: confirmacao?.destino || eq.destino || null,
+          status: equipamentosComVistoria.has(eq.id) ? 'Concluído' : 'Pendente'
+        };
+      });
 
       setEquipamentos(equipamentosComStatus);
 
@@ -301,9 +317,8 @@ export function DashboardCliente() {
   };
 
   const handleIniciarChecklist = (equipamento: Equipamento) => {
-  navigate(`/vistoria?numero_serie=${equipamento.numero_serie}&equipamento_id=${equipamento.id}`);
-};
-
+    navigate(`/checklist/${equipamento.id}`);
+  };
 
   const handleLogout = () => {
     logout();
