@@ -176,4 +176,3 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
     </div>
   );
 };
-
