@@ -1517,12 +1517,37 @@ export function Dashboard() {
             {respostasModal.analise_ia && (
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-sm font-bold text-gray-900 uppercase mb-3">Analise da IA</h3>
-                <div className="p-4 bg-white border border-gray-200 rounded">
-                  <p className="text-sm text-gray-800 leading-relaxed">
-                    {typeof respostasModal.analise_ia === 'string' 
-                      ? respostasModal.analise_ia 
-                      : JSON.stringify(respostasModal.analise_ia, null, 2)}
-                  </p>
+                <div className="p-4 bg-white border border-gray-200 rounded space-y-3">
+                  {typeof respostasModal.analise_ia === 'object' ? (
+                    <>
+                      {respostasModal.analise_ia.status && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase">Status</p>
+                          <p className="text-sm text-gray-900 font-bold">{respostasModal.analise_ia.status}</p>
+                        </div>
+                      )}
+                      {respostasModal.analise_ia.categoria && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase">Categoria</p>
+                          <p className="text-sm text-gray-900">{respostasModal.analise_ia.categoria}</p>
+                        </div>
+                      )}
+                      {respostasModal.analise_ia.tipo_dano && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase">Tipo de Dano</p>
+                          <p className="text-sm text-gray-900">{respostasModal.analise_ia.tipo_dano}</p>
+                        </div>
+                      )}
+                      {respostasModal.analise_ia.descricao && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase">Descricao</p>
+                          <p className="text-sm text-gray-800 leading-relaxed">{respostasModal.analise_ia.descricao}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-800 leading-relaxed">{respostasModal.analise_ia}</p>
+                  )}
                 </div>
               </div>
             )}
