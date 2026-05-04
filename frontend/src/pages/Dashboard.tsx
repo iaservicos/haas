@@ -1477,12 +1477,8 @@ export function Dashboard() {
                 </div>
                 <div className="bg-white p-3 rounded border border-gray-200">
                   <p className="text-xs text-gray-600 uppercase font-semibold">Status Geral</p>
-                  <p className={`text-lg font-bold ${
-                    Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Não')
-                      ? 'text-red-600'
-                      : 'text-green-600'
-                  }`}>
-                    {Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Não') ? 'Com Avaria' : 'OK'}
+                  <p className="text-lg font-bold text-gray-700">
+                    {Object.values(respostasModal.respostas || {}).some((r: any) => r === false || r === 'Nao') ? 'Com Avaria' : 'OK'}
                   </p>
                 </div>
               </div>
@@ -1503,7 +1499,9 @@ export function Dashboard() {
             )}
 
             {/* RESPOSTAS ESTRUTURADAS */}
-                          <div className="space-y-3">
+            <div className="px-6 py-4">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Respostas da Inspecao</h3>
+              <div className="space-y-3">
                 {Object.entries(respostasModal.respostas || {}).map(([pergunta, resposta]: [string, any]) => {
                   const isOk = resposta === true || resposta === 'Sim';
                   const isFaltando = resposta === false || resposta === 'Nao';
@@ -1536,7 +1534,7 @@ export function Dashboard() {
                   );
                 })}
               </div>
-            
+            </div>
 
             {/* OBSERVACOES */}
             {respostasModal.observacoes && (
