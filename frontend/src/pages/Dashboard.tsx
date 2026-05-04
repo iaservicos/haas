@@ -1048,16 +1048,17 @@ export function Dashboard() {
                                       let statusDisplay = '';
                                       
                                       if (status === 'OK') {
-                                        statusDisplay = 'OK - Sem problemas';
+                                        statusDisplay = 'OK';
                                       } else if (status === 'AVARIA') {
-                                        statusDisplay = `AVARIA - ${categoria} - ${tipo_dano}`;
+                                        const fullText = `${categoria}${tipo_dano ? ' - ' + tipo_dano : ''}`;
+                                        statusDisplay = fullText.length > 25 ? fullText.substring(0, 25) + '...' : fullText;
                                       } else if (status === 'pendente') {
                                         statusDisplay = 'PENDENTE';
                                       } else if (status === 'ERRO') {
-                                        statusDisplay = 'ERRO - Análise falhou';
+                                        statusDisplay = 'ERRO';
                                       }
                                       
-                                      return <span className="text-gray-900">{statusDisplay || '—'}</span>;
+                                      return <span className="text-gray-900 truncate" title={statusDisplay}>{statusDisplay || '—'}</span>;
                                     } catch (e) {
                                       return <span className="text-gray-500">—</span>;
                                     }
