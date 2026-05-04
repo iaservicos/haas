@@ -317,7 +317,7 @@ export function DashboardCliente() {
   };
 
   const handleIniciarChecklist = (equipamento: Equipamento) => {
-    navigate(`/checklist/${equipamento.id}`);
+    navigate(`/vistoria?numero_serie=${equipamento.numero_serie}&equipamento_id=${equipamento.id}`);
   };
 
   const handleLogout = () => {
@@ -399,8 +399,8 @@ export function DashboardCliente() {
                   <h2 className="text-lg font-semibold text-gray-700 mb-4">Instruções Importantes</h2>
                   <div className="space-y-3 text-gray-600 text-sm">
                     <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
-                    <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo no checklist.</p>
-                    <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado, com todos os itens que o compõem. Ex: Mouse, teclado, fonte.</p>
+                    <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
+                    <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
                     <p><strong>4. Higienização:</strong> Após vistoria, higienize e embale o equipamento.</p>
                     <p><strong>5. Embalagem:</strong> Use fita transparente e lacre bem a caixa.</p>
                     <p><strong>6. Identificação:</strong> Coloque folha com série, modelo, quantidade, dimensões e peso.</p>
