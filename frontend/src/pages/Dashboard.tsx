@@ -263,6 +263,18 @@ export function Dashboard() {
     setShowRespostasModal(true);
   };
 
+  
+  // Funcao para determinar status final (prioriza IA)
+  const getStatusFinal = (vistoria: any) => {
+    const analise = vistoria.analise_ia;
+    if (analise && typeof analise === 'object' && analise.status === 'AVARIA') {
+      return 'Com Avaria';
+    }
+    const respostas = vistoria.respostas || {};
+    const temAvaria = Object.values(respostas).some((r: any) => r === false || r === 'Nao');
+    return temAvaria ? 'Com Avaria' : 'OK';
+  };
+
   const buscarContratosDoUsuario = async (equipamento: any) => {
     try {
       const { data: usuarioContratos, error: ucError } = await supabase
@@ -1013,11 +1025,11 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.contratos?.numero_contrato || '—'}</td>
                                 <td className="px-6 py-4 text-sm">
                                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                    temAvaria
-                                      ? 'bg-gray-200 text-gray-800'
+                                    getStatusFinal(vistoria) === 'Com Avaria'
+                                      ? 'bg-gray-200 text-gray-800 font-bold'
                                       : 'bg-gray-200 text-gray-800'
                                   }`}>
-                                    {temAvaria ? 'Com Avaria' : 'OK'}
+                                    {getStatusFinal(vistoria)}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
@@ -1426,14 +1438,14 @@ export function Dashboard() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             {/* HEADER */}
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 flex justify-between items-center">
+            <div className="sticky top-0 bg-gray-900 text-white px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Detalhes da Inspeção</h2>
-                <p className="text-blue-100 text-sm mt-1">{formatarData(respostasModal.data_inspecao)}</p>
+                <h2 className="text-2xl font-bold">Detalhes da Inspecao</h2>
+                <p className="text-gray-400 text-sm mt-1">{formatarData(respostasModal.data_inspecao)}</p>
               </div>
               <button
                 onClick={() => setShowRespostasModal(false)}
-                className="text-white hover:bg-blue-700 rounded-full p-2 transition"
+                className="text-gray-400 hover:text-white rounded-full p-2 transition"
               >
                 ✕
               </button>
@@ -1476,40 +1488,46 @@ export function Dashboard() {
               </div>
             </div>
 
+            {/* ANALISE DA IA - DESTAQUE PROFISSIONAL */}
+            {respostasModal.analise_ia && (
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-sm font-bold text-gray-900 uppercase mb-3">Analise da IA</h3>
+                <div className="p-4 bg-white border border-gray-200 rounded">
+                  <p className="text-sm text-gray-800 leading-relaxed">
+                    {typeof respostasModal.analise_ia === 'string' 
+                      ? respostasModal.analise_ia 
+                      : JSON.stringify(respostasModal.analise_ia, null, 2)}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* RESPOSTAS ESTRUTURADAS */}
-            <div className="px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Respostas da Inspeção</h3>
-              <div className="space-y-3">
+                          <div className="space-y-3">
                 {Object.entries(respostasModal.respostas || {}).map(([pergunta, resposta]: [string, any]) => {
                   const isOk = resposta === true || resposta === 'Sim';
-                  const isFaltando = resposta === false || resposta === 'Não';
+                  const isFaltando = resposta === false || resposta === 'Nao';
                   
                   return (
-                    <div key={pergunta} className={`p-4 rounded-lg border-2 ${
-                      isOk 
-                        ? 'bg-green-50 border-green-200' 
-                        : isFaltando
-                        ? 'bg-red-50 border-red-200'
-                        : 'bg-gray-50 border-gray-200'
-                    }`}>
+                    <div key={pergunta} className="p-4 rounded-lg border border-gray-200 bg-gray-50">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-700 capitalize">{pergunta.replace(/_/g, ' ')}</p>
+                          <p className="text-sm font-semibold text-gray-900 capitalize">{pergunta.replace(/_/g, ' ')}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           {isOk && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-semibold">
                               ✓ OK
                             </span>
                           )}
                           {isFaltando && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-semibold">
                               ✕ Faltando
                             </span>
                           )}
                           {!isOk && !isFaltando && (
-                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
-                              ℹ {resposta}
+                            <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-semibold">
+                              {resposta}
                             </span>
                           )}
                         </div>
@@ -1518,13 +1536,13 @@ export function Dashboard() {
                   );
                 })}
               </div>
-            </div>
+            
 
-            {/* OBSERVAÇÕES */}
+            {/* OBSERVACOES */}
             {respostasModal.observacoes && (
-              <div className="px-6 py-4 bg-blue-50 border-t border-blue-200">
-                <h3 className="text-sm font-bold text-blue-900 mb-2">Observações</h3>
-                <p className="text-sm text-blue-800">{respostasModal.observacoes}</p>
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <h3 className="text-sm font-bold text-gray-900 mb-2">Observacoes</h3>
+                <p className="text-sm text-gray-800">{respostasModal.observacoes}</p>
               </div>
             )}
 
@@ -1532,7 +1550,7 @@ export function Dashboard() {
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
               <button
                 onClick={() => setShowRespostasModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition font-semibold"
+                className="px-4 py-2 bg-gray-900 text-white rounded hover:bg-gray-800 transition font-semibold"
               >
                 Fechar
               </button>
