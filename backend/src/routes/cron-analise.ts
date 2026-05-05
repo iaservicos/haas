@@ -20,6 +20,7 @@ const GEMINI_MODELS = [
   'gemini-2.0-flash',         // ✅ Fallback deprecated mas ainda funciona
 ];
 
+
 // ✅ Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000; // 2 segundos
