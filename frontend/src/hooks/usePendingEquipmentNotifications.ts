@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
 
 export interface PendingEquipmentNotification {
@@ -12,22 +12,21 @@ export interface PendingEquipmentNotification {
 
 export function usePendingEquipmentNotifications(userId: string | undefined) {
   const [notification, setNotification] = useState<PendingEquipmentNotification | null>(null);
-  const [lastCheckedAt, setLastCheckedAt] = useState<Date>(new Date());
+  const notifiedIdsRef = useRef<Set<number>>(new Set());
 
   // Função para buscar equipamentos com status atualizado
   const checkForUpdates = useCallback(async () => {
     if (!userId) return;
 
     try {
-      // Buscar equipamentos pendentes que foram atualizados depois da última verificação
+      // Buscar equipamentos que não estão mais pendentes
       const { data, error } = await supabase
         .from('pendingequipment')
         .select('*')
         .eq('user_id', userId)
         .neq('status', 'Pendente')
-        .gt('updated_at', lastCheckedAt.toISOString())
         .order('updated_at', { ascending: false })
-        .limit(1);
+        .limit(10);
 
       if (error) {
         console.error('Erro ao buscar notificações:', error);
@@ -35,44 +34,49 @@ export function usePendingEquipmentNotifications(userId: string | undefined) {
       }
 
       if (data && data.length > 0) {
-        const equipment = data[0];
+        // Encontrar o primeiro equipamento que ainda não foi notificado
+        const unnotifiedEquipment = data.find(
+          (equipment) => !notifiedIdsRef.current.has(equipment.id)
+        );
 
-        // Criar mensagem baseada no status
-        let message = '';
-        let type: 'sucesso' | 'erro' | 'aviso' = 'aviso';
+        if (unnotifiedEquipment) {
+          // Marcar como notificado
+          notifiedIdsRef.current.add(unnotifiedEquipment.id);
 
-        if (equipment.status === 'Aprovado') {
-          message = `✅ Equipamento ${equipment.numero_serie} foi APROVADO! Ele será adicionado ao seu contrato em breve.`;
-          type = 'sucesso';
-        } else if (equipment.status === 'Rejeitado') {
-          message = `❌ Equipamento ${equipment.numero_serie} foi REJEITADO.${
-            equipment.analyst_notes ? ` Motivo: ${equipment.analyst_notes}` : ''
-          }`;
-          type = 'erro';
+          // Criar mensagem baseada no status
+          let message = '';
+          let type: 'sucesso' | 'erro' | 'aviso' = 'aviso';
+
+          if (unnotifiedEquipment.status === 'Aprovado') {
+            message = `✅ Equipamento ${unnotifiedEquipment.numero_serie} foi APROVADO! Ele será adicionado ao seu contrato em breve.`;
+            type = 'sucesso';
+          } else if (unnotifiedEquipment.status === 'Rejeitado') {
+            message = `❌ Equipamento ${unnotifiedEquipment.numero_serie} foi REJEITADO.${
+              unnotifiedEquipment.analyst_notes ? ` Motivo: ${unnotifiedEquipment.analyst_notes}` : ''
+            }`;
+            type = 'erro';
+          }
+
+          // Mostrar notificação
+          setNotification({
+            id: unnotifiedEquipment.id,
+            numero_serie: unnotifiedEquipment.numero_serie,
+            status: unnotifiedEquipment.status,
+            analyst_notes: unnotifiedEquipment.analyst_notes,
+            message,
+            type,
+          });
         }
-
-        // Mostrar notificação
-        setNotification({
-          id: equipment.id,
-          numero_serie: equipment.numero_serie,
-          status: equipment.status,
-          analyst_notes: equipment.analyst_notes,
-          message,
-          type,
-        });
-
-        // Atualizar último tempo de verificação
-        setLastCheckedAt(new Date(equipment.updated_at));
       }
     } catch (error) {
       console.error('Erro ao verificar atualizações:', error);
     }
-  }, [userId, lastCheckedAt]);
+  }, [userId]);
 
-  // Verificar atualizações ao montar e a cada 10 segundos
+  // Verificar atualizações ao montar e a cada 30 segundos
   useEffect(() => {
     checkForUpdates();
-    const interval = setInterval(checkForUpdates, 10000); // Verificar a cada 10 segundos
+    const interval = setInterval(checkForUpdates, 30000); // Verificar a cada 30 segundos
 
     return () => clearInterval(interval);
   }, [checkForUpdates]);
