@@ -52,10 +52,10 @@ export function usePendingEquipmentNotifications(userId: string | undefined) {
           let type: 'sucesso' | 'erro' | 'aviso' = 'aviso';
 
           if (unnotifiedEquipment.status === 'Aprovado') {
-            message = `✅ Equipamento ${unnotifiedEquipment.numero_serie} foi APROVADO! Ele será adicionado ao seu contrato em breve.`;
+            message = `Equipamento ${unnotifiedEquipment.numero_serie} foi APROVADO! Ele será adicionado ao seu contrato em breve.`;
             type = 'sucesso';
           } else if (unnotifiedEquipment.status === 'Rejeitado') {
-            message = `❌ Equipamento ${unnotifiedEquipment.numero_serie} foi REJEITADO.${
+            message = `Equipamento ${unnotifiedEquipment.numero_serie} foi REJEITADO.${
               unnotifiedEquipment.analyst_notes ? ` Motivo: ${unnotifiedEquipment.analyst_notes}` : ''
             }`;
             type = 'erro';
