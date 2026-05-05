@@ -335,8 +335,8 @@ export function DashboardCliente() {
         />
       )}
 
-      {/* SIDEBAR */}
-      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
+      {/* SIDEBAR - HIDDEN ON MOBILE */}
+      <div className={`hidden md:flex ${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex-col`}>
         <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -381,9 +381,8 @@ export function DashboardCliente() {
           </div>
         </div>
 
-        {/* CONTENT */}
-        <div className="flex-1 overflow-auto p-8">
-          {loading ? (
+       {/* CONTEÚDO PRINCIPAL */}
+      <div className="flex-1 overflow-auto w-full">       {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
