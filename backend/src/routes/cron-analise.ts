@@ -13,11 +13,11 @@ const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// ✅ Modelos em ordem de preferência (fallback) - CORRETOS PARA MAIO 2026
+// ✅ Modelos em ordem de preferência (fallback) 
 const GEMINI_MODELS = [
-  'gemini-3.1-pro-preview',           // ✅ Novo, recomendado pelo Google
-  'gemini-3.1-flash-lite-preview',    // ✅ Rápido e barato
-  'gemini-3-flash-preview',           // ✅ Bom desempenho
+  'gemini-3.1-pro-preview',           
+  'gemini-3.1-flash-lite-preview',    
+  'gemini-3-flash-preview',         
 ];
 
 
