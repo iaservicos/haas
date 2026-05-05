@@ -13,12 +13,13 @@ const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// ✅ Modelos em ordem de preferência (fallback) - ESTÁVEIS E FUNCIONANDO (Maio 2026)
+// ✅ Modelos em ordem de preferência (fallback) - CORRETOS PARA MAIO 2026
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',         // ✅ Estável, melhor preço-performance
-  'gemini-2.5-pro',           // ✅ Fallback mais poderoso
-  'gemini-2.0-flash',         // ✅ Fallback deprecated mas ainda funciona
+  'gemini-3.1-pro-preview',           // ✅ Novo, recomendado pelo Google
+  'gemini-3.1-flash-lite-preview',    // ✅ Rápido e barato
+  'gemini-3-flash-preview',           // ✅ Bom desempenho
 ];
+
 
 
 // ✅ Configuração de retry com backoff exponencial
