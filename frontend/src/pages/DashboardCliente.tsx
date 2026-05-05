@@ -335,8 +335,8 @@ export function DashboardCliente() {
         />
       )}
 
-      {/* SIDEBAR - HIDDEN ON MOBILE */}
-      <div className={`hidden md:flex ${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex-col`}>
+      {/* SIDEBAR */}
+      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
         <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -381,8 +381,9 @@ export function DashboardCliente() {
           </div>
         </div>
 
-       {/* CONTEÚDO PRINCIPAL */}
-      <div className="flex-1 overflow-auto w-full">       {loading ? (
+        {/* CONTENT */}
+        <div className="flex-1 overflow-auto p-8">
+          {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -398,7 +399,7 @@ export function DashboardCliente() {
                   <h2 className="text-lg font-semibold text-gray-700 mb-4">Instruções Importantes</h2>
                   <div className="space-y-3 text-gray-600 text-sm">
                     <p><strong>1. Vistoria Visual:</strong> Observe danos físicos, peças quebradas, amassados, manchas e irregularidades.</p>
-                    <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo na planilha.</p>
+                    <p><strong>2. Registro:</strong> Pequenas marcas de uso são permitidas. Registre tudo no checklist.</p>
                     <p><strong>3. Fotos:</strong> Tire fotos de cada equipamento conforme solicitado.</p>
                     <p><strong>4. Higienização:</strong> Após vistoria, higienize e embale o equipamento.</p>
                     <p><strong>5. Embalagem:</strong> Use fita transparente e lacre bem a caixa.</p>
@@ -423,25 +424,25 @@ export function DashboardCliente() {
               </div>
 
               {/* ESTATÍSTICAS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow p-4 md:p-6">
-                  <div className="text-2xl md:text-3xl font-bold text-blue-600 mb-2">{stats.totalContratos}</div>
-                  <p className="text-sm md:text-base text-gray-600">Contratos Vinculados</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="text-3xl font-bold text-blue-600 mb-2">{stats.totalContratos}</div>
+                  <p className="text-gray-600">Contratos Vinculados</p>
                 </div>
-                <div className="bg-white rounded-lg shadow p-4 md:p-6">
-                  <div className="text-2xl md:text-3xl font-bold text-green-600 mb-2">{stats.totalEquipamentos}</div>
-                  <p className="text-sm md:text-base text-gray-600">Equipamentos</p>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="text-3xl font-bold text-green-600 mb-2">{stats.totalEquipamentos}</div>
+                  <p className="text-gray-600">Equipamentos</p>
                 </div>
-                <div className="bg-white rounded-lg shadow p-4 md:p-6">
-                  <div className="text-2xl md:text-3xl font-bold text-orange-600 mb-2">{stats.checklistsPendentes}</div>
-                  <p className="text-sm md:text-base text-gray-600">Checklists Pendentes</p>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="text-3xl font-bold text-orange-600 mb-2">{stats.checklistsPendentes}</div>
+                  <p className="text-gray-600">Checklists Pendentes</p>
                 </div>
               </div>
 
               {/* FILTRO E AÇÕES */}
-              <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-8">
-                <div className="flex flex-col md:flex-row gap-4 items-end">
-                  <div className="flex-1 w-full">
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Filtrar por Número de Série
                     </label>
@@ -455,9 +456,9 @@ export function DashboardCliente() {
                   </div>
                   <button
                     onClick={() => setShowAdicionarEquipamento(true)}
-                    className="w-full md:w-auto px-4 md:px-6 py-2 bg-blue-950 hover:bg-black text-white rounded-lg font-semibold transition text-sm md:text-base"
+                    className="px-6 py-2 bg-blue-950 hover:bg-black text-white rounded-lg font-semibold transition"
                   >
-                    + Adicionar
+                    + Adicionar Equipamento
                   </button>
                 </div>
               </div>
@@ -522,12 +523,10 @@ export function DashboardCliente() {
 
               {/* EQUIPAMENTOS */}
               <div className="bg-white rounded-lg shadow">
-                <div className="border-b border-gray-200 px-4 md:px-6 py-4">
-                  <h2 className="text-base md:text-lg font-semibold text-gray-900">Equipamentos para Vistoria</h2>
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-gray-900">Equipamentos para Vistoria</h2>
                 </div>
-                
-                {/* Versão Desktop - Tabela */}
-                <div className="hidden md:block overflow-x-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
@@ -584,68 +583,6 @@ export function DashboardCliente() {
                       )}
                     </tbody>
                   </table>
-                </div>
-
-                {/* Versão Mobile - Cards */}
-                <div className="md:hidden">
-                  {equipamentosFiltrados.length === 0 ? (
-                    <div className="p-4 text-center text-gray-600">
-                      {filtroSerial ? 'Nenhum equipamento encontrado com este filtro' : 'Nenhum equipamento para vistoria'}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-gray-200">
-                      {equipamentosFiltrados.map(equipamento => (
-                        <div key={equipamento.id} className="p-4 space-y-3">
-                          <div className="flex justify-between items-start gap-2">
-                            <div>
-                              <p className="text-xs text-gray-500 font-semibold">SÉRIE</p>
-                              <p className="text-sm font-bold text-gray-900">{equipamento.numero_serie}</p>
-                            </div>
-                            <span className={`px-2 py-1 text-xs font-medium border border-gray-300 rounded whitespace-nowrap ${
-                              equipamento.status === 'Pendente'
-                                ? 'text-gray-700 bg-gray-50'
-                                : equipamento.status === 'Concluído'
-                                ? 'text-gray-800 bg-white'
-                                : 'text-gray-600 bg-gray-50'
-                            }`}>
-                              {equipamento.status}
-                            </span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div>
-                              <p className="text-gray-500 font-semibold">Modelo</p>
-                              <p className="text-gray-900">{equipamento.modelo}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 font-semibold">Tipo</p>
-                              <p className="text-gray-900">{equipamento.tipo_material || equipamento.tipo || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 font-semibold">Destino</p>
-                              <p className="text-gray-900">{equipamento.destino || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 font-semibold">Nota Fiscal</p>
-                              <p className="text-gray-900">{equipamento.nota_fiscal || '—'}</p>
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => handleIniciarChecklist(equipamento)}
-                            disabled={equipamento.status === 'Concluído'}
-                            className={`w-full px-3 py-2 rounded text-sm font-semibold transition ${
-                              equipamento.status === 'Concluído'
-                                ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                : 'bg-blue-950 hover:bg-black text-white'
-                            }`}
-                          >
-                            {equipamento.status === 'Concluído' ? 'Vistoria Realizada' : 'Iniciar Vistoria'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             </>

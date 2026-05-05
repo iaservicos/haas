@@ -140,46 +140,39 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   };
 
   return (
-    <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', marginTop: '20px' }}>
-      <h3>Checklist de Vistoria - {equipmentType}</h3>
-      {equipamentoId && <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>Equipamento ID: {equipamentoId}</p>}
+    <div className="p-4 md:p-6 border border-gray-300 rounded-lg bg-white mt-4 md:mt-6">
+      <h3 className="text-lg md:text-xl font-bold mb-4">Checklist de Vistoria - {equipmentType}</h3>
+      {equipamentoId && <p className="text-xs md:text-sm text-gray-600 mb-4">Equipamento ID: {equipamentoId}</p>}
 
       {questions.length === 0 ? (
-        <p style={{ color: '#666', marginTop: '10px' }}>Carregando perguntas...</p>
+        <p className="text-gray-600 mt-2">Carregando perguntas...</p>
       ) : (
         <>
-          {questions.map((question) => (
-            <div key={question.id} style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                {question.text}
+          {questions.map((question, index) => (
+            <div key={question.id} className="mb-6 pb-6 border-b border-gray-200 last:border-b-0">
+              <label className="block mb-3 font-bold text-gray-900 text-sm md:text-base">
+                {index + 1}. {question.text}
               </label>
 
               {question.type === 'yes_no' && (
-                <div>
+                <div className="flex gap-2 md:gap-3">
                   <button
                     onClick={() => handleAnswerChange(question.id, true)}
-                    style={{
-                      padding: '8px 16px',
-                      marginRight: '10px',
-                      backgroundColor: answers[question.id] === true ? '#4CAF50' : '#ddd',
-                      color: answers[question.id] === true ? 'white' : 'black',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                    }}
+                    className={`flex-1 md:flex-none px-4 md:px-6 py-2 md:py-3 rounded text-sm md:text-base font-semibold transition ${
+                      answers[question.id] === true 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                    }`}
                   >
                     Sim
                   </button>
                   <button
                     onClick={() => handleAnswerChange(question.id, false)}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: answers[question.id] === false ? '#f44336' : '#ddd',
-                      color: answers[question.id] === false ? 'white' : 'black',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                    }}
+                    className={`flex-1 md:flex-none px-4 md:px-6 py-2 md:py-3 rounded text-sm md:text-base font-semibold transition ${
+                      answers[question.id] === false 
+                        ? 'bg-red-600 text-white' 
+                        : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                    }`}
                   >
                     Não
                   </button>
@@ -191,14 +184,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
                   value={answers[question.id]?.toString() || ''}
                   onChange={(e) => handleAnswerChange(question.id, e.target.value)}
                   placeholder="Digite suas observações..."
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                    minHeight: '80px',
-                    fontFamily: 'Arial, sans-serif',
-                  }}
+                  className="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base min-h-24 md:min-h-32"
                 />
               )}
 
@@ -206,12 +192,7 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
                 <select
                   value={answers[question.id]?.toString() || ''}
                   onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                  style={{
-                    padding: '8px',
-                    width: '100%',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                  }}
+                  className="w-full p-3 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                 >
                   <option value="">Selecione uma opção</option>
                   {question.options.map((option) => (
@@ -224,24 +205,26 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
             </div>
           ))}
 
-          <button
-            onClick={handleSalvar}
-            disabled={loading}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            {loading ? 'Salvando...' : 'Salvar Checklist'}
-          </button>
+          <div className="mt-6 space-y-3">
+            <button
+              onClick={handleSalvar}
+              disabled={loading}
+              className="w-full px-4 md:px-6 py-3 md:py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded font-bold text-sm md:text-base transition disabled:cursor-not-allowed"
+            >
+              {loading ? 'Salvando...' : 'Salvar Checklist'}
+            </button>
 
-          {erro && <p style={{ color: 'red', marginTop: '10px' }}>{erro}</p>}
-          {sucesso && <p style={{ color: 'green', marginTop: '10px' }}>Checklist salvo com sucesso!</p>}
+            {erro && (
+              <div className="p-3 md:p-4 bg-red-50 border-l-4 border-red-600 rounded">
+                <p className="text-red-700 text-sm md:text-base font-semibold">{erro}</p>
+              </div>
+            )}
+            {sucesso && (
+              <div className="p-3 md:p-4 bg-green-50 border-l-4 border-green-600 rounded">
+                <p className="text-green-700 text-sm md:text-base font-semibold">✓ Checklist salvo com sucesso!</p>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
