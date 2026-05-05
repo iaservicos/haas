@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 
 export interface PendingEquipmentNotification {
@@ -12,13 +12,16 @@ export interface PendingEquipmentNotification {
 
 export function usePendingEquipmentNotifications(userId: string | undefined) {
   const [notification, setNotification] = useState<PendingEquipmentNotification | null>(null);
-  const notifiedIdsRef = useRef<Set<number>>(new Set());
 
   // Função para buscar equipamentos com status atualizado
   const checkForUpdates = useCallback(async () => {
     if (!userId) return;
 
     try {
+      // Carregar IDs já notificados do localStorage
+      const notifiedIdsStr = localStorage.getItem(`notified_equipment_${userId}`);
+      const notifiedIds = new Set(notifiedIdsStr ? JSON.parse(notifiedIdsStr) : []);
+
       // Buscar equipamentos que não estão mais pendentes
       const { data, error } = await supabase
         .from('pendingequipment')
@@ -36,12 +39,13 @@ export function usePendingEquipmentNotifications(userId: string | undefined) {
       if (data && data.length > 0) {
         // Encontrar o primeiro equipamento que ainda não foi notificado
         const unnotifiedEquipment = data.find(
-          (equipment) => !notifiedIdsRef.current.has(equipment.id)
+          (equipment) => !notifiedIds.has(equipment.id)
         );
 
         if (unnotifiedEquipment) {
-          // Marcar como notificado
-          notifiedIdsRef.current.add(unnotifiedEquipment.id);
+          // Marcar como notificado no localStorage
+          notifiedIds.add(unnotifiedEquipment.id);
+          localStorage.setItem(`notified_equipment_${userId}`, JSON.stringify(Array.from(notifiedIds)));
 
           // Criar mensagem baseada no status
           let message = '';
