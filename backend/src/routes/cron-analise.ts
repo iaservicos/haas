@@ -15,9 +15,9 @@ const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models
 
 // ✅ Modelos em ordem de preferência (fallback)
 const GEMINI_MODELS = [
-  'gemini-3.1-pro',  // Novo, mais estável
-  'gemini-1.5-flash',         // Estável, rápido
-  'gemini-2.5-flash',         // Fallback (pode estar instável)
+  'gemini-3-flash',           // ✅ Novo, frontier-class
+  'gemini-2.5-flash',         // ✅ Estável, rápido
+  'gemini-2.5-pro',           // ✅ Fallback mais poderoso
 ];
 
 // ✅ Configuração de retry com backoff exponencial
