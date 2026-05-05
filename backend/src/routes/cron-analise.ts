@@ -21,7 +21,6 @@ const GEMINI_MODELS = [
 ];
 
 
-
 // ✅ Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000; // 2 segundos
