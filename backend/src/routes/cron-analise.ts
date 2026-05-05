@@ -9,11 +9,11 @@ const supabase = createClient(
 
 const router = express.Router();
 
-// ✅ Configuração do Gemini Pro com FALLBACK
+// Configuração do Gemini Pro com FALLBACK
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// ✅ Modelos em ordem de preferência (fallback) 
+// Modelos em ordem de preferência (fallback) 
 const GEMINI_MODELS = [
   'gemini-3.1-pro-preview',           
   'gemini-3.1-flash-lite-preview',    
@@ -21,7 +21,7 @@ const GEMINI_MODELS = [
 ];
 
 
-// ✅ Configuração de retry com backoff exponencial
+// Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000; // 2 segundos
 const MAX_RETRY_DELAY = 30000; // 30 segundos
@@ -137,7 +137,7 @@ async function makeGeminiRequestWithFallback(
 }
 
 /**
- * ✅ POST /api/cron/analise-fotos
+ * POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
  * Processa análises pendentes com Gemini Pro
  * COM RETRY AUTOMÁTICO, BACKOFF EXPONENCIAL E FALLBACK DE MODELOS
@@ -151,7 +151,7 @@ router.post('/analise-fotos', async (req: any, res: any) => {
       return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' });
     }
 
-    // ✅ Buscar análises com status "pendente"
+    // Buscar análises com status "pendente"
     const { data: analisesPendentes, error: fetchError } = await supabase
       .from('analises_fotos')
       .select('*')
@@ -181,7 +181,7 @@ router.post('/analise-fotos', async (req: any, res: any) => {
       try {
         console.log(`[CRON] Processando análise ID ${analise.id}...`);
 
-        // ✅ Buscar foto associada
+        //  Buscar foto associada
         const { data: foto, error: fotoError } = await supabase
           .from('fotos_vistoria')
           .select('*')
@@ -196,32 +196,32 @@ router.post('/analise-fotos', async (req: any, res: any) => {
 
         console.log(`[CRON] Foto encontrada: ${foto.foto_url}`);
 
-        // ✅ Baixar imagem
+        //  Baixar imagem
         console.log('[CRON] Baixando imagem para análise...');
         const imageResponse = await axios.get(foto.foto_url, {
           responseType: 'arraybuffer',
           timeout: 30000,
         });
 
-        // ✅ Converter para base64
+        //  Converter para base64
         const base64 = Buffer.from(imageResponse.data).toString('base64');
         console.log(`[CRON] Imagem convertida para base64: ${base64.length} caracteres`);
 
-        // ✅ Truncar base64 se muito grande (máximo 4MB)
+        //  Truncar base64 se muito grande (máximo 4MB)
         let base64Truncado = base64;
         if (base64.length > 4000000) {
           base64Truncado = base64.substring(0, 4000000);
           console.log(`[CRON] Base64 truncado para 4MB`);
         }
 
-        // ✅ Detectar mime type correto baseado na extensão do arquivo
+        //  Detectar mime type correto baseado na extensão do arquivo
         const fileName = foto.foto_url.split('/').pop() || '';
         const extension = fileName.split('.').pop()?.toLowerCase() || 'png';
         const mimeType = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 'image/png';
         
         console.log(`[CRON] Usando mime type: ${mimeType}`);
 
-        // ✅ Enviar para Gemini Pro COM FALLBACK E RETRY AUTOMÁTICO
+        //  Enviar para Gemini Pro COM FALLBACK E RETRY AUTOMÁTICO
         console.log('[CRON] Enviando para Gemini Pro com fallback de modelos e retry automático...');
 
         const geminiResponse = await makeGeminiRequestWithFallback(
@@ -308,7 +308,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
           analise.id
         );
 
-        // ✅ Extrair resposta do Gemini
+        //  Extrair resposta do Gemini
         const geminiContent = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (!geminiContent) {
@@ -319,10 +319,10 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
 
         console.log(`[CRON] Resposta recebida do Gemini: ${geminiContent.substring(0, 100)}...`);
 
-        // ✅ Fazer parse do JSON
+        //  Fazer parse do JSON
         let resultado;
         try {
-          // ✅ Remover blocos de código markdown se existirem
+          //  Remover blocos de código markdown se existirem
           let jsonContent = geminiContent;
           if (geminiContent.includes('```')) {
             console.log('[CRON] Removendo blocos de código markdown da resposta...');
@@ -337,7 +337,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
           continue;
         }
 
-        // ✅ Atualizar análise com resultado
+        //  Atualizar análise com resultado
         const { error: updateError } = await supabase
           .from('analises_fotos')
           .update({
@@ -361,7 +361,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
         const message = error.message || 'Erro desconhecido';
         console.error(`[CRON] ❌ Erro ao processar análise ${analise.id} (Status: ${status}): ${message}`);
 
-        // ✅ Registrar erro na análise
+        //  Registrar erro na análise
         try {
           await supabase
             .from('analises_fotos')
@@ -387,7 +387,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
       }
     }
 
-    console.log(`[CRON] ✅ Processamento concluído: ${processadas} processadas, ${erros} erros`);
+    console.log(`[CRON]  Processamento concluído: ${processadas} processadas, ${erros} erros`);
 
     res.json({
       success: true,
