@@ -410,7 +410,7 @@ export function DashboardCliente() {
                 {/* VÍDEO */}
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Vídeo de Instruções</h2>
-                  <div className="relative mx-auto" style={{ maxWidth: '400px', paddingBottom: '56.25%', height: 0, overflow: 'hidden' }}>
+                  <div className="relative w-full" style={{ paddingBottom: '56.25%', height: 0, overflow: 'hidden', maxHeight: '300px' }}>
                     <iframe
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                       src="https://www.youtube.com/embed/jeIxiUqDT-I"
@@ -421,6 +421,7 @@ export function DashboardCliente() {
                     />
                   </div>
                 </div>
+
 
 
                 </div>
