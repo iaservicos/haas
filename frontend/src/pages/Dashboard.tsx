@@ -1323,16 +1323,7 @@ export function Dashboard() {
                                     {vistoria.mouse_status}
                                   </span>
                                 </td>
-                              <td className="px-6 py-4 text-sm font-mono font-bold text-black">
-                                {(() => {
-                                  // Buscar contrato pelo numero_serie
-                                  const equipamento = vistoriasPortalFiltradas.find(
-                                    (v: any) => v.numero_serie === vistoria.numero_serie
-                                  );
-                                  return equipamento?.contrato_equipamentos?.contratos?.numero_contrato || '—';
-                                })()}
-                              </td>
-                              </tr>
+                             </tr>
                             ))}
                         </tbody>
                       </table>
