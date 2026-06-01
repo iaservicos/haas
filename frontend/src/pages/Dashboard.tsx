@@ -1277,7 +1277,7 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
-                            <td className="px-6 py-4 text-sm text-gray-900">{vistoria.contrato_equipamentos?.contratos?.numero_contrato || '—'}</td>
+                            
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
