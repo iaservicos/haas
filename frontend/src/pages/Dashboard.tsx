@@ -1270,6 +1270,7 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Estado</th>
@@ -1277,7 +1278,6 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -1296,6 +1296,14 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
                                 <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
+                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">
+                                  {(() => {
+                                    const contrato = vistorias.find(
+                                      (v: any) => v.numero_serie === vistoria.numero_serie
+                                    )?.contrato_equipamentos?.contratos?.numero_contrato;
+                                    return contrato || '—';
+                                  })()}
+                                </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
                                 <td className={`px-6 py-4 text-sm ${getCorEstado(vistoria.estado)}`}>
@@ -1315,15 +1323,15 @@ export function Dashboard() {
                                     {vistoria.mouse_status}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">
-                                  {(() => {
-                                    // Buscar contrato pelo numero_serie
-                                    const equipamento = vistoriasPortalFiltradas.find(
-                                      (v: any) => v.numero_serie === vistoria.numero_serie
-                                    );
-                                    return equipamento?.contrato_equipamentos?.contratos?.numero_contrato || '—';
-                                  })()}
-                                </td>
+                              <td className="px-6 py-4 text-sm font-mono font-bold text-black">
+                                {(() => {
+                                  // Buscar contrato pelo numero_serie
+                                  const equipamento = vistoriasPortalFiltradas.find(
+                                    (v: any) => v.numero_serie === vistoria.numero_serie
+                                  );
+                                  return equipamento?.contrato_equipamentos?.contratos?.numero_contrato || '—';
+                                })()}
+                              </td>
                               </tr>
                             ))}
                         </tbody>
