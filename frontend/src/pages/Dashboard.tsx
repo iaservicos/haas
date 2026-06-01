@@ -1277,6 +1277,7 @@ export function Dashboard() {
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Avaria</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Teclado</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mouse</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Contrato</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -1313,6 +1314,15 @@ export function Dashboard() {
                                   <span className={`${getCorComponente(vistoria.mouse_status)}`}>
                                     {vistoria.mouse_status}
                                   </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">
+                                  {(() => {
+                                    // Buscar contrato pelo numero_serie
+                                    const equipamento = vistoriasPortalFiltradas.find(
+                                      (v: any) => v.numero_serie === vistoria.numero_serie
+                                    );
+                                    return equipamento?.contrato_equipamentos?.contratos?.numero_contrato || '—';
+                                  })()}
                                 </td>
                               </tr>
                             ))}
