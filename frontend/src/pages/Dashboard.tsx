@@ -1296,14 +1296,6 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
                                 <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
-                                <td className="px-6 py-4 text-sm font-mono font-bold text-black">
-                                  {(() => {
-                                    const contrato = vistorias.find(
-                                      (v: any) => v.numero_serie === vistoria.numero_serie
-                                    )?.contrato_equipamentos?.contratos?.numero_contrato;
-                                    return contrato || '—';
-                                  })()}
-                                </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
                                 <td className={`px-6 py-4 text-sm ${getCorEstado(vistoria.estado)}`}>
