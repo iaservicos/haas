@@ -1269,7 +1269,6 @@ export function Dashboard() {
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Data</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Série</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Análise da Foto</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Equipamento</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cliente</th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Técnico</th>
