@@ -1,5 +1,3 @@
-// backend/src/routes/vistorias.ts
-
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 
@@ -7,31 +5,13 @@ const router = Router();
 
 /**
  * GET /api/vistorias
- * Listar todas as vistorias com filtros e paginação
- * Inclui informações do contrato através do numero_serie
+ * Listar todas as vistorias com paginação e filtros
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10, tecnico, estado, teclado, mouse } = req.query;
-    
-    // Query com JOIN para trazer o contrato
-    let query = supabase
-      .from('vistorias')
-      .select(`
-        *,
-        contrato_equipamentos!numero_serie(
-          id,
-          numero_serie,
-          modelo,
-          sku,
-          tipo_material,
-          contratos!contrato_id(
-            id,
-            numero_contrato,
-            nome_cliente
-          )
-        )
-      `);
+
+    let query = supabase.from('vistorias').select('*');
 
     if (tecnico) {
       query = query.ilike('tecnico', `%${tecnico}%`);
@@ -65,7 +45,6 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Erro ao buscar vistorias:', error);
     res.status(500).json({ error: 'Erro ao buscar vistorias' });
   }
 });
@@ -94,35 +73,21 @@ router.get('/stats', async (req: Request, res: Response) => {
 
     res.json(stats);
   } catch (error) {
-    console.error('Erro ao buscar estatísticas:', error);
     res.status(500).json({ error: 'Erro ao buscar estatísticas' });
   }
 });
 
 /**
  * GET /api/vistorias/:id
- * Retorna uma vistoria específica com contrato
+ * Retorna uma vistoria específica
  */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
     const { data, error } = await supabase
       .from('vistorias')
-      .select(`
-        *,
-        contrato_equipamentos!numero_serie(
-          id,
-          numero_serie,
-          modelo,
-          sku,
-          tipo_material,
-          contratos!contrato_id(
-            id,
-            numero_contrato,
-            nome_cliente
-          )
-        )
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -130,7 +95,6 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Erro ao buscar vistoria:', error);
     res.status(500).json({ error: 'Erro ao buscar vistoria' });
   }
 });
@@ -141,18 +105,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { 
-      data_vistoria, 
-      tecnico, 
-      email_tecnico, 
-      cliente, 
-      numero_serie, 
-      equipamento, 
-      estado, 
-      teclado_status, 
-      mouse_status, 
-      laudo 
-    } = req.body;
+    const { data_vistoria, tecnico, email_tecnico, cliente, numero_serie, equipamento, estado, teclado_status, mouse_status, laudo } = req.body;
 
     const { data, error } = await supabase
       .from('vistorias')
@@ -176,8 +129,41 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json(data[0]);
   } catch (error) {
-    console.error('Erro ao criar vistoria:', error);
     res.status(500).json({ error: 'Erro ao criar vistoria' });
+  }
+});
+
+/**
+ * GET /api/inspecao/portal/listar
+ * Retorna todas as inspeções (respostas) do portal com dados relacionados
+ */
+router.get('/portal/listar', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('inspecao_respostas')
+      .select(`
+        *,
+        contrato_equipamentos (
+          id,
+          numero_serie,
+          tipo_material,
+          modelo
+        )
+      `)
+      .order('data_inspecao', { ascending: false });
+
+    if (error) {
+      console.error('[inspecao] Erro ao buscar inspeções do portal:', error);
+      return res.status(500).json({ error: 'Erro ao buscar inspeções' });
+    }
+
+    res.json({
+      success: true,
+      data: data || [],
+    });
+  } catch (error) {
+    console.error('[inspecao] Erro:', error);
+    res.status(500).json({ error: 'Erro ao buscar inspeções' });
   }
 });
 
