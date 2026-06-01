@@ -1296,6 +1296,9 @@ export function Dashboard() {
                                 <td className="px-6 py-4 text-sm text-gray-900">{formatarData(vistoria.data_vistoria)}</td>
                                 <td className="px-6 py-4 text-sm font-mono font-bold text-black">{vistoria.numero_serie}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.equipamento}</td>
+                                <td className="px-6 py-4 text-sm font-mono font-bold text-blue-600">
+                                  {vistoria.contrato_equipamentos?.[0]?.contratos?.[0]?.numero_contrato || '—'}
+                                </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.cliente}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.tecnico}</td>
                                 <td className={`px-6 py-4 text-sm ${getCorEstado(vistoria.estado)}`}>
