@@ -480,6 +480,30 @@ router.get('/portal/listar', async (req: any, res: any) => {
 });
 
 /**
+ * GET /api/inspecao/fotos/:vistoriaId
+ * Retorna fotos enviadas para uma vistoria (usado pelo polling do QR code)
+ */
+router.get('/fotos/:vistoriaId', async (req: any, res: any) => {
+  try {
+    const { vistoriaId } = req.params;
+
+    const { data, error } = await supabase
+      .from('fotos_vistoria')
+      .select('id, foto_url, foto_nome')
+      .eq('vistoria_id', vistoriaId)
+      .order('id', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ success: true, data: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar fotos' });
+  }
+});
+
+/**
  * GET /api/inspecao/:vistoriaId
  * Retorna as respostas de uma inspeção específica
  */

@@ -11,6 +11,7 @@ import { Confirmacoes } from './pages/Confirmacoes';
 import { DashboardCliente } from './pages/DashboardCliente';
 import { VistoriaCliente } from './pages/VistoriaCliente';
 import { AnaliseEquipamento } from './pages/AnaliseEquipamento';
+import { MobileFoto } from './pages/MobileFoto';
 
 
 // ⚡ NOVO: Componente para rotas protegidas com verificação de role
@@ -134,6 +135,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Rota pública para captura de foto pelo celular via QR Code */}
+      <Route path="/foto-mobile" element={<MobileFoto />} />
 
       {/* ⚡ ROTA PADRÃO: Redireciona para login */}
       <Route path="*" element={<Navigate to="/login" />} />

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface UploadFotoProps {
   confirmacaoId: string;
@@ -8,27 +9,75 @@ interface UploadFotoProps {
   onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
 
-export const UploadFoto: React.FC<UploadFotoProps> = ({ 
-  confirmacaoId, 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+export const UploadFoto: React.FC<UploadFotoProps> = ({
+  confirmacaoId,
   numeroSerie,
   equipmentType,
   nomeCliente,
-  onUploadSuccess 
+  onUploadSuccess,
 }) => {
+  const [modo, setModo] = useState<'desktop' | 'qrcode'>('desktop');
+
+  // --- modo desktop ---
   const [foto, setFoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [erro, setErro] = useState<string>('');
 
+  // --- modo qrcode ---
+  const [aguardando, setAguardando] = useState(false);
+  const [fotoDetectada, setFotoDetectada] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const mobileUrl = `${window.location.origin}/foto-mobile?vistoria_id=${confirmacaoId}&numero_serie=${encodeURIComponent(numeroSerie || '')}`;
+
+  // Inicia polling quando entra no modo QR
+  useEffect(() => {
+    if (modo !== 'qrcode' || fotoDetectada) return;
+
+    setAguardando(true);
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/inspecao/fotos/${confirmacaoId}`);
+        if (!response.ok) return;
+        const json = await response.json();
+        if (json.data && json.data.length > 0) {
+          clearInterval(pollingRef.current!);
+          setAguardando(false);
+          setFotoDetectada(true);
+          if (onUploadSuccess) {
+            onUploadSuccess(json.data[0].id, null);
+          }
+        }
+      } catch {
+        // ignora erros de rede durante polling
+      }
+    }, 3000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [modo, confirmacaoId, fotoDetectada]);
+
+  // Para polling ao sair do modo QR
+  const handleSetModo = (novoModo: 'desktop' | 'qrcode') => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setAguardando(false);
+    setModo(novoModo);
+    setErro('');
+  };
+
+  // --- handlers desktop ---
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setFoto(file);
       const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreview(event.target?.result as string);
-      };
+      reader.onload = (event) => setPreview(event.target?.result as string);
       reader.readAsDataURL(file);
       setErro('');
       setUploadSuccess(false);
@@ -46,7 +95,6 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
     setUploadSuccess(false);
 
     try {
-      // ✅ CORRIGIDO: Usar FormData para enviar o arquivo como multipart
       const formData = new FormData();
       formData.append('file', foto);
       formData.append('vistoria_id', confirmacaoId);
@@ -54,34 +102,21 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
       formData.append('foto_tipo', 'equipamento');
       formData.append('numero_serie', numeroSerie || 'Desconhecido');
 
-      // ✅ CORRIGIDO: Usar a URL completa do backend em produção
       const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
         ? '/api/inspecao/upload-foto'
         : 'https://haas-mu.vercel.app/api/inspecao/upload-foto';
 
-      console.log('[UploadFoto] Iniciando upload para:', apiUrl);
-      console.log('[UploadFoto] vistoria_id:', confirmacaoId);
-
       const response = await fetch(apiUrl, {
         method: 'POST',
         body: formData,
-        // NÃO definir Content-Type - o navegador vai definir automaticamente com boundary
       });
-
-      console.log('[UploadFoto] Response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || 
-          `Erro ao fazer upload: ${response.status} ${response.statusText}`
-        );
+        throw new Error(errorData.error || `Erro ao fazer upload: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('[UploadFoto] Upload bem-sucedido:', data);
-
-      // ✅ Marcar como sucesso
       setUploadSuccess(true);
       setFoto(null);
       setPreview('');
@@ -90,7 +125,6 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         onUploadSuccess(data.data?.id || data.id || '', data.data?.analise || data.analise);
       }
     } catch (err) {
-      console.error('[UploadFoto] Erro:', err);
       setErro(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -99,70 +133,131 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* INPUT FILE COM LABEL CUSTOMIZADO */}
-      <div className="flex flex-col gap-3">
-        <label className="block">
-          <span className="sr-only">Escolher foto</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFotoChange}
-            disabled={loading}
-            className="block w-full text-sm text-gray-700
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-none file:border-0
-              file:text-sm file:font-semibold
-              file:bg-gray-900 file:text-white
-              hover:file:bg-gray-800
-              file:cursor-pointer file:transition-colors
-              disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </label>
-      </div>
-
-      {/* PREVIEW DA IMAGEM */}
-      {preview && (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-semibold text-gray-900">Prévia da foto:</p>
-          <div className="border-2 border-gray-300 rounded-none p-4 bg-gray-50 inline-block">
-            <img 
-              src={preview} 
-              alt="Preview" 
-              className="max-w-xs max-h-64 rounded-none"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* BOTÃO ENVIAR FOTO - TAMANHO PADRÃO */}
-      <div className="flex gap-3 pt-4">
+      {/* SELETOR DE MODO */}
+      <div className="flex gap-0 border border-gray-300">
         <button
-          onClick={handleUpload}
-          disabled={!foto || loading}
-          className="px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-none font-bold text-base transition-colors uppercase tracking-wide"
+          onClick={() => handleSetModo('desktop')}
+          className={`flex-1 py-3 px-4 text-sm font-bold uppercase tracking-wide transition-colors ${
+            modo === 'desktop'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-600 hover:bg-gray-100'
+          }`}
         >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <span className="inline-block animate-spin">⟳</span>
-              Enviando...
-            </span>
-          ) : (
-            'Enviar Foto'
-          )}
+          Enviar do computador
+        </button>
+        <button
+          onClick={() => handleSetModo('qrcode')}
+          className={`flex-1 py-3 px-4 text-sm font-bold uppercase tracking-wide transition-colors border-l border-gray-300 ${
+            modo === 'qrcode'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          Usar câmera do celular
         </button>
       </div>
 
-      {/* MENSAGEM DE ERRO */}
-      {erro && (
-        <div className="p-4 bg-red-50 border-l-4 border-red-600 rounded-none">
-          <p className="text-red-700 font-semibold">{erro}</p>
+      {/* MODO DESKTOP */}
+      {modo === 'desktop' && (
+        <div className="space-y-6">
+          <div className="flex flex-col gap-3">
+            <label className="block">
+              <span className="sr-only">Escolher foto</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFotoChange}
+                disabled={loading}
+                className="block w-full text-sm text-gray-700
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-none file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-gray-900 file:text-white
+                  hover:file:bg-gray-800
+                  file:cursor-pointer file:transition-colors
+                  disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </label>
+          </div>
+
+          {preview && (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm font-semibold text-gray-900">Prévia da foto:</p>
+              <div className="border-2 border-gray-300 rounded-none p-4 bg-gray-50 inline-block">
+                <img src={preview} alt="Preview" className="max-w-xs max-h-64 rounded-none" />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={handleUpload}
+              disabled={!foto || loading}
+              className="px-6 py-3 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-none font-bold text-base transition-colors uppercase tracking-wide"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block animate-spin">⟳</span>
+                  Enviando...
+                </span>
+              ) : (
+                'Enviar Foto'
+              )}
+            </button>
+          </div>
+
+          {erro && (
+            <div className="p-4 bg-red-50 border-l-4 border-red-600 rounded-none">
+              <p className="text-red-700 font-semibold">{erro}</p>
+            </div>
+          )}
+
+          {uploadSuccess && (
+            <div className="p-4 bg-green-50 border-l-4 border-green-600 rounded-none">
+              <p className="text-green-700 font-semibold">✓ Importação realizada com sucesso!</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* MENSAGEM DE SUCESSO - SEM DETALHES DA ANÁLISE */}
-      {uploadSuccess && (
-        <div className="p-4 bg-green-50 border-l-4 border-green-600 rounded-none">
-          <p className="text-green-700 font-semibold">✓ Importação realizada com sucesso!</p>
+      {/* MODO QR CODE */}
+      {modo === 'qrcode' && (
+        <div className="space-y-6">
+          {!fotoDetectada ? (
+            <>
+              <p className="text-gray-700">
+                Escaneie o QR Code abaixo com o celular para abrir a câmera e enviar a foto do equipamento diretamente.
+              </p>
+
+              <div className="flex flex-col items-center gap-6 py-6">
+                <div className="p-4 border-2 border-gray-900 inline-block bg-white">
+                  <QRCodeSVG
+                    value={mobileUrl}
+                    size={200}
+                    bgColor="#ffffff"
+                    fgColor="#111827"
+                    level="M"
+                  />
+                </div>
+
+                {aguardando && (
+                  <div className="flex items-center gap-3 text-gray-600">
+                    <span className="inline-block animate-spin text-xl">⟳</span>
+                    <span className="text-sm font-medium">Aguardando foto do celular...</span>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-400 text-center max-w-xs break-all">
+                  {mobileUrl}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="p-6 bg-green-50 border-l-4 border-green-600 rounded-none">
+              <p className="text-green-700 font-bold text-lg">✓ Foto recebida do celular!</p>
+              <p className="text-green-600 text-sm mt-1">A foto foi enviada com sucesso e está em análise.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
