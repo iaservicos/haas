@@ -70,7 +70,7 @@ export interface TokenPayload {
   userId: string;
   email: string;
   role: string;
-  user_type: 'analyst' | 'client';  // NOVO
+  user_type: 'analyst' | 'client' | 'admin';  // NOVO: inclui admin
   contrato_id?: string;              // NOVO
 }
 
