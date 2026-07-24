@@ -129,7 +129,10 @@ router.post('/criar', async (req: any, res: Response) => {
 // ============================================================================
 router.get('/listar', async (req: any, res: Response) => {
   try {
+    console.log('[GET /listar] Iniciando requisição');
+    console.log('[GET /listar] req.user:', req.user);
     const ehAdmin = await verificarAdmin(req);
+    console.log('[GET /listar] ehAdmin:', ehAdmin);
     if (!ehAdmin) {
       return res.status(403).json({
         sucesso: false,
