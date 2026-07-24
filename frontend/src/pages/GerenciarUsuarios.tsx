@@ -144,30 +144,29 @@ export function GerenciarUsuarios() {
     <div className="flex h-screen bg-gray-50">
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+        <div className="p-4 border-b border-gray-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-400 hover:text-white text-xl"
+            className="text-gray-400 hover:text-white"
           >
             ☰
           </button>
-          {sidebarOpen && <span className="text-xs text-gray-500">MENU</span>}
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-2">
+          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
+
           <button
             onClick={() => navigate('/')}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition text-sm"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
           >
-            <span>←</span>
             {sidebarOpen && <span>Dashboard</span>}
           </button>
 
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition text-sm"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
           >
-            <span>⊗</span>
             {sidebarOpen && <span>Sair</span>}
           </button>
         </nav>
@@ -184,19 +183,10 @@ export function GerenciarUsuarios() {
                 alt="Logo Positivo"
                 className="h-10 w-auto"
               />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Gerenciar Usuários</h1>
-                <p className="text-xs text-gray-500 mt-1">Administração de usuários do sistema</p>
-              </div>
+              <h1 className="text-xl font-bold text-gray-900">Gerenciar Usuários</h1>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="text-right">
-                <p className="text-gray-900 font-medium">{usuario?.nome}</p>
-                <p className="text-gray-500 text-xs">Administrador</p>
-              </div>
-              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                {usuario?.nome?.charAt(0).toUpperCase()}
-              </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-600">{usuario?.nome}</span>
             </div>
           </div>
         </div>
@@ -205,17 +195,13 @@ export function GerenciarUsuarios() {
         <div className="flex-1 overflow-auto">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              {/* Card Header com Stats */}
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Lista de Usuários</h2>
-                  <p className="text-sm text-gray-600 mt-1">Total: {usuarios.length} usuário{usuarios.length !== 1 ? 's' : ''}</p>
-                </div>
+              {/* Button to create new user */}
+              <div className="mb-6 flex justify-end">
                 <button
                   onClick={() => setShowModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition shadow-sm hover:shadow-md"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium"
                 >
-                  + Novo Usuário
+                  Criar Novo Usuário
                 </button>
               </div>
 
@@ -227,14 +213,8 @@ export function GerenciarUsuarios() {
                     <p className="text-gray-600 mt-4">Carregando usuários...</p>
                   </div>
                 ) : usuarios.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <p className="text-gray-500">Nenhum usuário cadastrado</p>
-                    <button
-                      onClick={() => setShowModal(true)}
-                      className="mt-4 text-blue-600 hover:text-blue-700 font-medium text-sm"
-                    >
-                      Criar o primeiro usuário
-                    </button>
+                  <div className="p-12 text-center text-gray-500">
+                    Nenhum usuário cadastrado
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -302,55 +282,49 @@ export function GerenciarUsuarios() {
               <h2 className="text-lg font-bold text-gray-900">
                 {editandoId ? 'Editar Usuário' : 'Novo Usuário'}
               </h2>
-              <p className="text-xs text-gray-600 mt-1">
-                {editandoId ? 'Atualize as informações do usuário' : 'Adicione um novo usuário ao sistema'}
-              </p>
             </div>
 
             {/* Modal Body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="usuario@example.com"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Nome Completo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
                 <input
                   type="text"
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="João Silva"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Tipo de Usuário</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
                 <select
                   value={formData.user_type}
                   onChange={(e) => setFormData({ ...formData, user_type: e.target.value as any })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
-                  <option value="">Selecionar...</option>
                   <option value="analyst">Analista</option>
                   <option value="client">Cliente</option>
-                  <option value="admin">Administrador</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
 
               {!editandoId && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
                   <p className="text-xs text-blue-900 font-medium">
-                    📝 Uma senha temporária será gerada automaticamente
+                    Uma senha temporária será gerada automaticamente
                   </p>
                 </div>
               )}
