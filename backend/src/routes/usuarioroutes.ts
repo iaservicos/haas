@@ -8,12 +8,24 @@ const router = Router();
 // HELPER: Verificar se usuário é admin
 // ============================================================================
 async function verificarAdmin(req: any): Promise<boolean> {
-  const usuarioId = req.user?.id;
-  console.log('[DEBUG] verificarAdmin - usuarioId:', usuarioId);
-  console.log('[DEBUG] verificarAdmin - req.user:', req.user);
+  console.log('[DEBUG verificarAdmin] Iniciando...');
+  console.log('[DEBUG verificarAdmin] req.user:', req.user);
+
+  // Verificar user_type direto do token JWT (mais rápido)
+  const userType = req.user?.user_type;
+  console.log('[DEBUG verificarAdmin] userType do token:', userType);
+
+  if (userType === 'admin') {
+    console.log('[DEBUG verificarAdmin] ✅ É admin (do token)');
+    return true;
+  }
+
+  // Se não for admin no token, verificar no banco como fallback
+  const usuarioId = req.user?.userId;
+  console.log('[DEBUG verificarAdmin] usuarioId:', usuarioId);
 
   if (!usuarioId) {
-    console.log('[DEBUG] usuarioId não encontrado');
+    console.log('[DEBUG verificarAdmin] ❌ usuarioId não encontrado');
     return false;
   }
 
@@ -23,9 +35,9 @@ async function verificarAdmin(req: any): Promise<boolean> {
     .eq('id', usuarioId)
     .single();
 
-  console.log('[DEBUG] usuário do banco:', usuario);
+  console.log('[DEBUG verificarAdmin] usuário do banco:', usuario);
   const isAdmin = usuario?.user_type === 'admin';
-  console.log('[DEBUG] isAdmin:', isAdmin);
+  console.log('[DEBUG verificarAdmin] isAdmin:', isAdmin);
 
   return isAdmin;
 }
