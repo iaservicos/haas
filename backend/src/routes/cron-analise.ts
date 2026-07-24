@@ -59,19 +59,31 @@ async function analyzeImageWithClaude(
               },
               {
                 type: 'text',
-                text: `Você é um especialista em inspeção de equipamentos de TI da Positivo Tecnologia. Analise a foto do equipamento e identifique danos ESPECÍFICOS e ASSERTIVOS.
+                text: `Você é um especialista CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia. Sua tarefa é identificar QUALQUER dano visível na imagem.
 
 Número de série: ${numeroSerie || 'N/A'}
 Nome da foto: ${fileName}
 
-CATEGORIAS DE AVARIAS ACEITAS (use EXATAMENTE como está):
+⚠️ INSTRUÇÕES CRÍTICAS - LEIA COM ATENÇÃO:
+1. Examine CADA PARTE da imagem em detalhes: tela/display, carcaça, teclado, conectores, bordas
+2. Se houver QUALQUER anomalia visual → é AVARIA (não é OK)
+3. Linhas na tela (horizontais ou verticais) = SEMPRE AVARIA
+4. Pixels mortos ou manchas = SEMPRE AVARIA
+5. Trincas em qualquer lugar = SEMPRE AVARIA
+6. Desbotamento ou descoloração = AVARIA
+7. Oxidação ou corrosão = AVARIA
+8. Amassados ou deformações = AVARIA
+9. Se tiver dúvida → responda AVARIA (é mais seguro)
+10. Nunca retorne OK se vê QUALQUER problema
 
-TELA/DISPLAY:
+CATEGORIAS DE AVARIAS:
+
+TELA/DISPLAY (procure atentamente por):
+- Linhas horizontais/verticais (LCD danificado) = SEMPRE AVARIA
 - Trincas (pequenas, médias, grandes)
 - Quebras (vidro quebrado)
 - Manchas (pixel morto, mancha de tinta)
 - Desbotamento
-- Linhas horizontais/verticais
 - Vidro solto
 
 CARCAÇA:
@@ -108,22 +120,15 @@ OUTROS:
 - Sinais de líquido
 - Oxidação
 
-INSTRUÇÕES:
-1. Se o equipamento está OK (sem danos visíveis), retorne status="OK" e deixe categoria e tipo_dano vazios
-2. Se houver dano, identifique a CATEGORIA e o TIPO_DANO específico
-3. A descrição deve ser RESUMIDA em 1 linha máximo
-4. Seja ASSERTIVO e ESPECÍFICO
-5. NÃO DEIXE PASSAR NENHUM DANO - se vê algo errado, é AVARIA
-
-Responda em JSON com EXATAMENTE esta estrutura:
+FORMATO DE RESPOSTA - RETORNE EXATAMENTE ASSIM:
 {
   "status": "OK" ou "AVARIA",
   "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "TOUCHPAD" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
-  "tipo_dano": "tipo específico encontrado" (ex: "Trincas", "Quebras", "Amassados") (vazio se OK),
-  "descricao": "descrição resumida em 1 linha"
+  "tipo_dano": "tipo específico encontrado" (ex: "Linhas horizontais/verticais", "Trincas", "Quebras", "Amassados") (vazio se OK),
+  "descricao": "descrição resumida em 1 linha do que viu"
 }
 
-Responda APENAS com o JSON, sem explicações adicionais.`,
+Responda APENAS com o JSON, sem explicações, sem markdown, sem blocos de código.`,
               },
             ],
           },
