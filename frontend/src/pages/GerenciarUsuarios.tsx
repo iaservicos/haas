@@ -141,7 +141,7 @@ export function GerenciarUsuarios() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-100">
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
         <div className="p-4 border-b border-gray-700">
@@ -192,8 +192,8 @@ export function GerenciarUsuarios() {
         </div>
 
         {/* CONTEÚDO */}
-        <div className="flex-1 overflow-auto">
-          <div className="p-6">
+        <div className="flex-1 overflow-auto bg-gray-100">
+          <div className="p-8">
             <div className="max-w-7xl mx-auto">
               {/* Button to create new user */}
               <div className="mb-6 flex justify-end">
@@ -206,7 +206,7 @@ export function GerenciarUsuarios() {
               </div>
 
               {/* Tabela */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-lg shadow overflow-hidden">
                 {loading ? (
                   <div className="p-12 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
