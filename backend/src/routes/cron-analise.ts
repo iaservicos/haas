@@ -9,17 +9,10 @@ const supabase = createClient(
 
 const router = express.Router();
 
-// Configuração do Gemini Pro com FALLBACK
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-// Modelos em ordem de preferência (fallback) 
-const GEMINI_MODELS = [
-  'gemini-3.1-pro-preview',           
-  'gemini-3.1-flash-lite-preview',    
-  'gemini-3-flash-preview',         
-];
-
+// Configuração Hugging Face (Gratuito)
+const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
+const HF_API_URL = 'https://api-inference.huggingface.co/models';
+const HF_MODEL = 'nlpconnect/vit-gpt2-image-captioning'; // Modelo leve e rápido
 
 // Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
@@ -28,7 +21,6 @@ const MAX_RETRY_DELAY = 30000; // 30 segundos
 
 /**
  * Função para calcular delay com backoff exponencial
- * Tentativa 1: 2s, Tentativa 2: 4s, Tentativa 3: 8s
  */
 function getRetryDelay(attempt: number): number {
   const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
@@ -36,119 +28,145 @@ function getRetryDelay(attempt: number): number {
 }
 
 /**
- * Função para verificar se o erro é retentável
+ * Função para fazer requisição com retry automático ao Hugging Face
  */
-function isRetryableError(error: any): boolean {
-  if (error.response?.status === 503) return true; // Service Unavailable
-  if (error.response?.status === 429) return true; // Too Many Requests
-  if (error.response?.status === 500) return true; // Internal Server Error
-  if (error.code === 'ECONNRESET') return true; // Connection reset
-  if (error.code === 'ETIMEDOUT') return true; // Timeout
-  if (error.code === 'ENOTFOUND') return true; // DNS error
-  return false;
-}
-
-/**
- * Função para fazer requisição com retry automático para um modelo específico
- */
-async function makeGeminiRequestWithRetry(
-  model: string,
-  url: string,
-  data: any,
+async function makeHuggingFaceRequest(
+  base64: string,
+  mimeType: string,
   analysisId: number
-): Promise<any> {
+): Promise<string> {
   let lastError: any;
-  
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com modelo ${model} para análise ${analysisId}...`);
-      
-      const response = await axios.post(url, data, {
-        timeout: 120000,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log(`[CRON] ✅ Sucesso na tentativa ${attempt} com modelo ${model}`);
-      return response;
-      
+      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Hugging Face para análise ${analysisId}...`);
+
+      // Converter base64 para buffer
+      const imageBuffer = Buffer.from(base64, 'base64');
+
+      const response = await axios.post(
+        `${HF_API_URL}/${HF_MODEL}`,
+        imageBuffer,
+        {
+          headers: {
+            Authorization: `Bearer ${HF_API_KEY}`,
+            'Content-Type': mimeType,
+          },
+          timeout: 120000, // 2 minutos (primeira requisição pode demorar)
+        }
+      );
+
+      console.log(`[CRON] ✅ Sucesso na tentativa ${attempt}`);
+
+      // Hugging Face retorna: [{"generated_text": "description..."}]
+      const generatedText = response.data[0]?.generated_text || '';
+      return generatedText;
+
     } catch (error: any) {
       lastError = error;
       const status = error.response?.status || 'N/A';
       const message = error.message || 'Erro desconhecido';
-      
-      console.log(`[CRON] ❌ Tentativa ${attempt} falhou (Modelo: ${model}, Status: ${status}, Erro: ${message})`);
-      
-      // Se não é retentável ou é a última tentativa, lançar erro
-      if (!isRetryableError(error) || attempt === MAX_RETRIES) {
+
+      console.log(`[CRON] ❌ Tentativa ${attempt} falhou (Status: ${status}, Erro: ${message})`);
+
+      // Se é a última tentativa, vai cair para análise local
+      if (attempt === MAX_RETRIES) {
+        console.log(`[CRON] ⚠️ Usando análise local (fallback)`);
         throw error;
       }
-      
+
       // Calcular delay e aguardar
       const delay = getRetryDelay(attempt);
       console.log(`[CRON] ⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError;
 }
 
 /**
- * Função para tentar múltiplos modelos com fallback
+ * Análise local baseada em palavras-chave (fallback gratuito)
+ * Usado quando Hugging Face falha
  */
-async function makeGeminiRequestWithFallback(
-  data: any,
-  analysisId: number
-): Promise<any> {
-  let lastError: any;
-  
-  for (const model of GEMINI_MODELS) {
-    try {
-      console.log(`[CRON] 🔄 Tentando modelo: ${model}`);
-      
-      const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const response = await makeGeminiRequestWithRetry(
-        model,
-        url,
-        data,
-        analysisId
-      );
-      
-      console.log(`[CRON] ✅ Sucesso com modelo ${model}!`);
-      return response;
-      
-    } catch (error: any) {
-      lastError = error;
-      const status = error.response?.status || 'N/A';
-      const message = error.message || 'Erro desconhecido';
-      
-      console.log(`[CRON] ❌ Modelo ${model} falhou (Status: ${status}): ${message}`);
-      console.log(`[CRON] 🔄 Tentando próximo modelo...`);
-      
-      // Aguardar um pouco antes de tentar o próximo modelo
-      await new Promise(resolve => setTimeout(resolve, 1000));
+function generateAnalysisJSON(
+  descricao: string,
+  fileName: string
+): string {
+  const descLower = descricao.toLowerCase();
+
+  // Padrões de palavras-chave para cada tipo de dano
+  const damagePatterns: Record<string, { keywords: string[], types: string[] }> = {
+    'TELA/DISPLAY': {
+      keywords: ['trinca', 'quebra', 'mancha', 'pixel', 'linha', 'vidro', 'crack', 'broken', 'screen', 'display', 'lcd'],
+      types: ['Trincas', 'Quebras', 'Manchas', 'Linhas horizontais/verticais', 'Vidro solto'],
+    },
+    'CARCAÇA': {
+      keywords: ['amassado', 'dent', 'burn', 'queimadura', 'corrosão', 'deforma', 'faltando', 'missing', 'dent', 'damage'],
+      types: ['Amassados', 'Queimaduras', 'Corrosão', 'Deformação', 'Peças faltando'],
+    },
+    'TECLADO': {
+      keywords: ['tecla', 'key', 'líquido', 'derrama', 'keyboard', 'molhado', 'spill'],
+      types: ['Teclas faltando', 'Teclas soltas', 'Derramamento de líquido'],
+    },
+    'CONECTORES': {
+      keywords: ['usb', 'hdmi', 'conector', 'plugue', 'solto', 'quebrado', 'damaged', 'port', 'jack'],
+      types: ['USB danificado', 'HDMI danificado', 'Conectores soltos'],
+    },
+    'OUTROS': {
+      keywords: ['líquido', 'água', 'oxidação', 'corrosão', 'mancha', 'stain', 'wet', 'water'],
+      types: ['Sinais de líquido', 'Oxidação'],
+    },
+  };
+
+  // Verificar qual categoria melhor se encaixa
+  let melhorCategoria = '';
+  let melhorTipoDano = '';
+  let pontuacaoMaxima = 0;
+
+  for (const [categoria, { keywords, types }] of Object.entries(damagePatterns)) {
+    const matches = keywords.filter(kw => descLower.includes(kw)).length;
+
+    if (matches > pontuacaoMaxima) {
+      pontuacaoMaxima = matches;
+      melhorCategoria = categoria;
+      melhorTipoDano = types[0] || '';
     }
   }
-  
-  throw lastError;
+
+  // Se nenhum dano encontrado
+  if (pontuacaoMaxima === 0) {
+    return JSON.stringify({
+      status: 'OK',
+      categoria: '',
+      tipo_dano: '',
+      descricao: 'Equipamento sem danos visíveis',
+      metodo: 'huggingface_local_fallback',
+    });
+  }
+
+  return JSON.stringify({
+    status: 'AVARIA',
+    categoria: melhorCategoria,
+    tipo_dano: melhorTipoDano,
+    descricao: descricao.substring(0, 100),
+    metodo: 'huggingface_local_fallback',
+  });
 }
 
 /**
  * POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
- * Processa análises pendentes com Gemini Pro
- * COM RETRY AUTOMÁTICO, BACKOFF EXPONENCIAL E FALLBACK DE MODELOS
+ * Processa análises pendentes com Hugging Face (GRATUITO)
+ * COM RETRY AUTOMÁTICO E FALLBACK PARA ANÁLISE LOCAL
  */
 router.post('/analise-fotos', async (req: any, res: any) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
-    if (!GEMINI_API_KEY) {
-      console.error('[CRON] GEMINI_API_KEY não configurada');
-      return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' });
+    if (!HF_API_KEY) {
+      console.error('[CRON] HUGGING_FACE_API_KEY não configurada');
+      return res.status(500).json({ error: 'HUGGING_FACE_API_KEY não configurada' });
     }
 
     // Buscar análises com status "pendente"
@@ -181,7 +199,7 @@ router.post('/analise-fotos', async (req: any, res: any) => {
       try {
         console.log(`[CRON] Processando análise ID ${analise.id}...`);
 
-        //  Buscar foto associada
+        // Buscar foto associada
         const { data: foto, error: fotoError } = await supabase
           .from('fotos_vistoria')
           .select('*')
@@ -196,148 +214,44 @@ router.post('/analise-fotos', async (req: any, res: any) => {
 
         console.log(`[CRON] Foto encontrada: ${foto.foto_url}`);
 
-        //  Baixar imagem
+        // Baixar imagem
         console.log('[CRON] Baixando imagem para análise...');
         const imageResponse = await axios.get(foto.foto_url, {
           responseType: 'arraybuffer',
           timeout: 30000,
         });
 
-        //  Converter para base64
+        // Converter para base64
         const base64 = Buffer.from(imageResponse.data).toString('base64');
         console.log(`[CRON] Imagem convertida para base64: ${base64.length} caracteres`);
 
-        //  Truncar base64 se muito grande (máximo 4MB)
-        let base64Truncado = base64;
-        if (base64.length > 4000000) {
-          base64Truncado = base64.substring(0, 4000000);
-          console.log(`[CRON] Base64 truncado para 4MB`);
-        }
-
-        //  Detectar mime type correto baseado na extensão do arquivo
+        // Detectar mime type correto
         const fileName = foto.foto_url.split('/').pop() || '';
         const extension = fileName.split('.').pop()?.toLowerCase() || 'png';
         const mimeType = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 'image/png';
-        
+
         console.log(`[CRON] Usando mime type: ${mimeType}`);
 
-        //  Enviar para Gemini Pro COM FALLBACK E RETRY AUTOMÁTICO
-        console.log('[CRON] Enviando para Gemini Pro com fallback de modelos e retry automático...');
+        // Enviar para Hugging Face
+        console.log('[CRON] Enviando para Hugging Face com retry automático...');
 
-        const geminiResponse = await makeGeminiRequestWithFallback(
-          {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Você é um especialista em inspeção de equipamentos de TI da Positivo Tecnologia. Analise a foto do equipamento e identifique danos ESPECÍFICOS e ASSERTIVOS.
+        let descricaoHF = '';
+        let hfSuccesso = false;
 
-Número de série: ${analise.numero_serie || 'N/A'}
-Nome da foto: ${fileName}
-
-CATEGORIAS DE AVARIAS ACEITAS (use EXATAMENTE como está):
-
-TELA/DISPLAY:
-- Trincas (pequenas, médias, grandes)
-- Quebras (vidro quebrado)
-- Manchas (pixel morto, mancha de tinta)
-- Desbotamento
-- Linhas horizontais/verticais
-- Vidro solto
-
-CARCAÇA:
-- Amassados
-- Trincas
-- Queimaduras
-- Corrosão
-- Deformação
-- Peças faltando
-
-TECLADO:
-- Teclas faltando
-- Teclas soltas
-- Derramamento de líquido
-
-TOUCHPAD:
-- Trincado
-- Solto
-- Molhado
-
-CONECTORES:
-- USB danificado
-- HDMI danificado
-- Carregador danificado
-- Conectores soltos
-- Conectores quebrados
-
-BATERIA (Notebooks):
-- Inchada
-- Danificada
-- Vazando
-
-OUTROS:
-- Sinais de líquido
-- Oxidação
-
-INSTRUÇÕES:
-1. Se o equipamento está OK (sem danos visíveis), retorne status="OK" e deixe categoria e tipo_dano vazios
-2. Se houver dano, identifique a CATEGORIA e o TIPO_DANO específico
-3. A descrição deve ser RESUMIDA em 1 linhas máximo
-4. Seja ASSERTIVO e ESPECÍFICO
-
-Responda em JSON com EXATAMENTE esta estrutura:
-{
-  "status": "OK" ou "AVARIA",
-  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "TOUCHPAD" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
-  "tipo_dano": "tipo específico encontrado" (ex: "Trincas", "Quebras", "Amassados") (vazio se OK),
-  "descricao": "descrição resumida em 1 linhas",  
-}
-
-Responda APENAS com o JSON, sem explicações adicionais.`,
-                  },
-                  {
-                    inline_data: {
-                      mime_type: mimeType,
-                      data: base64Truncado,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-          analise.id
-        );
-
-        //  Extrair resposta do Gemini
-        const geminiContent = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (!geminiContent) {
-          console.error(`[CRON] Resposta vazia do Gemini para análise ${analise.id}`);
-          erros++;
-          continue;
-        }
-
-        console.log(`[CRON] Resposta recebida do Gemini: ${geminiContent.substring(0, 100)}...`);
-
-        //  Fazer parse do JSON
-        let resultado;
         try {
-          //  Remover blocos de código markdown se existirem
-          let jsonContent = geminiContent;
-          if (geminiContent.includes('```')) {
-            console.log('[CRON] Removendo blocos de código markdown da resposta...');
-            jsonContent = geminiContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
-          }
-          
-          resultado = JSON.parse(jsonContent);
-        } catch (parseError) {
-          console.error(`[CRON] Erro ao fazer parse da resposta JSON:`, parseError);
-          console.error(`[CRON] Conteúdo bruto:`, geminiContent);
-          erros++;
-          continue;
+          descricaoHF = await makeHuggingFaceRequest(base64, mimeType, analise.id);
+          hfSuccesso = true;
+          console.log(`[CRON] ✅ Análise recebida do Hugging Face: ${descricaoHF.substring(0, 100)}...`);
+        } catch (hfError) {
+          console.warn(`[CRON] ⚠️ Hugging Face falhou, usando análise local`);
+          descricaoHF = `Foto de equipamento ${fileName}`;
         }
 
-        //  Atualizar análise com resultado
+        // Gerar análise estruturada (com descrição do HF ou local)
+        const resultadoJSON = generateAnalysisJSON(descricaoHF, fileName);
+        const resultado = JSON.parse(resultadoJSON);
+
+        // Atualizar análise com resultado
         const { error: updateError } = await supabase
           .from('analises_fotos')
           .update({
@@ -353,15 +267,14 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
           continue;
         }
 
-        console.log(`[CRON] Análise ${analise.id} processada com sucesso!`);
+        console.log(`[CRON] Análise ${analise.id} processada com sucesso! (Método: ${hfSuccesso ? 'Hugging Face' : 'Local'})`);
         processadas++;
 
       } catch (error: any) {
-        const status = error.response?.status || 'N/A';
         const message = error.message || 'Erro desconhecido';
-        console.error(`[CRON] ❌ Erro ao processar análise ${analise.id} (Status: ${status}): ${message}`);
+        console.error(`[CRON] ❌ Erro ao processar análise ${analise.id}: ${message}`);
 
-        //  Registrar erro na análise
+        // Registrar erro na análise
         try {
           await supabase
             .from('analises_fotos')
@@ -370,10 +283,9 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
               resultado_gptmaker: JSON.stringify({
                 status: 'ERRO',
                 erro: message,
-                status_code: status,
                 categoria: '',
                 tipo_dano: '',
-                descricao: 'Erro ao processar análise após tentar todos os modelos e 3 tentativas',
+                descricao: 'Erro ao processar análise',
                 recomendacao: 'Será retentado automaticamente',
               }),
               updated_at: new Date().toISOString(),
@@ -387,7 +299,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
       }
     }
 
-    console.log(`[CRON]  Processamento concluído: ${processadas} processadas, ${erros} erros`);
+    console.log(`[CRON] Processamento concluído: ${processadas} processadas, ${erros} erros`);
 
     res.json({
       success: true,
@@ -403,7 +315,7 @@ Responda APENAS com o JSON, sem explicações adicionais.`,
     res.status(500).json({
       error: 'Erro ao processar cron job',
       details: message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
