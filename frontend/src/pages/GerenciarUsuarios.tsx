@@ -40,11 +40,19 @@ export function GerenciarUsuarios() {
   const carregarUsuarios = async () => {
     try {
       setLoading(true);
+      console.log('[GerenciarUsuarios] Carregando usuários...');
+      console.log('[GerenciarUsuarios] usuario:', usuario);
+      console.log('[GerenciarUsuarios] usuario.user_type:', usuario?.user_type);
+      console.log('[GerenciarUsuarios] token no localStorage:', localStorage.getItem('token')?.substring(0, 20) + '...');
+
       const response = await api.get('/usuario/listar');
+      console.log('[GerenciarUsuarios] Resposta:', response);
+
       if (response.data.sucesso) {
         setUsuarios(response.data.dados);
       }
     } catch (erro: any) {
+      console.error('[GerenciarUsuarios] Erro:', erro);
       alert(`Erro ao carregar usuários: ${erro.response?.data?.mensagem || erro.message}`);
     } finally {
       setLoading(false);
