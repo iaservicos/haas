@@ -14,17 +14,16 @@ const client = new Anthropic({
 
 const router = express.Router();
 
-// Configuração de retry com backoff exponencial
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 2000; // 2 segundos
-const MAX_RETRY_DELAY = 30000; // 30 segundos
+// Configuração otimizada para velocidade
+const MAX_RETRIES = 2;
+const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 
 /**
  * Função para calcular delay com backoff exponencial
  */
 function getRetryDelay(attempt: number): number {
   const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
-  return Math.min(delay, MAX_RETRY_DELAY);
+  return Math.min(delay, 5000); // Máximo 5 segundos
 }
 
 /**
@@ -41,11 +40,11 @@ async function analyzeImageWithClaude(
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Claude 3.5 Sonnet para análise ${analysisId}...`);
+      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Claude 3.5 Haiku para análise ${analysisId}...`);
 
       const response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 500,
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 300,
         messages: [
           {
             role: 'user',
