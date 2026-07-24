@@ -98,6 +98,7 @@ router.post('/criar', async (req: any, res: Response) => {
           email,
           nome,
           user_type,
+          role: 'VIEWER', // Role padrão para novos usuários
           senha_hash: senhaPorPadrao, // TODO: Hashear com bcrypt em produção
           ativo: true,
           data_criacao: new Date().toISOString(),
