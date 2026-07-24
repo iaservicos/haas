@@ -221,19 +221,19 @@ export function GerenciarUsuarios() {
                     <table className="w-full">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Email</th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Nome</th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Criado em</th>
-                          <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Ações</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Email</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Nome</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Tipo</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Criado em</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {usuarios.map((usuario) => (
                           <tr key={usuario.id} className="hover:bg-gray-50 transition">
-                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{usuario.email}</td>
-                            <td className="px-6 py-4 text-sm text-gray-700">{usuario.nome}</td>
-                            <td className="px-6 py-4 text-sm">
+                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">{usuario.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{usuario.nome}</td>
+                            <td className="px-4 py-3 text-sm">
                               <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                                 usuario.user_type === 'admin'
                                   ? 'bg-red-100 text-red-800'
@@ -244,22 +244,20 @@ export function GerenciarUsuarios() {
                                 {getTipoLabel(usuario.user_type)}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{formatarData(usuario.data_criacao)}</td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-3">
-                                <button
-                                  onClick={() => handleEditar(usuario)}
-                                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium transition"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => handleDeletar(usuario.id)}
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded text-sm font-medium transition"
-                                >
-                                  Deletar
-                                </button>
-                              </div>
+                            <td className="px-4 py-3 text-sm text-gray-600">{formatarData(usuario.data_criacao)}</td>
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => handleEditar(usuario)}
+                                className="text-blue-600 hover:text-blue-800 text-sm mr-3"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleDeletar(usuario.id)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                Deletar
+                              </button>
                             </td>
                           </tr>
                         ))}
