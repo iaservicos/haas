@@ -30,28 +30,71 @@ const REQUEST_TIMEOUT = 30000; // 30 segundos
 const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 
 // ============================================================================
-// ANÁLISE PROMPT - Otimizado para detectar LCD quebrado
+// ANÁLISE PROMPT - CRÍTICA: Foco extremo em TRINCAS E QUEBRAS
 // ============================================================================
-const ANALYSIS_PROMPT = `Você é um especialista CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia.
+const ANALYSIS_PROMPT = `Você é um especialista EXTREMAMENTE CRÍTICO em inspeção de equipamentos de TI.
 
-REGRA FUNDAMENTAL: Se a tela mostra LINHAS (horizontais ou verticais) = SEMPRE AVARIA (LCD danificado).
+🚨 PRIORIDADE MÁXIMA - TRINCAS E QUEBRAS NA TELA:
+Examine a tela com MÁXIMA ATENÇÃO procurando por:
+- QUALQUER linha fina ou rachadura no vidro (mesmo muito pequena)
+- QUALQUER rachadura nas BORDAS da tela
+- QUALQUER padrão de trinca (tipo aranha, linear, ramificado)
+- QUALQUER área de vidro com aspecto danificado
+- Se há QUALQUER dúvida = é TRINCA = AVARIA
 
-Analise a imagem cuidadosamente e identifique danos.
+🔴 REGRAS ABSOLUTAS - SE VER, SEMPRE AVARIA:
+1. TRINCAS no vidro (qualquer tamanho, mesmo invisíveis à distância) = AVARIA
+2. QUEBRAS/RACHADURAS (mesmo parciais) = AVARIA
+3. LINHAS no LCD (horizontais/verticais) = AVARIA
+4. PIXELS MORTOS ou manchas = AVARIA
+5. QUALQUER anomalia visual = AVARIA
 
-CATEGORIAS:
-- TELA/DISPLAY: Linhas, trincas, quebras, manchas, pixels mortos
-- CARCAÇA: Amassados, trincas, corrosão, peças faltando
-- TECLADO: Teclas faltando, derramamento de líquido
-- CONECTORES: Conectores danificados/soltos
-- BATERIA: Inchada, danificada
-- OUTROS: Sinais de líquido, oxidação
+📋 VERIFICAÇÃO SISTEMÁTICA DA TELA/DISPLAY:
+Examine em SEQUÊNCIA:
+1. BORDAS (topo, lados, inferior) - procure trincas finas
+2. CANTOS - áreas críticas para trincas
+3. SUPERFÍCIE INTEIRA - varrer de cima para baixo procurando:
+   - Linhas (LCD danificado)
+   - Trincas (vidro danificado)
+   - Manchas/pixels mortos
+   - Qualquer defeito visual
+4. REFLEXOS - algumas trincas só aparecem com ângulo certo
+
+⚠️ SE TEM DÚVIDA SOBRE TRINCA = RESPONDA COMO TRINCA (AVARIA)
+Falso positivo é melhor que deixar trinca passar!
+
+DANOS EM OUTRAS ÁREAS:
+
+CARCAÇA:
+- Trincas no plástico/metal (mesmo pequenas)
+- Quebras/rachaduras
+- Amassados profundos
+- Deformação
+- Queimaduras, corrosão
+
+TECLADO:
+- Teclas faltando/pressionadas
+- Sinais de derramamento líquido
+
+CONECTORES:
+- Danificados, soltos, quebrados
+
+BATERIA:
+- Inchada, deformada, vazando
+
+OUTROS:
+- Sinais de líquido, oxidação, danos por queda
+
+🎯 REGRA FINAL: Se a imagem mostra QUALQUER dano visível = AVARIA
+Não retorne OK a menos que o equipamento esteja PERFEITO.
 
 RESPONDA APENAS EM JSON (sem markdown, sem explicações):
 {
   "status": "OK" ou "AVARIA",
   "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
-  "tipo_dano": "tipo específico" (vazio se OK),
-  "descricao": "descrição resumida em 1 linha"
+  "tipo_dano": "tipo específico encontrado" (ex: "Trincas no vidro", "Quebra", "Linhas no LCD") (vazio se OK),
+  "descricao": "descrição detalhada em 1-2 linhas do dano encontrado",
+  "confianca": "alta" ou "média" ou "baixa"
 }`;
 
 // ============================================================================
