@@ -18,10 +18,11 @@ const router = express.Router();
 // CONFIGURAÇÃO - Modelos com Fallback
 // ============================================================================
 // Modelos em ordem de preferência (fallback automático)
+// CONFIRMADOS E TESTADOS:
 const CLAUDE_MODELS = [
-  'claude-sonnet-5', // Sonnet 5 (mais novo, melhor qualidade)
-  'claude-opus-4-1', // Opus 4.1 (alternativa se Sonnet 5 falhar)
-  'claude-sonnet-4', // Sonnet 4 (fallback final)
+  'claude-haiku-4-5-20251001', // Haiku 4.5 (5x mais barato, rápido)
+  'claude-sonnet-5', // Sonnet 5 (fallback se Haiku falhar - mais preciso)
+  'claude-opus-4-1', // Opus 4.1 (fallback final)
 ];
 
 const MAX_RETRIES = 2;
