@@ -14,21 +14,61 @@ const client = new Anthropic({
 
 const router = express.Router();
 
-// Configuração otimizada para velocidade
+// ============================================================================
+// CONFIGURAÇÃO - Todas as constantes em um lugar
+// ============================================================================
+const CLAUDE_MODEL = 'claude-opus-4-1-20250805'; // Modelo mais novo (garantido até 2027)
 const MAX_RETRIES = 2;
+const REQUEST_TIMEOUT = 30000; // 30 segundos
 const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 
-/**
- * Função para calcular delay com backoff exponencial
- */
+// ============================================================================
+// ANÁLISE PROMPT - Otimizado para detectar LCD quebrado
+// ============================================================================
+const ANALYSIS_PROMPT = `Você é um especialista CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia.
+
+REGRA FUNDAMENTAL: Se a tela mostra LINHAS (horizontais ou verticais) = SEMPRE AVARIA (LCD danificado).
+
+Analise a imagem cuidadosamente e identifique danos.
+
+CATEGORIAS:
+- TELA/DISPLAY: Linhas, trincas, quebras, manchas, pixels mortos
+- CARCAÇA: Amassados, trincas, corrosão, peças faltando
+- TECLADO: Teclas faltando, derramamento de líquido
+- CONECTORES: Conectores danificados/soltos
+- BATERIA: Inchada, danificada
+- OUTROS: Sinais de líquido, oxidação
+
+RESPONDA APENAS EM JSON (sem markdown, sem explicações):
+{
+  "status": "OK" ou "AVARIA",
+  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
+  "tipo_dano": "tipo específico" (vazio se OK),
+  "descricao": "descrição resumida em 1 linha"
+}`;
+
+// ============================================================================
+// FUNÇÕES AUXILIARES
+// ============================================================================
+
 function getRetryDelay(attempt: number): number {
-  const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
-  return Math.min(delay, 5000); // Máximo 5 segundos
+  return INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
 }
 
-/**
- * Função para fazer requisição com retry automático ao Claude
- */
+function isValidAnalysisResponse(response: any): boolean {
+  if (!response || typeof response !== 'object') {
+    return false;
+  }
+  return (
+    (response.status === 'OK' || response.status === 'AVARIA') &&
+    typeof response.descricao === 'string'
+  );
+}
+
+// ============================================================================
+// ANÁLISE COM CLAUDE
+// ============================================================================
+
 async function analyzeImageWithClaude(
   base64: string,
   mimeType: string,
@@ -40,10 +80,12 @@ async function analyzeImageWithClaude(
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Claude 3.5 Sonnet para análise ${analysisId}...`);
+      console.log(
+        `[CRON] Tentativa ${attempt}/${MAX_RETRIES} com ${CLAUDE_MODEL} para análise ${analysisId}...`
+      );
 
       const response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: CLAUDE_MODEL,
         max_tokens: 300,
         messages: [
           {
@@ -53,82 +95,17 @@ async function analyzeImageWithClaude(
                 type: 'image',
                 source: {
                   type: 'base64',
-                  media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                  media_type: mimeType as
+                    | 'image/jpeg'
+                    | 'image/png'
+                    | 'image/gif'
+                    | 'image/webp',
                   data: base64,
                 },
               },
               {
                 type: 'text',
-                text: `Você é um especialista CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia. Sua tarefa é identificar QUALQUER dano visível na imagem.
-
-Número de série: ${numeroSerie || 'N/A'}
-Nome da foto: ${fileName}
-
-⚠️ INSTRUÇÕES CRÍTICAS - LEIA COM ATENÇÃO:
-1. Examine CADA PARTE da imagem em detalhes: tela/display, carcaça, teclado, conectores, bordas
-2. Se houver QUALQUER anomalia visual → é AVARIA (não é OK)
-3. Linhas na tela (horizontais ou verticais) = SEMPRE AVARIA
-4. Pixels mortos ou manchas = SEMPRE AVARIA
-5. Trincas em qualquer lugar = SEMPRE AVARIA
-6. Desbotamento ou descoloração = AVARIA
-7. Oxidação ou corrosão = AVARIA
-8. Amassados ou deformações = AVARIA
-9. Se tiver dúvida → responda AVARIA (é mais seguro)
-10. Nunca retorne OK se vê QUALQUER problema
-
-CATEGORIAS DE AVARIAS:
-
-TELA/DISPLAY (procure atentamente por):
-- Linhas horizontais/verticais (LCD danificado) = SEMPRE AVARIA
-- Trincas (pequenas, médias, grandes)
-- Quebras (vidro quebrado)
-- Manchas (pixel morto, mancha de tinta)
-- Desbotamento
-- Vidro solto
-
-CARCAÇA:
-- Amassados
-- Trincas
-- Queimaduras
-- Corrosão
-- Deformação
-- Peças faltando
-
-TECLADO:
-- Teclas faltando
-- Teclas soltas
-- Derramamento de líquido
-
-TOUCHPAD:
-- Trincado
-- Solto
-- Molhado
-
-CONECTORES:
-- USB danificado
-- HDMI danificado
-- Carregador danificado
-- Conectores soltos
-- Conectores quebrados
-
-BATERIA (Notebooks):
-- Inchada
-- Danificada
-- Vazando
-
-OUTROS:
-- Sinais de líquido
-- Oxidação
-
-FORMATO DE RESPOSTA - RETORNE EXATAMENTE ASSIM:
-{
-  "status": "OK" ou "AVARIA",
-  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "TOUCHPAD" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
-  "tipo_dano": "tipo específico encontrado" (ex: "Linhas horizontais/verticais", "Trincas", "Quebras", "Amassados") (vazio se OK),
-  "descricao": "descrição resumida em 1 linha do que viu"
-}
-
-Responda APENAS com o JSON, sem explicações, sem markdown, sem blocos de código.`,
+                text: `${ANALYSIS_PROMPT}\n\nNúmero de série: ${numeroSerie || 'N/A'}\nFoto: ${fileName}`,
               },
             ],
           },
@@ -137,27 +114,23 @@ Responda APENAS com o JSON, sem explicações, sem markdown, sem blocos de códi
 
       const content = response.content[0];
       if (content.type !== 'text') {
-        throw new Error('Resposta não é texto');
+        throw new Error('Resposta do Claude não é texto');
       }
 
       console.log(`[CRON] ✅ Sucesso na tentativa ${attempt}`);
       return content.text;
-
     } catch (error: any) {
       lastError = error;
       const message = error.message || 'Erro desconhecido';
 
       console.log(`[CRON] ❌ Tentativa ${attempt} falhou: ${message}`);
 
-      // Se é a última tentativa, vai cair para análise local
       if (attempt === MAX_RETRIES) {
-        console.log(`[CRON] ⚠️ Usando análise local (fallback)`);
         throw error;
       }
 
-      // Calcular delay e aguardar
       const delay = getRetryDelay(attempt);
-      console.log(`[CRON] ⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+      console.log(`[CRON] ⏳ Aguardando ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -165,104 +138,35 @@ Responda APENAS com o JSON, sem explicações, sem markdown, sem blocos de códi
   throw lastError;
 }
 
-/**
- * Análise local baseada em palavras-chave (fallback gratuito)
- * Usado quando Claude falha
- */
-function generateAnalysisJSON(
-  descricao: string,
-  fileName: string
-): string {
-  const descLower = descricao.toLowerCase();
+// ============================================================================
+// ENDPOINT PRINCIPAL
+// ============================================================================
 
-  // Padrões de palavras-chave para cada tipo de dano (expandido)
-  const damagePatterns: Record<string, { keywords: string[], types: string[] }> = {
-    'TELA/DISPLAY': {
-      keywords: ['trinca', 'quebra', 'mancha', 'pixel', 'linha', 'vidro', 'crack', 'broken', 'screen', 'display', 'lcd', 'risca', 'risco', 'desbotamento', 'burn', 'queimada', 'horizontal', 'vertical'],
-      types: ['Trincas', 'Quebras', 'Manchas', 'Linhas horizontais/verticais', 'Vidro solto'],
-    },
-    'CARCAÇA': {
-      keywords: ['amassado', 'dent', 'burn', 'queimadura', 'corrosão', 'deforma', 'faltando', 'missing', 'damage', 'oxidação', 'mancha escura', 'risca', 'deformado'],
-      types: ['Amassados', 'Queimaduras', 'Corrosão', 'Deformação', 'Peças faltando'],
-    },
-    'TECLADO': {
-      keywords: ['tecla', 'key', 'líquido', 'derrama', 'keyboard', 'molhado', 'spill', 'sujeira'],
-      types: ['Teclas faltando', 'Teclas soltas', 'Derramamento de líquido'],
-    },
-    'CONECTORES': {
-      keywords: ['usb', 'hdmi', 'conector', 'plugue', 'solto', 'quebrado', 'damaged', 'port', 'jack', 'pino'],
-      types: ['USB danificado', 'HDMI danificado', 'Conectores soltos'],
-    },
-    'OUTROS': {
-      keywords: ['líquido', 'água', 'oxidação', 'corrosão', 'mancha', 'stain', 'wet', 'water', 'sujeira'],
-      types: ['Sinais de líquido', 'Oxidação'],
-    },
-  };
-
-  // Verificar qual categoria melhor se encaixa
-  let melhorCategoria = '';
-  let melhorTipoDano = '';
-  let pontuacaoMaxima = 0;
-
-  for (const [categoria, { keywords, types }] of Object.entries(damagePatterns)) {
-    const matches = keywords.filter(kw => descLower.includes(kw)).length;
-
-    if (matches > pontuacaoMaxima) {
-      pontuacaoMaxima = matches;
-      melhorCategoria = categoria;
-      melhorTipoDano = types[0] || '';
-    }
-  }
-
-  // Se nenhum dano encontrado
-  if (pontuacaoMaxima === 0) {
-    return JSON.stringify({
-      status: 'OK',
-      categoria: '',
-      tipo_dano: '',
-      descricao: 'Equipamento sem danos visíveis',
-      metodo: 'local_fallback',
-    });
-  }
-
-  return JSON.stringify({
-    status: 'AVARIA',
-    categoria: melhorCategoria,
-    tipo_dano: melhorTipoDano,
-    descricao: descricao.substring(0, 100),
-    metodo: 'local_fallback',
-  });
-}
-
-/**
- * POST /api/cron/analise-fotos
- * Cron job que roda a cada 1 minuto
- * Processa análises pendentes com Claude 3.5 Sonnet (GRATUITO NO PILOTO)
- * COM RETRY AUTOMÁTICO E FALLBACK PARA ANÁLISE LOCAL
- */
 router.post('/analise-fotos', async (req: any, res: any) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error('[CRON] ANTHROPIC_API_KEY não configurada');
-      return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada' });
+      return res
+        .status(500)
+        .json({ error: 'ANTHROPIC_API_KEY não configurada' });
     }
 
-    // Buscar análises com status "pendente"
+    // Buscar análises pendentes
     const { data: analisesPendentes, error: fetchError } = await supabase
       .from('analises_fotos')
       .select('*')
       .eq('status', 'pendente')
-      .limit(1); // Processar 1 por vez para evitar rate limit
+      .limit(1);
 
     if (fetchError) {
-      console.error('[CRON] Erro ao buscar análises pendentes:', fetchError);
+      console.error('[CRON] Erro ao buscar análises:', fetchError);
       return res.status(500).json({ error: 'Erro ao buscar análises' });
     }
 
     if (!analisesPendentes || analisesPendentes.length === 0) {
-      console.log('[CRON] Nenhuma análise pendente encontrada');
+      console.log('[CRON] Nenhuma análise pendente');
       return res.json({
         success: true,
         message: 'Nenhuma análise pendente',
@@ -270,7 +174,9 @@ router.post('/analise-fotos', async (req: any, res: any) => {
       });
     }
 
-    console.log(`[CRON] Encontradas ${analisesPendentes.length} análises pendentes`);
+    console.log(
+      `[CRON] Encontradas ${analisesPendentes.length} análises pendentes`
+    );
 
     let processadas = 0;
     let erros = 0;
@@ -279,7 +185,7 @@ router.post('/analise-fotos', async (req: any, res: any) => {
       try {
         console.log(`[CRON] Processando análise ID ${analise.id}...`);
 
-        // Buscar foto associada
+        // Buscar foto
         const { data: foto, error: fotoError } = await supabase
           .from('fotos_vistoria')
           .select('*')
@@ -294,29 +200,32 @@ router.post('/analise-fotos', async (req: any, res: any) => {
 
         console.log(`[CRON] Foto encontrada: ${foto.foto_url}`);
 
-        // Baixar imagem
-        console.log('[CRON] Baixando imagem para análise...');
+        // Baixar e converter imagem
+        console.log('[CRON] Baixando imagem...');
         const imageResponse = await axios.get(foto.foto_url, {
           responseType: 'arraybuffer',
           timeout: 30000,
         });
 
-        // Converter para base64
         const base64 = Buffer.from(imageResponse.data).toString('base64');
-        console.log(`[CRON] Imagem convertida para base64: ${base64.length} caracteres`);
+        console.log(
+          `[CRON] Imagem convertida para base64: ${base64.length} caracteres`
+        );
 
-        // Detectar mime type correto
+        // Determinar mime type
         const fileName = foto.foto_url.split('/').pop() || '';
         const extension = fileName.split('.').pop()?.toLowerCase() || 'png';
-        const mimeType = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const mimeType =
+          extension === 'jpg' || extension === 'jpeg'
+            ? 'image/jpeg'
+            : 'image/png';
 
-        console.log(`[CRON] Usando mime type: ${mimeType}`);
+        console.log(`[CRON] Mime type: ${mimeType}`);
 
-        // Enviar para Claude Sonnet com retry automático
-        console.log('[CRON] Enviando para Claude 3.5 Sonnet com retry automático...');
-
-        let claudeResponse = '';
-        let claudeSuccesso = false;
+        // Analisar com Claude
+        console.log('[CRON] Enviando para Claude...');
+        let claudeResponse: string;
+        let resultado: any;
 
         try {
           claudeResponse = await analyzeImageWithClaude(
@@ -326,33 +235,41 @@ router.post('/analise-fotos', async (req: any, res: any) => {
             fileName,
             analise.id
           );
-          claudeSuccesso = true;
-          console.log(`[CRON] ✅ Análise recebida do Claude: ${claudeResponse.substring(0, 100)}...`);
-        } catch (claudeError) {
-          console.warn(`[CRON] ⚠️ Claude falhou, usando análise local`);
-          claudeResponse = `Foto de equipamento ${fileName}`;
-        }
 
-        // Fazer parse do JSON
-        let resultado;
-        try {
-          // Remover blocos de código markdown se existirem
+          console.log(
+            `[CRON] Resposta bruta: ${claudeResponse.substring(0, 100)}...`
+          );
+
+          // Parse JSON
           let jsonContent = claudeResponse;
           if (claudeResponse.includes('```')) {
-            console.log('[CRON] Removendo blocos de código markdown da resposta...');
-            jsonContent = claudeResponse.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+            jsonContent = claudeResponse
+              .replace(/```json\n?/g, '')
+              .replace(/```/g, '')
+              .trim();
           }
 
           resultado = JSON.parse(jsonContent);
-        } catch (parseError) {
-          console.error(`[CRON] Erro ao fazer parse da resposta JSON:`, parseError);
-          console.error(`[CRON] Conteúdo bruto:`, claudeResponse);
-          // Fallback para análise local se parse falhar
-          const resultadoJSON = generateAnalysisJSON(claudeResponse, fileName);
-          resultado = JSON.parse(resultadoJSON);
+
+          // Validar resposta
+          if (!isValidAnalysisResponse(resultado)) {
+            throw new Error('Resposta inválida do Claude');
+          }
+
+          console.log(
+            `[CRON] ✅ Análise válida: ${resultado.status} - ${resultado.tipo_dano}`
+          );
+        } catch (parseError: any) {
+          console.error(`[CRON] Erro ao processar resposta: ${parseError.message}`);
+          console.error(`[CRON] Conteúdo bruto: ${claudeResponse}`);
+
+          // ERRO REAL: não retornar "OK" falso
+          throw new Error(
+            `Falha ao analisar imagem: ${parseError.message}`
+          );
         }
 
-        // Atualizar análise com resultado
+        // Atualizar banco
         const { error: updateError } = await supabase
           .from('analises_fotos')
           .update({
@@ -363,19 +280,20 @@ router.post('/analise-fotos', async (req: any, res: any) => {
           .eq('id', analise.id);
 
         if (updateError) {
-          console.error(`[CRON] Erro ao atualizar análise ${analise.id}:`, updateError);
+          console.error(`[CRON] Erro ao atualizar: ${updateError.message}`);
           erros++;
           continue;
         }
 
-        console.log(`[CRON] Análise ${analise.id} processada com sucesso! (Método: ${claudeSuccesso ? 'Claude' : 'Local'})`);
+        console.log(`[CRON] Análise ${analise.id} concluída com sucesso!`);
         processadas++;
-
       } catch (error: any) {
         const message = error.message || 'Erro desconhecido';
-        console.error(`[CRON] ❌ Erro ao processar análise ${analise.id}: ${message}`);
+        console.error(
+          `[CRON] ❌ Erro ao processar análise ${analise.id}: ${message}`
+        );
 
-        // Registrar erro na análise
+        // Registrar erro (melhor que falso negativo)
         try {
           await supabase
             .from('analises_fotos')
@@ -386,21 +304,22 @@ router.post('/analise-fotos', async (req: any, res: any) => {
                 erro: message,
                 categoria: '',
                 tipo_dano: '',
-                descricao: 'Erro ao processar análise',
-                recomendacao: 'Será retentado automaticamente',
+                descricao: 'Erro ao processar análise com Claude',
               }),
               updated_at: new Date().toISOString(),
             })
             .eq('id', analise.id);
         } catch (updateError) {
-          console.error(`[CRON] Erro ao registrar erro:`, updateError);
+          console.error('[CRON] Erro ao registrar erro:', updateError);
         }
 
         erros++;
       }
     }
 
-    console.log(`[CRON] Processamento concluído: ${processadas} processadas, ${erros} erros`);
+    console.log(
+      `[CRON] Concluído: ${processadas} processadas, ${erros} erros`
+    );
 
     res.json({
       success: true,
@@ -409,7 +328,6 @@ router.post('/analise-fotos', async (req: any, res: any) => {
       erros,
       total: analisesPendentes.length,
     });
-
   } catch (error: any) {
     const message = error instanceof Error ? error.message : 'Erro desconhecido';
     console.error('[CRON] ❌ Erro geral:', message);
