@@ -721,6 +721,19 @@ export function Dashboard() {
             {sidebarOpen && <span>Fotos</span>}
           </button>
 
+          {usuario?.user_type === 'admin' && (
+            <>
+              <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase mt-4">Administração</div>
+
+              <button
+                onClick={() => navigate('/usuarios')}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
+              >
+                {sidebarOpen && <span>👥 Gerenciar Usuários</span>}
+              </button>
+            </>
+          )}
+
           <button
             onClick={() => setShowChangePasswordModal(true)}
             className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"

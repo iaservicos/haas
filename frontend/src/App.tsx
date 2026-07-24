@@ -16,10 +16,10 @@ import { GerenciarUsuarios } from './pages/GerenciarUsuarios';
 
 
 // ⚡ NOVO: Componente para rotas protegidas com verificação de role
-function ProtectedRoute({ 
-  children, 
-  allowedRoles 
-}: { 
+function ProtectedRoute({
+  children,
+  allowedRoles
+}: {
   children: React.ReactNode;
   allowedRoles: string[];
 }) {
@@ -42,14 +42,19 @@ function ProtectedRoute({
   }
 
   // ⚡ NOVO: Se está autenticado mas não tem permissão, redireciona para página inicial
-  if (usuario && !allowedRoles.includes(usuario.user_type)) {
-    console.warn(`❌ Acesso negado para ${usuario.user_type} em rota que requer: ${allowedRoles.join(', ')}`);
-    
-    // Redireciona para a página padrão do seu tipo de usuário
-    if (usuario.user_type === 'client') {
-      return <Navigate to="/dashboard-cliente" />;
-    } else {
-      return <Navigate to="/" />;
+  if (usuario) {
+    // Admin pode acessar tudo (inclusive rotas de analyst)
+    const temPermissao = usuario.user_type === 'admin' || allowedRoles.includes(usuario.user_type);
+
+    if (!temPermissao) {
+      console.warn(`❌ Acesso negado para ${usuario.user_type} em rota que requer: ${allowedRoles.join(', ')}`);
+
+      // Redireciona para a página padrão do seu tipo de usuário
+      if (usuario.user_type === 'client') {
+        return <Navigate to="/dashboard-cliente" />;
+      } else {
+        return <Navigate to="/" />;
+      }
     }
   }
 
