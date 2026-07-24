@@ -9,7 +9,13 @@ const router = Router();
 // ============================================================================
 async function verificarAdmin(req: any): Promise<boolean> {
   const usuarioId = req.user?.id;
-  if (!usuarioId) return false;
+  console.log('[DEBUG] verificarAdmin - usuarioId:', usuarioId);
+  console.log('[DEBUG] verificarAdmin - req.user:', req.user);
+
+  if (!usuarioId) {
+    console.log('[DEBUG] usuarioId não encontrado');
+    return false;
+  }
 
   const { data: usuario } = await supabase
     .from('usuarios')
@@ -17,7 +23,11 @@ async function verificarAdmin(req: any): Promise<boolean> {
     .eq('id', usuarioId)
     .single();
 
-  return usuario?.user_type === 'admin';
+  console.log('[DEBUG] usuário do banco:', usuario);
+  const isAdmin = usuario?.user_type === 'admin';
+  console.log('[DEBUG] isAdmin:', isAdmin);
+
+  return isAdmin;
 }
 
 // ============================================================================
