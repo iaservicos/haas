@@ -193,8 +193,8 @@ export function GerenciarUsuarios() {
 
         {/* CONTEÚDO */}
         <div className="flex-1 overflow-auto bg-gray-100">
-          <div className="p-8">
-            <div className="max-w-7xl mx-auto">
+          <div className="p-8 h-full">
+            <div className="max-w-full h-full flex flex-col">
               {/* Button to create new user */}
               <div className="mb-6 flex justify-end">
                 <button
@@ -206,7 +206,7 @@ export function GerenciarUsuarios() {
               </div>
 
               {/* Tabela */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col">
                 {loading ? (
                   <div className="p-12 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -217,23 +217,23 @@ export function GerenciarUsuarios() {
                     Nenhum usuário cadastrado
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
+                  <div className="overflow-x-auto flex-1 flex flex-col">
+                    <table className="w-full flex-1">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Email</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Nome</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Tipo</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Criado em</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Ações</th>
+                          <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
+                          <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Nome</th>
+                          <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tipo</th>
+                          <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Criado em</th>
+                          <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {usuarios.map((usuario) => (
                           <tr key={usuario.id} className="hover:bg-gray-50 transition">
-                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">{usuario.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{usuario.nome}</td>
-                            <td className="px-4 py-3 text-sm">
+                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{usuario.email}</td>
+                            <td className="px-6 py-4 text-sm text-gray-700">{usuario.nome}</td>
+                            <td className="px-6 py-4 text-sm">
                               <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                                 usuario.user_type === 'admin'
                                   ? 'bg-red-100 text-red-800'
@@ -244,8 +244,8 @@ export function GerenciarUsuarios() {
                                 {getTipoLabel(usuario.user_type)}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{formatarData(usuario.data_criacao)}</td>
-                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <td className="px-6 py-4 text-sm text-gray-600">{formatarData(usuario.data_criacao)}</td>
+                            <td className="px-6 py-4 text-right whitespace-nowrap">
                               <button
                                 onClick={() => handleEditar(usuario)}
                                 className="text-blue-600 hover:text-blue-800 text-sm mr-3"
