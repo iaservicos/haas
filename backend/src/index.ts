@@ -3,6 +3,7 @@ import { corsOptions } from './config/cors.js';
 import { env } from './config/env.js';
 import { testConnection } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authMiddleware } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import componentesRoutes from './routes/componentes.js';
 import fotosRoutes from './routes/fotos.js';
@@ -22,14 +23,14 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.options('*', corsOptions);
 
 app.use('/api/auth', authRoutes);
-app.use('/api/componentes', componentesRoutes);
-app.use('/api/fotos', fotosRoutes);
-app.use('/api/clientes', clientesRoutes);
-app.use('/api/confirmacoes', confirmacoes);
-app.use('/api/inspecao', inspecaoRoutes);
+app.use('/api/componentes', authMiddleware, componentesRoutes);
+app.use('/api/fotos', authMiddleware, fotosRoutes);
+app.use('/api/clientes', authMiddleware, clientesRoutes);
+app.use('/api/confirmacoes', authMiddleware, confirmacoes);
+app.use('/api/inspecao', authMiddleware, inspecaoRoutes);
 app.use('/api/cron', cronAnaliseRouter);
-app.use('/api/usuario', usuarioRoutes);
-app.use('/api/vistorias', vistoriasRoutes);
+app.use('/api/usuario', authMiddleware, usuarioRoutes);
+app.use('/api/vistorias', authMiddleware, vistoriasRoutes);
 
 
 
