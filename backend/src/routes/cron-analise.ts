@@ -54,7 +54,7 @@ async function analyzeImageWithClaude(
                 type: 'image',
                 source: {
                   type: 'base64',
-                  media_type: mimeType,
+                  media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
                   data: base64,
                 },
               },
