@@ -66,11 +66,11 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       
-      {/* ⚡ ROTAS PARA ANALISTAS */}
+      {/* ⚡ ROTAS PARA ANALISTAS E ADMIN */}
       <Route
         path="/"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -78,7 +78,7 @@ function AppRoutes() {
       <Route
         path="/fotos"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <Fotos />
           </ProtectedRoute>
         }
@@ -86,7 +86,7 @@ function AppRoutes() {
       <Route
         path="/contratos"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <GerenciarContratos />
           </ProtectedRoute>
         }
@@ -94,7 +94,7 @@ function AppRoutes() {
       <Route
         path="/clientes"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <GerenciarClientes />
           </ProtectedRoute>
         }
@@ -102,7 +102,7 @@ function AppRoutes() {
       <Route
         path="/equipamentos"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <GerenciarEquipamentos />
           </ProtectedRoute>
         }
@@ -110,7 +110,7 @@ function AppRoutes() {
       <Route
         path="/confirmacoes"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <Confirmacoes />
           </ProtectedRoute>
         }
@@ -118,7 +118,7 @@ function AppRoutes() {
       <Route
         path="/analise-equipamentos"
         element={
-          <ProtectedRoute allowedRoles={['analyst']}>
+          <ProtectedRoute allowedRoles={['analyst', 'admin']}>
             <AnaliseEquipamento />
           </ProtectedRoute>
         }
