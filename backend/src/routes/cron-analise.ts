@@ -9,10 +9,8 @@ const supabase = createClient(
 
 const router = express.Router();
 
-// Configuração Hugging Face (Gratuito)
-const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
-const HF_API_URL = 'https://api-inference.huggingface.co/models';
-const HF_MODEL = 'nlpconnect/vit-gpt2-image-captioning'; // Modelo leve e rápido
+// Configuração Claude Analysis Service (Proxy Gratuito)
+const ANALYZER_SERVICE_URL = process.env.ANALYZER_SERVICE_URL || 'https://haas-analyzer.vercel.app/api/analyze';
 
 // Configuração de retry com backoff exponencial
 const MAX_RETRIES = 3;
@@ -28,39 +26,35 @@ function getRetryDelay(attempt: number): number {
 }
 
 /**
- * Função para fazer requisição com retry automático ao Hugging Face
+ * Função para fazer requisição ao serviço de análise Claude
  */
-async function makeHuggingFaceRequest(
+async function makeAnalysisRequest(
   base64: string,
   mimeType: string,
   analysisId: number
-): Promise<string> {
+): Promise<any> {
   let lastError: any;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Hugging Face para análise ${analysisId}...`);
-
-      // Converter base64 para buffer
-      const imageBuffer = Buffer.from(base64, 'base64');
+      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Claude Analyzer para análise ${analysisId}...`);
 
       const response = await axios.post(
-        `${HF_API_URL}/${HF_MODEL}`,
-        imageBuffer,
+        ANALYZER_SERVICE_URL,
         {
+          base64,
+          mimeType,
+        },
+        {
+          timeout: 120000, // 2 minutos
           headers: {
-            Authorization: `Bearer ${HF_API_KEY}`,
-            'Content-Type': mimeType,
+            'Content-Type': 'application/json',
           },
-          timeout: 120000, // 2 minutos (primeira requisição pode demorar)
         }
       );
 
       console.log(`[CRON] ✅ Sucesso na tentativa ${attempt}`);
-
-      // Hugging Face retorna: [{"generated_text": "description..."}]
-      const generatedText = response.data[0]?.generated_text || '';
-      return generatedText;
+      return response.data;
 
     } catch (error: any) {
       lastError = error;
@@ -164,9 +158,9 @@ router.post('/analise-fotos', async (req: any, res: any) => {
   try {
     console.log('[CRON] Iniciando processamento de análises pendentes...');
 
-    if (!HF_API_KEY) {
-      console.error('[CRON] HUGGING_FACE_API_KEY não configurada');
-      return res.status(500).json({ error: 'HUGGING_FACE_API_KEY não configurada' });
+    if (!ANALYZER_SERVICE_URL) {
+      console.error('[CRON] ANALYZER_SERVICE_URL não configurada');
+      return res.status(500).json({ error: 'ANALYZER_SERVICE_URL não configurada' });
     }
 
     // Buscar análises com status "pendente"
@@ -232,24 +226,24 @@ router.post('/analise-fotos', async (req: any, res: any) => {
 
         console.log(`[CRON] Usando mime type: ${mimeType}`);
 
-        // Enviar para Hugging Face
-        console.log('[CRON] Enviando para Hugging Face com retry automático...');
+        // Enviar para Claude Analyzer Service
+        console.log('[CRON] Enviando para Claude Analyzer com retry automático...');
 
-        let descricaoHF = '';
-        let hfSuccesso = false;
+        let resultado: any = null;
+        let analyzerSuccesso = false;
 
         try {
-          descricaoHF = await makeHuggingFaceRequest(base64, mimeType, analise.id);
-          hfSuccesso = true;
-          console.log(`[CRON] ✅ Análise recebida do Hugging Face: ${descricaoHF.substring(0, 100)}...`);
-        } catch (hfError) {
-          console.warn(`[CRON] ⚠️ Hugging Face falhou, usando análise local`);
-          descricaoHF = `Foto de equipamento ${fileName}`;
+          const analysisResponse = await makeAnalysisRequest(base64, mimeType, analise.id);
+          if (analysisResponse.success && analysisResponse.data) {
+            resultado = analysisResponse.data;
+            analyzerSuccesso = true;
+            console.log(`[CRON] ✅ Análise recebida do Claude: ${resultado.status}`);
+          }
+        } catch (analyzerError) {
+          console.warn(`[CRON] ⚠️ Claude Analyzer falhou, usando análise local`);
+          const resultadoJSON = generateAnalysisJSON(`Foto de equipamento ${fileName}`, fileName);
+          resultado = JSON.parse(resultadoJSON);
         }
-
-        // Gerar análise estruturada (com descrição do HF ou local)
-        const resultadoJSON = generateAnalysisJSON(descricaoHF, fileName);
-        const resultado = JSON.parse(resultadoJSON);
 
         // Atualizar análise com resultado
         const { error: updateError } = await supabase
@@ -267,7 +261,7 @@ router.post('/analise-fotos', async (req: any, res: any) => {
           continue;
         }
 
-        console.log(`[CRON] Análise ${analise.id} processada com sucesso! (Método: ${hfSuccesso ? 'Hugging Face' : 'Local'})`);
+        console.log(`[CRON] Análise ${analise.id} processada com sucesso! (Método: ${analyzerSuccesso ? 'Claude' : 'Local'})`);
         processadas++;
 
       } catch (error: any) {
