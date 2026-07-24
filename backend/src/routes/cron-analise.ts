@@ -237,31 +237,36 @@ router.post('/analise-fotos', async (req: any, res: any) => {
           );
 
           console.log(
-            `[CRON] Resposta bruta: ${claudeResponse.substring(0, 100)}...`
+            `[CRON] Resposta bruta COMPLETA:\n${claudeResponse}`
           );
 
           // Parse JSON
-          let jsonContent = claudeResponse;
-          if (claudeResponse.includes('```')) {
-            jsonContent = claudeResponse
+          let jsonContent = claudeResponse.trim();
+
+          // Remover markdown se existir
+          if (jsonContent.includes('```')) {
+            console.log('[CRON] Removendo blocos de markdown...');
+            jsonContent = jsonContent
               .replace(/```json\n?/g, '')
-              .replace(/```/g, '')
+              .replace(/```\n?/g, '')
               .trim();
           }
 
+          console.log(`[CRON] JSON a fazer parse:\n${jsonContent}`);
           resultado = JSON.parse(jsonContent);
 
           // Validar resposta
           if (!isValidAnalysisResponse(resultado)) {
-            throw new Error('Resposta inválida do Claude');
+            console.error(`[CRON] Resposta inválida:`, resultado);
+            throw new Error('Resposta não tem formato esperado');
           }
 
           console.log(
-            `[CRON] ✅ Análise válida: ${resultado.status} - ${resultado.tipo_dano}`
+            `[CRON] ✅ Análise válida: status=${resultado.status}, categoria=${resultado.categoria}, tipo=${resultado.tipo_dano}`
           );
         } catch (parseError: any) {
-          console.error(`[CRON] Erro ao processar resposta: ${parseError.message}`);
-          console.error(`[CRON] Conteúdo bruto: ${claudeResponse}`);
+          console.error(`[CRON] ❌ ERRO AO FAZER PARSE: ${parseError.message}`);
+          console.error(`[CRON] RESPOSTA BRUTA COMPLETA:\n${claudeResponse}`);
 
           // ERRO REAL: não retornar "OK" falso
           throw new Error(
