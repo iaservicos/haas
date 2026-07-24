@@ -81,7 +81,7 @@ async function makeAnalysisRequest(
 
 /**
  * Análise local baseada em palavras-chave (fallback gratuito)
- * Usado quando Hugging Face falha
+ * Usado quando Claude Analyzer falha
  */
 function generateAnalysisJSON(
   descricao: string,
@@ -89,26 +89,26 @@ function generateAnalysisJSON(
 ): string {
   const descLower = descricao.toLowerCase();
 
-  // Padrões de palavras-chave para cada tipo de dano
+  // Padrões de palavras-chave para cada tipo de dano (expandido)
   const damagePatterns: Record<string, { keywords: string[], types: string[] }> = {
     'TELA/DISPLAY': {
-      keywords: ['trinca', 'quebra', 'mancha', 'pixel', 'linha', 'vidro', 'crack', 'broken', 'screen', 'display', 'lcd'],
+      keywords: ['trinca', 'quebra', 'mancha', 'pixel', 'linha', 'vidro', 'crack', 'broken', 'screen', 'display', 'lcd', 'risca', 'risco', 'desbotamento', 'burn', 'queimada'],
       types: ['Trincas', 'Quebras', 'Manchas', 'Linhas horizontais/verticais', 'Vidro solto'],
     },
     'CARCAÇA': {
-      keywords: ['amassado', 'dent', 'burn', 'queimadura', 'corrosão', 'deforma', 'faltando', 'missing', 'dent', 'damage'],
+      keywords: ['amassado', 'dent', 'burn', 'queimadura', 'corrosão', 'deforma', 'faltando', 'missing', 'damage', 'oxidação', 'mancha escura', 'risca'],
       types: ['Amassados', 'Queimaduras', 'Corrosão', 'Deformação', 'Peças faltando'],
     },
     'TECLADO': {
-      keywords: ['tecla', 'key', 'líquido', 'derrama', 'keyboard', 'molhado', 'spill'],
+      keywords: ['tecla', 'key', 'líquido', 'derrama', 'keyboard', 'molhado', 'spill', 'sujeira'],
       types: ['Teclas faltando', 'Teclas soltas', 'Derramamento de líquido'],
     },
     'CONECTORES': {
-      keywords: ['usb', 'hdmi', 'conector', 'plugue', 'solto', 'quebrado', 'damaged', 'port', 'jack'],
+      keywords: ['usb', 'hdmi', 'conector', 'plugue', 'solto', 'quebrado', 'damaged', 'port', 'jack', 'pino'],
       types: ['USB danificado', 'HDMI danificado', 'Conectores soltos'],
     },
     'OUTROS': {
-      keywords: ['líquido', 'água', 'oxidação', 'corrosão', 'mancha', 'stain', 'wet', 'water'],
+      keywords: ['líquido', 'água', 'oxidação', 'corrosão', 'mancha', 'stain', 'wet', 'water', 'sujeira'],
       types: ['Sinais de líquido', 'Oxidação'],
     },
   };
@@ -135,7 +135,8 @@ function generateAnalysisJSON(
       categoria: '',
       tipo_dano: '',
       descricao: 'Equipamento sem danos visíveis',
-      metodo: 'huggingface_local_fallback',
+      confianca: 'média',
+      metodo: 'local_fallback',
     });
   }
 
@@ -144,14 +145,15 @@ function generateAnalysisJSON(
     categoria: melhorCategoria,
     tipo_dano: melhorTipoDano,
     descricao: descricao.substring(0, 100),
-    metodo: 'huggingface_local_fallback',
+    confianca: 'média',
+    metodo: 'local_fallback',
   });
 }
 
 /**
  * POST /api/cron/analise-fotos
  * Cron job que roda a cada 1 minuto
- * Processa análises pendentes com Hugging Face (GRATUITO)
+ * Processa análises pendentes com Claude Analyzer Service (GRATUITO)
  * COM RETRY AUTOMÁTICO E FALLBACK PARA ANÁLISE LOCAL
  */
 router.post('/analise-fotos', async (req: any, res: any) => {
