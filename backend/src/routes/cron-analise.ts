@@ -40,10 +40,10 @@ async function analyzeImageWithClaude(
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Claude 3.5 Haiku para análise ${analysisId}...`);
+      console.log(`[CRON] Tentativa ${attempt}/${MAX_RETRIES} com Claude 3.5 Sonnet para análise ${analysisId}...`);
 
       const response = await client.messages.create({
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 300,
         messages: [
           {
