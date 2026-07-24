@@ -12,6 +12,7 @@ import { DashboardCliente } from './pages/DashboardCliente';
 import { VistoriaCliente } from './pages/VistoriaCliente';
 import { AnaliseEquipamento } from './pages/AnaliseEquipamento';
 import { MobileFoto } from './pages/MobileFoto';
+import { GerenciarUsuarios } from './pages/GerenciarUsuarios';
 
 
 // ⚡ NOVO: Componente para rotas protegidas com verificação de role
@@ -138,6 +139,16 @@ function AppRoutes() {
 
       {/* Rota pública para captura de foto pelo celular via QR Code */}
       <Route path="/foto-mobile" element={<MobileFoto />} />
+
+      {/* ⚡ ROTA PARA ADMIN: Gerenciar usuários */}
+      <Route
+        path="/usuarios"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <GerenciarUsuarios />
+          </ProtectedRoute>
+        }
+      />
 
       {/* ⚡ ROTA PADRÃO: Redireciona para login */}
       <Route path="*" element={<Navigate to="/login" />} />
