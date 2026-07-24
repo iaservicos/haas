@@ -91,6 +91,12 @@ function isValidAnalysisResponse(response: any): boolean {
   if (!response || typeof response !== 'object') {
     return false;
   }
+
+  // Normalizar status: OPERACIONAL -> OK, qualquer outro -> manter
+  if (response.status === 'OPERACIONAL') {
+    response.status = 'OK';
+  }
+
   return (
     (response.status === 'OK' || response.status === 'AVARIA') &&
     typeof response.descricao === 'string'
