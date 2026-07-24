@@ -141,32 +141,33 @@ export function GerenciarUsuarios() {
   };
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-gray-50">
       {/* SIDEBAR */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b border-gray-700">
+        <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-400 hover:text-white"
+            className="text-gray-400 hover:text-white text-xl"
           >
             ☰
           </button>
+          {sidebarOpen && <span className="text-xs text-gray-500">MENU</span>}
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          <div className="px-4 py-2 text-sm font-semibold text-gray-500 uppercase">Menu</div>
-
+        <nav className="flex-1 p-4 space-y-1">
           <button
             onClick={() => navigate('/')}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded transition text-sm"
           >
-            {sidebarOpen && <span>Voltar</span>}
+            <span>←</span>
+            {sidebarOpen && <span>Dashboard</span>}
           </button>
 
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition"
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-red-600 rounded transition text-sm"
           >
+            <span>⊗</span>
             {sidebarOpen && <span>Sair</span>}
           </button>
         </nav>
@@ -175,7 +176,7 @@ export function GerenciarUsuarios() {
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0">
           <div className="px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <img
@@ -183,74 +184,108 @@ export function GerenciarUsuarios() {
                 alt="Logo Positivo"
                 className="h-10 w-auto"
               />
-              <h1 className="text-2xl font-bold text-gray-900">Gerenciar Usuários</h1>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Gerenciar Usuários</h1>
+                <p className="text-xs text-gray-500 mt-1">Administração de usuários do sistema</p>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">{usuario?.nome}</span>
+            <div className="flex items-center gap-3 text-sm">
+              <div className="text-right">
+                <p className="text-gray-900 font-medium">{usuario?.nome}</p>
+                <p className="text-gray-500 text-xs">Administrador</p>
+              </div>
+              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                {usuario?.nome?.charAt(0).toUpperCase()}
+              </div>
             </div>
           </div>
         </div>
 
         {/* CONTEÚDO */}
         <div className="flex-1 overflow-auto">
-          <div className="p-8">
+          <div className="p-6">
             <div className="max-w-7xl mx-auto">
-              {/* Botão Criar */}
-              <div className="mb-6">
+              {/* Card Header com Stats */}
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Lista de Usuários</h2>
+                  <p className="text-sm text-gray-600 mt-1">Total: {usuarios.length} usuário{usuarios.length !== 1 ? 's' : ''}</p>
+                </div>
                 <button
                   onClick={() => setShowModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition shadow-sm hover:shadow-md"
                 >
-                  + Criar Novo Usuário
+                  + Novo Usuário
                 </button>
               </div>
 
               {/* Tabela */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 {loading ? (
-                  <div className="p-8 text-center text-gray-500">Carregando...</div>
+                  <div className="p-12 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-600 mt-4">Carregando usuários...</p>
+                  </div>
                 ) : usuarios.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">Nenhum usuário cadastrado</div>
+                  <div className="p-12 text-center">
+                    <p className="text-gray-500">Nenhum usuário cadastrado</p>
+                    <button
+                      onClick={() => setShowModal(true)}
+                      className="mt-4 text-blue-600 hover:text-blue-700 font-medium text-sm"
+                    >
+                      Criar o primeiro usuário
+                    </button>
+                  </div>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-100 border-b">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tipo</th>
-                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data Criação</th>
-                        <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usuarios.map((usuario) => (
-                        <tr key={usuario.id} className="border-b hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{usuario.email}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{usuario.nome}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-semibold">
-                              {getTipoLabel(usuario.user_type)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{formatarData(usuario.data_criacao)}</td>
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              onClick={() => handleEditar(usuario)}
-                              className="text-blue-600 hover:text-blue-800 text-sm font-medium mr-4"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleDeletar(usuario.id)}
-                              className="text-red-600 hover:text-red-800 text-sm font-medium"
-                            >
-                              Deletar
-                            </button>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Email</th>
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Nome</th>
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Criado em</th>
+                          <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Ações</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {usuarios.map((usuario) => (
+                          <tr key={usuario.id} className="hover:bg-gray-50 transition">
+                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{usuario.email}</td>
+                            <td className="px-6 py-4 text-sm text-gray-700">{usuario.nome}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                                usuario.user_type === 'admin'
+                                  ? 'bg-red-100 text-red-800'
+                                  : usuario.user_type === 'analyst'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {getTipoLabel(usuario.user_type)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{formatarData(usuario.data_criacao)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-3">
+                                <button
+                                  onClick={() => handleEditar(usuario)}
+                                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1 rounded text-sm font-medium transition"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleDeletar(usuario.id)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded text-sm font-medium transition"
+                                >
+                                  Deletar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -260,68 +295,81 @@ export function GerenciarUsuarios() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-6">
-              {editandoId ? 'Editar Usuário' : 'Criar Novo Usuário'}
-            </h2>
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">
+                {editandoId ? 'Editar Usuário' : 'Novo Usuário'}
+              </h2>
+              <p className="text-xs text-gray-600 mt-1">
+                {editandoId ? 'Atualize as informações do usuário' : 'Adicione um novo usuário ao sistema'}
+              </p>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Email</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="usuario@example.com"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Nome Completo</label>
                 <input
                   type="text"
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="João Silva"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Usuário</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Tipo de Usuário</label>
                 <select
                   value={formData.user_type}
                   onChange={(e) => setFormData({ ...formData, user_type: e.target.value as any })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
+                  <option value="">Selecionar...</option>
                   <option value="analyst">Analista</option>
                   <option value="client">Cliente</option>
-                  <option value="admin">Admin</option>
+                  <option value="admin">Administrador</option>
                 </select>
               </div>
 
               {!editandoId && (
-                <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-                  Uma senha temporária será gerada automaticamente
-                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                  <p className="text-xs text-blue-900 font-medium">
+                    📝 Uma senha temporária será gerada automaticamente
+                  </p>
+                </div>
               )}
 
-              <div className="flex gap-4 pt-6">
+              {/* Modal Footer */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200 mt-6">
                 <button
                   type="button"
                   onClick={handleFecharModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:bg-gray-400"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Salvando...' : 'Salvar'}
+                  {loading ? 'Salvando...' : editandoId ? 'Atualizar' : 'Criar'}
                 </button>
               </div>
             </form>
