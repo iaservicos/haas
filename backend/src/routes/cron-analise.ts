@@ -15,9 +15,15 @@ const client = new Anthropic({
 const router = express.Router();
 
 // ============================================================================
-// CONFIGURAÇÃO - Todas as constantes em um lugar
+// CONFIGURAÇÃO - Modelos com Fallback
 // ============================================================================
-const CLAUDE_MODEL = 'claude-opus-4-1-20250805'; // Modelo mais novo (garantido até 2027)
+// Modelos em ordem de preferência (fallback automático)
+const CLAUDE_MODELS = [
+  'claude-sonnet-5', // Sonnet 5 (mais novo, melhor qualidade)
+  'claude-opus-4-1', // Opus 4.1 (alternativa se Sonnet 5 falhar)
+  'claude-sonnet-4', // Sonnet 4 (fallback final)
+];
+
 const MAX_RETRIES = 2;
 const REQUEST_TIMEOUT = 30000; // 30 segundos
 const INITIAL_RETRY_DELAY = 1000; // 1 segundo
@@ -66,7 +72,7 @@ function isValidAnalysisResponse(response: any): boolean {
 }
 
 // ============================================================================
-// ANÁLISE COM CLAUDE
+// ANÁLISE COM CLAUDE (com fallback de modelos)
 // ============================================================================
 
 async function analyzeImageWithClaude(
@@ -78,63 +84,76 @@ async function analyzeImageWithClaude(
 ): Promise<string> {
   let lastError: any;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      console.log(
-        `[CRON] Tentativa ${attempt}/${MAX_RETRIES} com ${CLAUDE_MODEL} para análise ${analysisId}...`
-      );
+  // Tentar cada modelo em ordem
+  for (const model of CLAUDE_MODELS) {
+    let modelLastError: any;
 
-      const response = await client.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 300,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mimeType as
-                    | 'image/jpeg'
-                    | 'image/png'
-                    | 'image/gif'
-                    | 'image/webp',
-                  data: base64,
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(
+          `[CRON] Tentativa ${attempt}/${MAX_RETRIES} com ${model} para análise ${analysisId}...`
+        );
+
+        const response = await client.messages.create({
+          model: model,
+          max_tokens: 300,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: mimeType as
+                      | 'image/jpeg'
+                      | 'image/png'
+                      | 'image/gif'
+                      | 'image/webp',
+                    data: base64,
+                  },
                 },
-              },
-              {
-                type: 'text',
-                text: `${ANALYSIS_PROMPT}\n\nNúmero de série: ${numeroSerie || 'N/A'}\nFoto: ${fileName}`,
-              },
-            ],
-          },
-        ],
-      });
+                {
+                  type: 'text',
+                  text: `${ANALYSIS_PROMPT}\n\nNúmero de série: ${numeroSerie || 'N/A'}\nFoto: ${fileName}`,
+                },
+              ],
+            },
+          ],
+        });
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Resposta do Claude não é texto');
+        const content = response.content[0];
+        if (content.type !== 'text') {
+          throw new Error('Resposta do Claude não é texto');
+        }
+
+        console.log(`[CRON] ✅ Sucesso com ${model}!`);
+        return content.text;
+      } catch (error: any) {
+        modelLastError = error;
+        const message = error.message || 'Erro desconhecido';
+
+        console.log(
+          `[CRON] ❌ Tentativa ${attempt} com ${model} falhou: ${message}`
+        );
+
+        if (attempt < MAX_RETRIES) {
+          const delay = getRetryDelay(attempt);
+          console.log(`[CRON] ⏳ Aguardando ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-
-      console.log(`[CRON] ✅ Sucesso na tentativa ${attempt}`);
-      return content.text;
-    } catch (error: any) {
-      lastError = error;
-      const message = error.message || 'Erro desconhecido';
-
-      console.log(`[CRON] ❌ Tentativa ${attempt} falhou: ${message}`);
-
-      if (attempt === MAX_RETRIES) {
-        throw error;
-      }
-
-      const delay = getRetryDelay(attempt);
-      console.log(`[CRON] ⏳ Aguardando ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
     }
+
+    // Se este modelo falhou em todas as tentativas, tentar o próximo
+    lastError = modelLastError;
+    console.log(
+      `[CRON] 🔄 Modelo ${model} não funcionou, tentando próximo...`
+    );
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
+  // Se todos os modelos falharam
   throw lastError;
 }
 
@@ -222,8 +241,8 @@ router.post('/analise-fotos', async (req: any, res: any) => {
 
         console.log(`[CRON] Mime type: ${mimeType}`);
 
-        // Analisar com Claude
-        console.log('[CRON] Enviando para Claude...');
+        // Analisar com Claude (com fallback)
+        console.log('[CRON] Enviando para Claude (tentará múltiplos modelos se necessário)...');
         let claudeResponse: string;
         let resultado: any;
 
