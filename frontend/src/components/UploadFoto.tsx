@@ -42,20 +42,19 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
 
     pollingRef.current = setInterval(async () => {
       try {
-        console.log('[UploadFoto] Polling para fotos:', confirmacaoId);
         const response = await apiClient.get(`/inspecao/fotos/${confirmacaoId}`);
-        console.log('[UploadFoto] Resposta do polling:', response.data);
-        if (response.data && response.data.length > 0) {
-          console.log('[UploadFoto] Foto detectada! ID:', response.data[0].id);
+        const fotos = response.data?.data || response.data;
+
+        if (fotos && fotos.length > 0) {
+          console.log('[UploadFoto] Foto detectada! ID:', fotos[0].id);
           clearInterval(pollingRef.current!);
           setAguardando(false);
           setFotoDetectada(true);
           if (onUploadSuccess) {
-            onUploadSuccess(response.data[0].id, null);
+            onUploadSuccess(fotos[0].id, null);
           }
         }
       } catch (error) {
-        console.log('[UploadFoto] Erro no polling:', error);
         // ignora erros de rede durante polling
       }
     }, 3000);
