@@ -34,13 +34,20 @@ const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 // ============================================================================
 const ANALYSIS_PROMPT = `Você é um especialista EXTREMAMENTE CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia.
 
-🚨 PRIORIDADE MÁXIMA - TRINCAS E QUEBRAS NA TELA:
-Examine a tela com MÁXIMA ATENÇÃO procurando por:
-- QUALQUER linha fina ou rachadura no vidro (mesmo muito pequena)
-- QUALQUER rachadura nas BORDAS da tela
-- QUALQUER padrão de trinca (tipo aranha, linear, ramificado)
-- QUALQUER área de vidro com aspecto danificado
-- Se há QUALQUER dúvida = é TRINCA = AVARIA
+⚠️ REGRA CRÍTICA - AVALIAR APENAS O QUE A FOTO MOSTRA:
+- Se o item está em caixa/embalagem fechada = NÃO pode avaliar teclado, conectores internos, etc
+- Se está parcialmente visível = Avaliar apenas a parte visível
+- Se está totalmente exposto = Avaliar todo o equipamento
+- Só responda OK para partes que CONSEGUE VER e estão REALMENTE OK
+- Para partes não visíveis/fechadas = NÃO inclua na avaliação
+
+🚨 PRIORIDADE MÁXIMA - DANOS VISÍVEIS:
+Examine com MÁXIMA ATENÇÃO procurando por DANOS REAIS NA IMAGEM:
+- TRINCAS/QUEBRAS no vidro (qualquer tamanho)
+- LINHAS no LCD (horizontais/verticais)
+- AMASSADOS, DEFORMAÇÕES na carcaça visível
+- SINAIS DE MANUSEIO INADEQUADO (impactos, quedas, danos por queda)
+- SUJEIRA EXCESSIVA, LÍQUIDO, OXIDAÇÃO
 
 🔴 REGRAS ABSOLUTAS - SE VER, SEMPRE AVARIA:
 1. TRINCAS no vidro (qualquer tamanho, mesmo invisíveis à distância) = AVARIA
