@@ -500,7 +500,7 @@ router.get('/portal/listar', async (req: any, res: any) => {
  * GET /api/inspecao/fotos/:vistoriaId
  * Retorna fotos enviadas para uma vistoria (usado pelo polling do QR code)
  */
-router.get('/fotos/:vistoriaId', async (req: any, res: any) => {
+router.get('/fotos/:vistoriaId', optionalAuth, async (req: any, res: any) => {
   try {
     const { vistoriaId } = req.params;
 
@@ -524,7 +524,7 @@ router.get('/fotos/:vistoriaId', async (req: any, res: any) => {
  * GET /api/inspecao/:vistoriaId
  * Retorna as respostas de uma inspeção específica
  */
-router.get('/:vistoriaId', async (req, res) => {
+router.get('/:vistoriaId', optionalAuth, async (req, res) => {
   try {
     const { vistoriaId } = req.params;
 
