@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { apiClient } from '../services/api';
+import axios from 'axios';
 
 export const MobileFoto: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -45,7 +45,20 @@ export const MobileFoto: React.FC = () => {
       formData.append('foto_tipo', 'equipamento');
       formData.append('numero_serie', numeroSerie);
 
-      await apiClient.post('/inspecao/upload-foto', formData);
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const token = localStorage.getItem('token');
+
+      const config: any = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      await axios.post(`${API_BASE_URL}/inspecao/upload-foto`, formData, config);
 
       setSucesso(true);
       setFoto(null);

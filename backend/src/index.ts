@@ -27,7 +27,8 @@ app.use('/api/componentes', authMiddleware, componentesRoutes);
 app.use('/api/fotos', authMiddleware, fotosRoutes);
 app.use('/api/clientes', authMiddleware, clientesRoutes);
 app.use('/api/confirmacoes', authMiddleware, confirmacoes);
-app.use('/api/inspecao', authMiddleware, inspecaoRoutes);
+// Rota de inspecao: autenticação opcional (para QR Code)
+app.use('/api/inspecao', inspecaoRoutes);
 app.use('/api/cron', cronAnaliseRouter);
 app.use('/api/usuario', authMiddleware, usuarioRoutes);
 app.use('/api/vistorias', authMiddleware, vistoriasRoutes);

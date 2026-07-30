@@ -1,10 +1,27 @@
 import express from 'express';
 import multer from 'multer';
+import jwt from 'jsonwebtoken';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
+import { env } from '../config/env.js';
+import { TokenPayload } from '../types/index.js';
 
 const router = express.Router();
+
+// Middleware de autenticação OPCIONAL (não força erro se faltar token)
+const optionalAuth = (req: any, res: any, next: any) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET) as TokenPayload;
+      req.user = decoded;
+    } catch (error) {
+      // Ignora erro de token, prossegue sem autenticação
+    }
+  }
+  next();
+};
 
 // ✅ Configurar multer para upload de arquivos
 const upload = multer({
@@ -23,7 +40,7 @@ const STORAGE_BUCKET = 'fotos';
  * GET /api/inspecao/equipamento/:equipamentoId
  * Retorna o tipo de equipamento pelo ID
  */
-router.get('/equipamento/:equipamentoId', async (req, res ) => {
+router.get('/equipamento/:equipamentoId', optionalAuth, async (req, res ) => {
   try {
     const { equipamentoId } = req.params;
 
@@ -56,7 +73,7 @@ router.get('/equipamento/:equipamentoId', async (req, res ) => {
  * GET /api/inspecao/perguntas/:equipmentType
  * Retorna as perguntas para um tipo de equipamento específico
  */
-router.get('/perguntas/:equipmentType', async (req, res) => {
+router.get('/perguntas/:equipmentType', optionalAuth, async (req, res) => {
   try {
     const { equipmentType } = req.params;
     
@@ -90,7 +107,7 @@ router.get('/perguntas/:equipmentType', async (req, res) => {
  * POST /api/inspecao/salvar
  * Salva as respostas da inspeção com equipamento_id
  */
-router.post('/salvar', async (req, res) => {
+router.post('/salvar', optionalAuth, async (req, res) => {
   try {
     const { vistoriaId, equipmentType, answers, observacoes, equipamento_id } = req.body;
 
@@ -163,7 +180,7 @@ router.post('/salvar', async (req, res) => {
  * 4. Vincula via numero_serie (equipamento)
  * 5. Retorna imediatamente (SEM fazer análise)
  */
-router.post('/upload-foto', (upload.single('file') as any), async (req: any, res: any) => {
+router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async (req: any, res: any) => {
   try {
     console.log('[inspecao.ts] Iniciando upload de foto...');
 
