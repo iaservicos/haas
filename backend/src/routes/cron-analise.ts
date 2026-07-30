@@ -30,53 +30,65 @@ const REQUEST_TIMEOUT = 30000; // 30 segundos
 const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 
 // ============================================================================
-// ANÁLISE PROMPT - CRÍTICA: Foco extremo em TRINCAS E QUEBRAS
+// ANÁLISE PROMPT - INSPEÇÃO COMPLETA DO EQUIPAMENTO
 // ============================================================================
-const ANALYSIS_PROMPT = `ANÁLISE CRÍTICA DE EQUIPAMENTO TI - POSITIVO TECNOLOGIA
+const ANALYSIS_PROMPT = `Você é um especialista EXTREMAMENTE CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia.
 
-INSTRUÇÃO PRIMÁRIA: Você DEVE mencionar TODOS os danos encontrados, não apenas um.
+🚨 PRIORIDADE MÁXIMA - TRINCAS E QUEBRAS NA TELA:
+Examine a tela com MÁXIMA ATENÇÃO procurando por:
+- QUALQUER linha fina ou rachadura no vidro (mesmo muito pequena)
+- QUALQUER rachadura nas BORDAS da tela
+- QUALQUER padrão de trinca (tipo aranha, linear, ramificado)
+- QUALQUER área de vidro com aspecto danificado
+- Se há QUALQUER dúvida = é TRINCA = AVARIA
 
-🔴 PRIMEIRA VERIFICAÇÃO - TELA/VIDRO:
-PROCURE OBRIGATORIAMENTE POR:
-A) TRINCAS NO VIDRO - qualquer linha/rachadura no vidro da tela
-   - Trincas finas (mesmo invisíveis à distância)
-   - Trincas nos cantos ou bordas
-   - Qualquer padrão de quebra (tipo teia de aranha, linear, etc)
-   - Se há QUALQUER dúvida = REPORTAR COMO TRINCA
+🔴 REGRAS ABSOLUTAS - SE VER, SEMPRE AVARIA:
+1. TRINCAS no vidro (qualquer tamanho, mesmo invisíveis à distância) = AVARIA
+2. QUEBRAS/RACHADURAS (mesmo parciais) = AVARIA
+3. LINHAS no LCD (horizontais/verticais) = AVARIA
+4. PIXELS MORTOS ou manchas = AVARIA
+5. QUALQUER anomalia visual = AVARIA
 
-B) LINHAS/FALHA LCD - linhas horizontais ou verticais na exibição
-   - Indica LCD danificado/matriz quebrada
-   - Mesmo que haja TAMBÉM trincas no vidro, MENCIONE AMBAS
+📋 VERIFICAÇÃO SISTEMÁTICA DA TELA/DISPLAY:
+Examine em SEQUÊNCIA:
+1. BORDAS (topo, lados, inferior) - procure trincas finas
+2. CANTOS - áreas críticas para trincas
+3. SUPERFÍCIE INTEIRA - varrer de cima para baixo procurando linhas, trincas, manchas
+4. REFLEXOS - algumas trincas só aparecem com ângulo certo
 
-C) QUEBRAS - vidro totalmente quebrado/fragmentado
-   - Reportar como QUEBRA, não apenas TRINCA
+⚠️ SE TEM DÚVIDA SOBRE TRINCA = RESPONDA COMO TRINCA (AVARIA)
 
-🟢 SEGUNDA VERIFICAÇÃO - OUTROS DANOS:
-- Manchas, pixels mortos
-- Desbotamento
-- Amassados na carcaça
-- Qualquer outra anomalia
+DANOS EM OUTRAS ÁREAS:
 
-⚠️ REGRA CRÍTICA:
-Se há MÚLTIPLOS danos (ex: trinca + linhas LCD), LISTE TODOS NA RESPOSTA.
-Não reporte apenas um e ignore os outros!
+CARCAÇA:
+- Trincas no plástico/metal (mesmo pequenas)
+- Quebras/rachaduras
+- Amassados profundos
+- Deformação, queimaduras, corrosão
 
-EXEMPLOS DE RESPOSTAS CORRETAS:
-✅ "Trincas no vidro + Linhas verticais no LCD - Dano duplo"
-✅ "Múltiplas trincas nos cantos + Linha horizontal - Vidro e LCD danificados"
-✅ "Quebra do vidro com linhas no LCD - Falha dupla de display"
+TECLADO:
+- Teclas faltando/pressionadas
+- Sinais de derramamento de líquido
 
-EXEMPLOS DE RESPOSTAS INCORRETAS:
-❌ "Apenas linhas no LCD" (se há também trinca)
-❌ "Apenas trinca no vidro" (se há também linhas LCD)
-❌ Mencionar um dano e ignorar outro
+CONECTORES:
+- Danificados, soltos, quebrados
+
+BATERIA:
+- Inchada, deformada, vazando
+
+OUTROS:
+- Sinais de líquido, oxidação, danos por queda, sujeira excessiva, componentes internos visíveis
+
+🎯 REGRA FINAL: Se a imagem mostra QUALQUER dano visível = AVARIA
+Não retorne OK a menos que o equipamento esteja PERFEITO.
 
 RESPONDA APENAS EM JSON (sem markdown):
 {
-  "status": "AVARIA",
-  "categoria": "TELA/DISPLAY",
-  "tipo_dano": "DESCREVA TODOS OS DANOS (ex: 'Trincas no vidro + Linhas no LCD')",
-  "descricao": "Liste cada dano encontrado (ex: 'Múltiplas trincas visíveis + linhas verticais e horizontais no painel LCD')"
+  "status": "OK" ou "AVARIA",
+  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
+  "tipo_dano": "tipo específico encontrado (ex: 'Trincas no vidro', 'Quebra', 'Linhas no LCD', 'Amassado na carcaça')" (vazio se OK),
+  "descricao": "descrição detalhada de TODOS os danos encontrados",
+  "confianca": "alta" ou "média" ou "baixa"
 }`;
 
 // ============================================================================
