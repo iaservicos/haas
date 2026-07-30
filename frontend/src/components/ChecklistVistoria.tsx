@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiClient } from '../services/api';
 
 interface Question {
   id: string;
@@ -35,29 +36,16 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
   const [erro, setErro] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
 
-  // Get API base URL from environment variable
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-
   useEffect(() => {
     const loadQuestions = async () => {
       try {
         const type = equipmentType || 'Desktop';
         console.log('[ChecklistVistoria] Carregando perguntas para:', type);
-        
-        // Use full URL with API_BASE_URL
-        const url = `${API_BASE_URL}/inspecao/perguntas/${type}`;
-        console.log('[ChecklistVistoria] URL da requisição:', url);
-        
-        const response = await fetch(url);
-        console.log('[ChecklistVistoria] Status da resposta:', response.status);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[ChecklistVistoria] Erro na resposta:', errorText);
-          throw new Error(`Erro ao carregar perguntas (${response.status})`);
-        }
-        
-        const data = await response.json();
+
+        const response = await apiClient.get(`/inspecao/perguntas/${type}`);
+        console.log('[ChecklistVistoria] Resposta recebida:', response);
+
+        const data = response.data;
         console.log('[ChecklistVistoria] Perguntas recebidas:', data);
         
         setQuestions(data.questions || []);
@@ -91,35 +79,21 @@ export const ChecklistVistoria: React.FC<ChecklistVistoriaProps> = ({
     setSucesso(false);
 
     try {
-      // Use full URL with API_BASE_URL
-      const url = `${API_BASE_URL}/inspecao/salvar`;
-      
       // ✅ CORREÇÃO: Gerar UUID válido ao invés de "equip-ID"
       const vistoriaId = confirmacaoId || generateUUID();
-      
+
       const payload = {
         vistoriaId,
         equipmentType,
         answers,
         ...(equipamentoId && { equipamento_id: equipamentoId })
       };
-      
+
       console.log('[ChecklistVistoria] Enviando payload:', payload);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar checklist');
-      }
+      const response = await apiClient.post('/inspecao/salvar', payload);
+      const data = response.data;
 
-      const data = await response.json();
       console.log('[ChecklistVistoria] Resposta do servidor:', data);
       setSucesso(true);
 
