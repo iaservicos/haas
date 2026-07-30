@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { apiClient } from '../services/api';
 
 export const MobileFoto: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -46,15 +45,7 @@ export const MobileFoto: React.FC = () => {
       formData.append('foto_tipo', 'equipamento');
       formData.append('numero_serie', numeroSerie);
 
-      const response = await fetch(`${API_BASE_URL}/inspecao/upload-foto`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || `Erro ${response.status}`);
-      }
+      await apiClient.post('/inspecao/upload-foto', formData);
 
       setSucesso(true);
       setFoto(null);

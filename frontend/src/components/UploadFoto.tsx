@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { apiClient } from '../services/api';
 
 interface UploadFotoProps {
   confirmacaoId: string;
@@ -9,7 +10,6 @@ interface UploadFotoProps {
   onUploadSuccess?: (fotoId: string, analise: any) => void;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export const UploadFoto: React.FC<UploadFotoProps> = ({
   confirmacaoId,
@@ -42,15 +42,13 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
 
     pollingRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/inspecao/fotos/${confirmacaoId}`);
-        if (!response.ok) return;
-        const json = await response.json();
-        if (json.data && json.data.length > 0) {
+        const response = await apiClient.get(`/inspecao/fotos/${confirmacaoId}`);
+        if (response.data && response.data.length > 0) {
           clearInterval(pollingRef.current!);
           setAguardando(false);
           setFotoDetectada(true);
           if (onUploadSuccess) {
-            onUploadSuccess(json.data[0].id, null);
+            onUploadSuccess(response.data[0].id, null);
           }
         }
       } catch {
@@ -102,27 +100,14 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
       formData.append('foto_tipo', 'equipamento');
       formData.append('numero_serie', numeroSerie || 'Desconhecido');
 
-      const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? '/api/inspecao/upload-foto'
-        : 'https://haas-mu.vercel.app/api/inspecao/upload-foto';
+      const response = await apiClient.post('/inspecao/upload-foto', formData);
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erro ao fazer upload: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
       setUploadSuccess(true);
       setFoto(null);
       setPreview('');
 
       if (onUploadSuccess) {
-        onUploadSuccess(data.data?.id || data.id || '', data.data?.analise || data.analise);
+        onUploadSuccess(response.data.data?.id || response.data.id || '', response.data.data?.analise || response.data.analise);
       }
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Erro desconhecido');
