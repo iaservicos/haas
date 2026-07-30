@@ -103,8 +103,18 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
       formData.append('foto_tipo', 'equipamento');
       formData.append('numero_serie', numeroSerie || 'Desconhecido');
 
-      const response = await apiClient.post('/inspecao/upload-foto', formData);
+      console.log('[UploadFoto] Enviando upload:', {
+        confirmacaoId,
+        fotoNome: foto.name,
+        fotoSize: foto.size,
+        numeroSerie: numeroSerie || 'Desconhecido'
+      });
 
+      const response = await apiClient.post('/inspecao/upload-foto', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      console.log('[UploadFoto] Resposta do upload:', response.data);
       setUploadSuccess(true);
       setFoto(null);
       setPreview('');
@@ -113,6 +123,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
         onUploadSuccess(response.data.data?.id || response.data.id || '', response.data.data?.analise || response.data.analise);
       }
     } catch (err) {
+      console.error('[UploadFoto] Erro no upload:', err);
       setErro(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
