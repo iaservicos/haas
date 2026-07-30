@@ -82,14 +82,19 @@ OUTROS:
 🎯 REGRA FINAL: Se a imagem mostra QUALQUER dano visível = AVARIA
 Não retorne OK a menos que o equipamento esteja PERFEITO.
 
-RESPONDA APENAS EM JSON (sem markdown):
-{
-  "status": "OK" ou "AVARIA",
-  "categoria": "TELA/DISPLAY" ou "CARCAÇA" ou "TECLADO" ou "CONECTORES" ou "BATERIA" ou "OUTROS" (vazio se OK),
-  "tipo_dano": "tipo específico encontrado (ex: 'Trincas no vidro', 'Quebra', 'Linhas no LCD', 'Amassado na carcaça')" (vazio se OK),
-  "descricao": "descrição detalhada de TODOS os danos encontrados",
-  "confianca": "alta" ou "média" ou "baixa"
-}`;
+IMPORTANTE: Responda EXATAMENTE neste formato JSON, SEM markdown, SEM quebras de linha, SEM caracteres especiais:
+{"status":"OK","categoria":"","tipo_dano":"","descricao":"","confianca":""}
+
+Ou se tiver avaria:
+{"status":"AVARIA","categoria":"TELA/DISPLAY","tipo_dano":"Trincas no vidro","descricao":"Múltiplas trincas visíveis no vidro da tela. Dano crítico.","confianca":"alta"}
+
+REGRAS DO JSON:
+- Use APENAS aspas duplas (")
+- SEM quebras de linha dentro dos campos
+- SEM caracteres especiais (substitua por equivalentes)
+- categoria: pode ser TELA/DISPLAY, CARCAÇA, TECLADO, CONECTORES, BATERIA, OUTROS
+- status: SEMPRE OK ou AVARIA
+- confianca: alta, média ou baixa`;
 
 // ============================================================================
 // FUNÇÕES AUXILIARES
@@ -314,6 +319,17 @@ router.post('/analise-fotos', async (req: any, res: any) => {
               .replace(/```\n?/g, '')
               .trim();
           }
+
+          // Limpar quebras de linha dentro de strings JSON
+          jsonContent = jsonContent
+            .replace(/\n/g, ' ') // Substituir quebras de linha por espaço
+            .replace(/\r/g, '') // Remover carriage returns
+            .replace(/\t/g, ' ') // Substituir tabs por espaço
+            .replace(/  +/g, ' '); // Múltiplos espaços em um
+
+          // Remover aspas simples e substituir por duplas (se estiverem erradas)
+          // Mas cuidado para não quebrar o JSON válido
+          jsonContent = jsonContent.replace(/": '/g, '": "').replace(/', "/g, '", "').replace(/',/g, '",');
 
           console.log(`[CRON] JSON a fazer parse:\n${jsonContent}`);
           resultado = JSON.parse(jsonContent);
