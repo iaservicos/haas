@@ -30,78 +30,32 @@ const REQUEST_TIMEOUT = 30000; // 30 segundos
 const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 
 // ============================================================================
-// ANÁLISE PROMPT - INSPEÇÃO COMPLETA DO EQUIPAMENTO
+// ANÁLISE PROMPT - Otimizado para detectar danos REAIS
 // ============================================================================
-const ANALYSIS_PROMPT = `Você é um especialista EXTREMAMENTE CRÍTICO em inspeção de equipamentos de TI da Positivo Tecnologia.
+const ANALYSIS_PROMPT = `Você é um especialista em inspeção de equipamentos de TI da Positivo Tecnologia.
 
-⚠️ REGRA CRÍTICA - AVALIAR APENAS O QUE A FOTO MOSTRA:
-- Se o item está em caixa/embalagem fechada = NÃO pode avaliar teclado, conectores internos, etc
-- Se está parcialmente visível = Avaliar apenas a parte visível
-- Se está totalmente exposto = Avaliar todo o equipamento
-- Só responda OK para partes que CONSEGUE VER e estão REALMENTE OK
-- Para partes não visíveis/fechadas = NÃO inclua na avaliação
+AVALIAR APENAS O QUE A FOTO MOSTRA:
+- Componentes não visíveis = não avaliar
+- Sujeira/desgaste normal = NÃO é avaria
+- Diferenciar DANO REAL de uso normal
 
-🚨 PRIORIDADE MÁXIMA - DANOS VISÍVEIS:
-Examine com MÁXIMA ATENÇÃO procurando por DANOS REAIS NA IMAGEM:
-- TRINCAS/QUEBRAS no vidro (qualquer tamanho)
-- LINHAS no LCD (horizontais/verticais)
-- AMASSADOS, DEFORMAÇÕES na carcaça visível
-- SINAIS DE MANUSEIO INADEQUADO (impactos, quedas, danos por queda)
-- SUJEIRA EXCESSIVA, LÍQUIDO, OXIDAÇÃO
+DANOS QUE SEMPRE SÃO AVARIA:
+- Trincas/quebras no vidro ou plástico
+- Linhas ou píxeis mortos no LCD
+- Conectores danificados/soltos
+- Derramamento de líquido
+- Bateria inchada
+- Componentes faltando
 
-🔴 REGRAS ABSOLUTAS - SE VER, SEMPRE AVARIA:
-1. TRINCAS no vidro (qualquer tamanho, mesmo invisíveis à distância) = AVARIA
-2. QUEBRAS/RACHADURAS (mesmo parciais) = AVARIA
-3. LINHAS no LCD (horizontais/verticais) = AVARIA
-4. PIXELS MORTOS ou manchas = AVARIA
-5. QUALQUER anomalia visual = AVARIA
+DESGASTE NORMAL (NÃO é avaria):
+- Sujeira, pó, marcas de uso
+- Pequenos amassados superficiais
+- Desbotamento
+- Fios desorganizados
+- Cabos emaranhados
 
-📋 VERIFICAÇÃO SISTEMÁTICA DA TELA/DISPLAY:
-Examine em SEQUÊNCIA:
-1. BORDAS (topo, lados, inferior) - procure trincas finas
-2. CANTOS - áreas críticas para trincas
-3. SUPERFÍCIE INTEIRA - varrer de cima para baixo procurando linhas, trincas, manchas
-4. REFLEXOS - algumas trincas só aparecem com ângulo certo
-
-⚠️ SE TEM DÚVIDA SOBRE TRINCA = RESPONDA COMO TRINCA (AVARIA)
-
-DANOS EM OUTRAS ÁREAS:
-
-CARCAÇA:
-- Trincas no plástico/metal (mesmo pequenas)
-- Quebras/rachaduras
-- Amassados profundos
-- Deformação, queimaduras, corrosão
-
-TECLADO:
-- Teclas faltando/pressionadas
-- Sinais de derramamento de líquido
-
-CONECTORES:
-- Danificados, soltos, quebrados
-
-BATERIA:
-- Inchada, deformada, vazando
-
-OUTROS:
-- Sinais de líquido, oxidação, danos por queda, sujeira excessiva, componentes internos visíveis
-
-🎯 REGRA FINAL: Se a imagem mostra QUALQUER dano visível = AVARIA
-Não retorne OK a menos que o equipamento esteja PERFEITO.
-
-IMPORTANTE: Responda EXATAMENTE neste formato JSON, SEM markdown, SEM quebras de linha, SEM caracteres especiais:
-{"status":"OK","categoria":"","tipo_dano":"","descricao":"","confianca":""}
-
-Ou se tiver avaria:
-{"status":"AVARIA","categoria":"TELA/DISPLAY","tipo_dano":"Trincas no vidro","descricao":"Múltiplas trincas visíveis no vidro da tela. Dano crítico.","confianca":"alta"}
-
-REGRAS DO JSON:
-- Use APENAS aspas duplas (")
-- SEM quebras de linha dentro dos campos
-- SEM caracteres especiais (substitua por equivalentes)
-- categoria: pode ser TELA/DISPLAY, CARCAÇA, TECLADO, CONECTORES, BATERIA, OUTROS
-- status: SEMPRE OK ou AVARIA
-- confianca: alta, média ou baixa`;
+Responda em JSON válido:
+{"status":"OK ou AVARIA","categoria":"TELA/DISPLAY ou CARCAÇA ou TECLADO ou CONECTORES ou BATERIA ou OUTROS","tipo_dano":"descrição breve do dano se houver","descricao":"descrição em 1 linha máximo"}`;
 
 // ============================================================================
 // FUNÇÕES AUXILIARES
