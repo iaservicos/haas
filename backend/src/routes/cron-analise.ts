@@ -30,32 +30,61 @@ const REQUEST_TIMEOUT = 30000; // 30 segundos
 const INITIAL_RETRY_DELAY = 1000; // 1 segundo
 
 // ============================================================================
-// ANÁLISE PROMPT - Otimizado para detectar danos REAIS
+// ANÁLISE PROMPT - Inspeção de Equipamentos Positivo Tecnologia
 // ============================================================================
-const ANALYSIS_PROMPT = `Você é um especialista em inspeção de equipamentos de TI da Positivo Tecnologia.
+const ANALYSIS_PROMPT = `Você é especialista em inspeção de equipamentos TI - Positivo Tecnologia.
 
-AVALIAR APENAS O QUE A FOTO MOSTRA:
-- Componentes não visíveis = não avaliar
-- Sujeira/desgaste normal = NÃO é avaria
-- Diferenciar DANO REAL de uso normal
+AVALIAR APENAS O QUE A FOTO MOSTRA - não assume componentes não visíveis.
 
-DANOS QUE SEMPRE SÃO AVARIA:
-- Trincas/quebras no vidro ou plástico
-- Linhas ou píxeis mortos no LCD
-- Conectores danificados/soltos
+AVARIAS A DETECTAR:
+
+TELA/DISPLAY:
+- Trincas (pequenas, médias, grandes)
+- Quebras (vidro quebrado)
+- Manchas (pixel morto, mancha de tinta)
+- Linhas horizontais/verticais
+- Vidro solto
+
+CARCAÇA:
+- Amassados
+- Trincas bem visíveis
+- Corrosão
+- Deformação
+- Peças faltando
+
+TECLADO:
+- Teclas faltando
+- Teclas soltas
 - Derramamento de líquido
-- Bateria inchada
-- Componentes faltando
+
+TOUCHPAD:
+- Trincado
+- Solto
+- Molhado
+
+CONECTORES:
+- USB danificado
+- HDMI danificado
+- Carregador danificado
+- Conectores soltos
+- Conectores quebrados
+
+BATERIA (Notebooks):
+- Inchada
+- Danificada
+- Vazando
+
+OUTROS:
+- Sinais de líquido
+- Oxidação
 
 DESGASTE NORMAL (NÃO é avaria):
 - Sujeira, pó, marcas de uso
-- Pequenos amassados superficiais
-- Desbotamento
 - Fios desorganizados
 - Cabos emaranhados
+- Desbotamento leve
 
-Responda em JSON válido:
-{"status":"OK ou AVARIA","categoria":"TELA/DISPLAY ou CARCAÇA ou TECLADO ou CONECTORES ou BATERIA ou OUTROS","tipo_dano":"descrição breve do dano se houver","descricao":"descrição em 1 linha máximo"}`;
+Responda em JSON: {"status":"OK ou AVARIA","categoria":"TELA/DISPLAY|CARCAÇA|TECLADO|TOUCHPAD|CONECTORES|BATERIA|OUTROS","tipo_dano":"tipo específico se houver avaria","descricao":"descrição breve (máximo 1 linha)"}`;
 
 // ============================================================================
 // FUNÇÕES AUXILIARES
