@@ -137,6 +137,11 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
       .eq('foto_hash', fotoHash)
       .limit(1);
 
+    console.log('[inspecao.ts] Verificação de duplicata:');
+    console.log('[inspecao.ts] - Hash:', fotoHash);
+    console.log('[inspecao.ts] - Erro verificação:', erroVerificacao);
+    console.log('[inspecao.ts] - Fotos encontradas:', fotosExistentes?.length || 0);
+
     if (!erroVerificacao && fotosExistentes && fotosExistentes.length > 0) {
       const fotoExistente = fotosExistentes[0];
       console.log('[inspecao.ts] ⚠️ Foto duplicada detectada! Hash encontrado em:', fotoExistente.id);
