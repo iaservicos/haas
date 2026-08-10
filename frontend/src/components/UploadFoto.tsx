@@ -122,9 +122,17 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
       if (onUploadSuccess) {
         onUploadSuccess(response.data.data?.id || response.data.id || '', response.data.data?.analise || response.data.analise);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[UploadFoto] Erro no upload:', err);
-      setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+
+      // Verificar se é erro de foto duplicada (409)
+      if (err.response?.status === 409) {
+        const mensagem = err.response?.data?.message || 'Foto duplicada';
+        const fotoAnterior = err.response?.data?.detalhes?.foto_anterior || 'desconhecida';
+        setErro(`${mensagem}. A foto "${fotoAnterior}" já foi enviada anteriormente.`);
+      } else {
+        setErro(err instanceof Error ? err.message : 'Erro desconhecido');
+      }
     } finally {
       setLoading(false);
     }
@@ -207,7 +215,10 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
 
           {erro && (
             <div className="p-4 bg-red-50 border-l-4 border-red-600 rounded-none">
-              <p className="text-red-700 font-semibold">{erro}</p>
+              <p className="text-red-700 font-semibold text-sm">{erro}</p>
+              {erro.includes('Foto duplicada') && (
+                <p className="text-red-600 text-xs mt-2">Tente enviar uma foto diferente do equipamento.</p>
+              )}
             </div>
           )}
 

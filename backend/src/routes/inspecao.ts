@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import type { EquipmentType } from '../config/equipmentQuestions.js';
 import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
@@ -174,11 +175,13 @@ router.post('/salvar', optionalAuth, async (req, res) => {
 
 /**
  * ✅ POST /api/inspecao/upload-foto
- * 1. Salva foto no Supabase Storage (bucket 'fotos')
- * 2. Obtém URL pública
- * 3. Cria registro com status "pendente"
- * 4. Vincula via numero_serie (equipamento)
- * 5. Retorna imediatamente (SEM fazer análise)
+ * 1. Calcula hash MD5 da foto
+ * 2. Verifica se foto idêntica já foi enviada
+ * 3. Salva foto no Supabase Storage (bucket 'fotos')
+ * 4. Obtém URL pública
+ * 5. Cria registro com status "pendente" e foto_hash
+ * 6. Vincula via numero_serie (equipamento)
+ * 7. Retorna imediatamente (SEM fazer análise)
  */
 router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async (req: any, res: any) => {
   try {
@@ -198,6 +201,30 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     console.log('[inspecao.ts] foto_nome:', foto_nome);
     console.log('[inspecao.ts] numero_serie:', numero_serie);
     console.log('[inspecao.ts] tamanho_bytes:', file.size);
+
+    // ✅ Gerar hash MD5 da foto
+    const fotoHash = crypto.createHash('md5').update(file.buffer).digest('hex');
+    console.log('[inspecao.ts] Hash da foto:', fotoHash);
+
+    // ✅ Verificar se foto idêntica já existe
+    const { data: fotoExistente, error: erroVerificacao } = await supabase
+      .from('fotos_vistoria')
+      .select('id, foto_nome, created_at')
+      .eq('foto_hash', fotoHash)
+      .limit(1)
+      .single();
+
+    if (!erroVerificacao && fotoExistente) {
+      console.log('[inspecao.ts] ⚠️ Foto duplicada detectada! Hash encontrado em:', fotoExistente.id);
+      return res.status(409).json({
+        error: 'Foto duplicada',
+        message: 'Esta foto já foi enviada anteriormente',
+        detalhes: {
+          foto_anterior: fotoExistente.foto_nome,
+          enviada_em: fotoExistente.created_at
+        }
+      });
+    }
 
     // ✅ Salvar foto no Supabase Storage
     const fileName = `${vistoria_id || 'sem-vistoria'}/${Date.now()}-${foto_nome || file.originalname}`;
@@ -225,7 +252,7 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
 
     console.log('[inspecao.ts] URL pública:', publicUrl);
 
-    // ✅ Salvar registro no banco de dados com URL pública
+    // ✅ Salvar registro no banco de dados com URL pública e hash
     const { data, error } = await supabase
       .from('fotos_vistoria')
       .insert({
@@ -234,6 +261,7 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
         foto_nome: foto_nome || file.originalname,
         foto_tipo: foto_tipo || file.mimetype,
         tamanho_bytes: file.size,
+        foto_hash: fotoHash,
       })
       .select();
 
