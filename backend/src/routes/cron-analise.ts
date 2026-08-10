@@ -1,200 +1,16 @@
 import express from 'express';
-import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
+import ClaudeAnalysisService from '../services/claudeAnalysisService.js';
+import { env } from '../config/env.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || '',
   process.env.SUPABASE_KEY || ''
 );
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
+const analysisService = new ClaudeAnalysisService(env.ANTHROPIC_API_KEY);
 const router = express.Router();
 
-// ============================================================================
-// CONFIGURAÇÃO - Modelos com Fallback
-// ============================================================================
-// Modelos em ordem de preferência (fallback automático)
-// CONFIRMADOS E TESTADOS:
-const CLAUDE_MODELS = [
-  'claude-haiku-4-5-20251001', // Haiku 4.5 (5x mais barato, rápido)
-  'claude-sonnet-5', // Sonnet 5 (fallback se Haiku falhar - mais preciso)
-  'claude-opus-4-1', // Opus 4.1 (fallback final)
-];
-
-const MAX_RETRIES = 2;
-const REQUEST_TIMEOUT = 30000; // 30 segundos
-const INITIAL_RETRY_DELAY = 1000; // 1 segundo
-
-// ============================================================================
-// ANÁLISE PROMPT - Inspeção de Equipamentos Positivo Tecnologia
-// ============================================================================
-const ANALYSIS_PROMPT = `Você é especialista em inspeção de equipamentos TI - Positivo Tecnologia.
-
-AVALIAR APENAS O QUE A FOTO MOSTRA - não assume componentes não visíveis.
-
-AVARIAS A DETECTAR:
-
-TELA/DISPLAY:
-- Trincas (pequenas, médias, grandes)
-- Quebras (vidro quebrado)
-- Manchas (pixel morto, mancha de tinta)
-- Linhas horizontais/verticais
-- Vidro solto
-
-CARCAÇA:
-- Amassados
-- Trincas bem visíveis
-- Corrosão
-- Deformação
-- Peças faltando
-
-TECLADO:
-- Teclas faltando
-- Teclas soltas
-- Derramamento de líquido
-
-TOUCHPAD:
-- Trincado
-- Solto
-- Molhado
-
-CONECTORES:
-- USB danificado
-- HDMI danificado
-- Carregador danificado
-- Conectores soltos
-- Conectores quebrados
-
-BATERIA (Notebooks):
-- Inchada
-- Danificada
-- Vazando
-
-OUTROS:
-- Sinais de líquido
-- Oxidação
-
-DESGASTE NORMAL (NÃO é avaria):
-- Sujeira, pó, marcas de uso
-- Fios desorganizados
-- Cabos emaranhados
-- Desbotamento leve
-
-Responda em JSON: {"status":"OK ou AVARIA","categoria":"TELA/DISPLAY|CARCAÇA|TECLADO|TOUCHPAD|CONECTORES|BATERIA|OUTROS","tipo_dano":"tipo específico se houver avaria","descricao":"descrição breve (máximo 1 linha)"}`;
-
-// ============================================================================
-// FUNÇÕES AUXILIARES
-// ============================================================================
-
-function getRetryDelay(attempt: number): number {
-  return INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
-}
-
-function isValidAnalysisResponse(response: any): boolean {
-  if (!response || typeof response !== 'object') {
-    return false;
-  }
-
-  // Normalizar status: OPERACIONAL -> OK, qualquer outro -> manter
-  if (response.status === 'OPERACIONAL') {
-    response.status = 'OK';
-  }
-
-  return (
-    (response.status === 'OK' || response.status === 'AVARIA') &&
-    typeof response.descricao === 'string'
-  );
-}
-
-// ============================================================================
-// ANÁLISE COM CLAUDE (com fallback de modelos)
-// ============================================================================
-
-async function analyzeImageWithClaude(
-  base64: string,
-  mimeType: string,
-  numeroSerie: string,
-  fileName: string,
-  analysisId: number
-): Promise<string> {
-  let lastError: any;
-
-  // Tentar cada modelo em ordem
-  for (const model of CLAUDE_MODELS) {
-    let modelLastError: any;
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(
-          `[CRON] Tentativa ${attempt}/${MAX_RETRIES} com ${model} para análise ${analysisId}...`
-        );
-
-        const response = await client.messages.create({
-          model: model,
-          max_tokens: 300,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: mimeType as
-                      | 'image/jpeg'
-                      | 'image/png'
-                      | 'image/gif'
-                      | 'image/webp',
-                    data: base64,
-                  },
-                },
-                {
-                  type: 'text',
-                  text: `${ANALYSIS_PROMPT}\n\nNúmero de série: ${numeroSerie || 'N/A'}\nFoto: ${fileName}`,
-                },
-              ],
-            },
-          ],
-        });
-
-        const content = response.content[0];
-        if (content.type !== 'text') {
-          throw new Error('Resposta do Claude não é texto');
-        }
-
-        console.log(`[CRON] ✅ Sucesso com ${model}!`);
-        return content.text;
-      } catch (error: any) {
-        modelLastError = error;
-        const message = error.message || 'Erro desconhecido';
-
-        console.log(
-          `[CRON] ❌ Tentativa ${attempt} com ${model} falhou: ${message}`
-        );
-
-        if (attempt < MAX_RETRIES) {
-          const delay = getRetryDelay(attempt);
-          console.log(`[CRON] ⏳ Aguardando ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    // Se este modelo falhou em todas as tentativas, tentar o próximo
-    lastError = modelLastError;
-    console.log(
-      `[CRON] 🔄 Modelo ${model} não funcionou, tentando próximo...`
-    );
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-
-  // Se todos os modelos falharam
-  throw lastError;
-}
 
 // ============================================================================
 // ENDPOINT PRINCIPAL
@@ -258,90 +74,12 @@ router.post('/analise-fotos', async (req: any, res: any) => {
 
         console.log(`[CRON] Foto encontrada: ${foto.foto_url}`);
 
-        // Baixar e converter imagem
-        console.log('[CRON] Baixando imagem...');
-        const imageResponse = await axios.get(foto.foto_url, {
-          responseType: 'arraybuffer',
-          timeout: 30000,
-        });
-
-        const base64 = Buffer.from(imageResponse.data).toString('base64');
-        console.log(
-          `[CRON] Imagem convertida para base64: ${base64.length} caracteres`
-        );
-
-        // Determinar mime type
-        const fileName = foto.foto_url.split('/').pop() || '';
-        const extension = fileName.split('.').pop()?.toLowerCase() || 'png';
-        const mimeType =
-          extension === 'jpg' || extension === 'jpeg'
-            ? 'image/jpeg'
-            : 'image/png';
-
-        console.log(`[CRON] Mime type: ${mimeType}`);
-
-        // Analisar com Claude (com fallback)
+        // Analisar com Claude (download + análise)
         console.log('[CRON] Enviando para Claude (tentará múltiplos modelos se necessário)...');
-        let claudeResponse: string;
-        let resultado: any;
-
-        try {
-          claudeResponse = await analyzeImageWithClaude(
-            base64,
-            mimeType,
-            analise.numero_serie,
-            fileName,
-            analise.id
-          );
-
-          console.log(
-            `[CRON] Resposta bruta COMPLETA:\n${claudeResponse}`
-          );
-
-          // Parse JSON
-          let jsonContent = claudeResponse.trim();
-
-          // Remover markdown se existir
-          if (jsonContent.includes('```')) {
-            console.log('[CRON] Removendo blocos de markdown...');
-            jsonContent = jsonContent
-              .replace(/```json\n?/g, '')
-              .replace(/```\n?/g, '')
-              .trim();
-          }
-
-          // Limpar quebras de linha dentro de strings JSON
-          jsonContent = jsonContent
-            .replace(/\n/g, ' ') // Substituir quebras de linha por espaço
-            .replace(/\r/g, '') // Remover carriage returns
-            .replace(/\t/g, ' ') // Substituir tabs por espaço
-            .replace(/  +/g, ' '); // Múltiplos espaços em um
-
-          // Remover aspas simples e substituir por duplas (se estiverem erradas)
-          // Mas cuidado para não quebrar o JSON válido
-          jsonContent = jsonContent.replace(/": '/g, '": "').replace(/', "/g, '", "').replace(/',/g, '",');
-
-          console.log(`[CRON] JSON a fazer parse:\n${jsonContent}`);
-          resultado = JSON.parse(jsonContent);
-
-          // Validar resposta
-          if (!isValidAnalysisResponse(resultado)) {
-            console.error(`[CRON] Resposta inválida:`, resultado);
-            throw new Error('Resposta não tem formato esperado');
-          }
-
-          console.log(
-            `[CRON] ✅ Análise válida: status=${resultado.status}, categoria=${resultado.categoria}, tipo=${resultado.tipo_dano}`
-          );
-        } catch (parseError: any) {
-          console.error(`[CRON] ❌ ERRO AO FAZER PARSE: ${parseError.message}`);
-          console.error(`[CRON] RESPOSTA BRUTA COMPLETA:\n${claudeResponse}`);
-
-          // ERRO REAL: não retornar "OK" falso
-          throw new Error(
-            `Falha ao analisar imagem: ${parseError.message}`
-          );
-        }
+        const resultado = await analysisService.analyzeImageFromUrl(
+          foto.foto_url,
+          analise.numero_serie
+        );
 
         // Atualizar banco
         const { error: updateError } = await supabase
