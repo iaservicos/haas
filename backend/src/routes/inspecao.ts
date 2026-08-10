@@ -182,6 +182,7 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     console.log('[inspecao.ts] URL pública:', publicUrl);
 
     // ✅ Salvar registro no banco de dados com URL pública e hash
+    console.log('[inspecao.ts] Tentando inserir foto com hash:', fotoHash);
     const { data, error } = await supabase
       .from('fotos_vistoria')
       .insert({
@@ -195,9 +196,15 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
       .select();
 
     if (error) {
-      console.error('[inspecao.ts] Erro ao salvar foto no banco:', error);
+      console.error('[inspecao.ts] ERRO ao salvar foto no banco:');
+      console.error('[inspecao.ts] - Código:', error.code);
+      console.error('[inspecao.ts] - Mensagem:', error.message);
+      console.error('[inspecao.ts] - Status:', error.status);
+      console.error('[inspecao.ts] - Detalhes:', JSON.stringify(error));
       return res.status(500).json({
         error: 'Erro ao salvar foto',
+        code: error.code,
+        message: error.message,
         details: error.message
       });
     }
