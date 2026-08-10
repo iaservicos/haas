@@ -130,19 +130,28 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     const fotoHash = crypto.createHash('md5').update(file.buffer).digest('hex');
     console.log('[inspecao.ts] Hash da foto:', fotoHash);
 
-    // ✅ Verificar se foto idêntica já existe
-    const { data: fotosExistentes, error: erroVerificacao } = await supabase
-      .from('fotos_vistoria')
-      .select('id, foto_nome, created_at')
-      .eq('foto_hash', fotoHash)
-      .limit(1);
+    // ✅ Verificar se foto idêntica já existe (com tratamento de erro)
+    console.log('[inspecao.ts] 🔍 Verificando duplicata com hash:', fotoHash);
 
-    console.log('[inspecao.ts] Verificação de duplicata:');
-    console.log('[inspecao.ts] - Hash:', fotoHash);
-    console.log('[inspecao.ts] - Erro verificação:', erroVerificacao);
-    console.log('[inspecao.ts] - Fotos encontradas:', fotosExistentes?.length || 0);
+    let fotosExistentes = [];
+    try {
+      const { data, error: erroVerificacao } = await supabase
+        .from('fotos_vistoria')
+        .select('id, foto_nome, created_at')
+        .eq('foto_hash', fotoHash)
+        .limit(1);
 
-    if (!erroVerificacao && fotosExistentes && fotosExistentes.length > 0) {
+      console.log('[inspecao.ts] - Erro verificação:', erroVerificacao);
+      console.log('[inspecao.ts] - Fotos encontradas:', data?.length || 0);
+
+      if (!erroVerificacao && data && data.length > 0) {
+        fotosExistentes = data;
+      }
+    } catch (dupError) {
+      console.log('[inspecao.ts] ⚠️ Erro na verificação de duplicata:', dupError);
+    }
+
+    if (fotosExistentes.length > 0) {
       const fotoExistente = fotosExistentes[0];
       console.log('[inspecao.ts] ⚠️ Foto duplicada detectada! Hash encontrado em:', fotoExistente.id);
       return res.status(409).json({
@@ -183,6 +192,9 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
 
     // ✅ Salvar registro no banco de dados com URL pública e hash
     console.log('[inspecao.ts] Tentando inserir foto com hash:', fotoHash);
+    console.log('[inspecao.ts] - vistoria_id:', vistoria_id);
+    console.log('[inspecao.ts] - foto_nome:', foto_nome || file.originalname);
+
     const { data, error } = await supabase
       .from('fotos_vistoria')
       .insert({
@@ -196,11 +208,22 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
       .select();
 
     if (error) {
-      console.error('[inspecao.ts] ERRO ao salvar foto no banco:');
+      console.error('[inspecao.ts] ❌ ERRO CRÍTICO ao salvar foto no banco:');
       console.error('[inspecao.ts] - Código:', error.code);
       console.error('[inspecao.ts] - Mensagem:', error.message);
       console.error('[inspecao.ts] - Status:', error.status);
-      console.error('[inspecao.ts] - Detalhes:', JSON.stringify(error));
+      console.error('[inspecao.ts] - Details:', error.details);
+
+      // Se for erro de unique constraint, pode ser duplicata que não foi detectada
+      if (error.code === '23505' || error.message?.includes('unique')) {
+        console.log('[inspecao.ts] 🔔 Parece ser erro de UNIQUE - foto duplicada!');
+        return res.status(409).json({
+          error: 'Foto duplicada',
+          message: 'Esta foto já foi enviada anteriormente',
+          code: 'DUPLICATE_PHOTO'
+        });
+      }
+
       return res.status(500).json({
         error: 'Erro ao salvar foto',
         code: error.code,
