@@ -7,6 +7,7 @@ import { supabase } from '../config/database.js';
 import { getQuestionsByEquipmentType } from '../config/equipmentQuestions.js';
 import { env } from '../config/env.js';
 import { TokenPayload } from '../types/index.js';
+import inspecaoService from '../services/inspecaoService.js';
 
 const router = express.Router();
 
@@ -37,138 +38,61 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const STORAGE_BUCKET = 'fotos';
 
-/**
- * GET /api/inspecao/equipamento/:equipamentoId
- * Retorna o tipo de equipamento pelo ID
- */
-router.get('/equipamento/:equipamentoId', optionalAuth, async (req, res ) => {
+router.get('/equipamento/:equipamentoId', optionalAuth, async (req, res) => {
   try {
     const { equipamentoId } = req.params;
-
-    const { data, error } = await supabase
-      .from('contrato_equipamentos')
-      .select('tipo_material, numero_serie, modelo')
-      .eq('id', equipamentoId)
-      .single();
-
-    if (error || !data) {
-      return res.status(404).json({ error: 'Equipamento não encontrado' });
-    }
+    const data = await inspecaoService.buscarEquipamento(equipamentoId);
 
     res.json({
       success: true,
-      data: {
-        id: equipamentoId,
-        tipo_material: data.tipo_material,
-        numero_serie: data.numero_serie,
-        modelo: data.modelo,
-      },
+      data,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao buscar equipamento:', error);
-    res.status(500).json({ error: 'Erro ao buscar equipamento' });
+    res.status(404).json({ error: error.message || 'Equipamento não encontrado' });
   }
 });
 
-/**
- * GET /api/inspecao/perguntas/:equipmentType
- * Retorna as perguntas para um tipo de equipamento específico
- */
 router.get('/perguntas/:equipmentType', optionalAuth, async (req, res) => {
   try {
     const { equipmentType } = req.params;
-    
-    // Validar tipo de equipamento
-    const validTypes = [
-      'Desktop', 'Monitor', 'Notebook', 'MiniPro', 'All in One',
-      'Duo', 'Tablet', 'Chromebook', 'Máquina de pagamento', 'Diversos', 'Celular'
-    ];
-    
-    if (!validTypes.includes(equipmentType)) {
-      return res.status(400).json({ 
-        error: 'Tipo de equipamento inválido',
-        validTypes 
-      });
-    }
+    const data = inspecaoService.getQuestionsByEquipmentType(equipmentType);
 
-    const questions = getQuestionsByEquipmentType(equipmentType as EquipmentType);
-
-    res.json({
-      equipmentType,
-      questions,
-      totalQuestions: questions.length,
-    });
-  } catch (error) {
+    res.json(data);
+  } catch (error: any) {
     console.error('Erro ao buscar perguntas:', error);
-    res.status(500).json({ error: 'Erro ao buscar perguntas' });
+    res.status(400).json({ error: error.message || 'Erro ao buscar perguntas' });
   }
 });
 
-/**
- * POST /api/inspecao/salvar
- * Salva as respostas da inspeção com equipamento_id
- */
 router.post('/salvar', optionalAuth, async (req, res) => {
   try {
     const { vistoriaId, equipmentType, answers, observacoes, equipamento_id } = req.body;
 
     if (!vistoriaId || !equipmentType || !answers) {
-      return res.status(400).json({ 
-        error: 'Dados incompletos: vistoriaId, equipmentType e answers são obrigatórios' 
+      return res.status(400).json({
+        error: 'Dados incompletos: vistoriaId, equipmentType e answers são obrigatórios'
       });
     }
 
-    // Construir objeto de inserção
-    const insertData: any = {
-      vistoria_id: vistoriaId,
-      equipment_type: equipmentType,
-      respostas: answers,
-      observacoes: observacoes || null,
-      data_inspecao: new Date().toISOString(),
-    };
-
-    // Adicionar equipamento_id se fornecido
-    if (equipamento_id) {
-      insertData.equipamento_id = equipamento_id;
-      console.log(`[inspecao.ts] Salvando inspeção com equipamento_id: ${equipamento_id}`);
-    }
-
-    // Salvar respostas no banco de dados
-    const { data, error } = await supabase
-      .from('inspecao_respostas')
-      .insert(insertData)
-      .select();
-
-    if (error) {
-      console.error('Erro ao salvar respostas:', error);
-      return res.status(500).json({ 
-        error: 'Erro ao salvar respostas',
-        details: error.message 
-      });
-    }
-
-    console.log('[inspecao.ts] Inspeção salva com sucesso:', data[0]);
-
-    // Atualizar status da vistoria (se existir)
-    try {
-      await supabase
-        .from('vistorias')
-        .update({ status: 'inspecionada' })
-        .eq('id', vistoriaId);
-    } catch (updateError) {
-      console.log('[inspecao.ts] Aviso: Não foi possível atualizar status da vistoria', updateError);
-    }
+    const data = await inspecaoService.salvarRespostas({
+      vistoriaId,
+      equipmentType,
+      answers,
+      observacoes,
+      equipamento_id
+    });
 
     res.json({
       success: true,
       message: 'Inspeção salva com sucesso',
-      data: data[0],
+      data,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao salvar inspeção:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro ao salvar inspeção',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
+      details: error.message || 'Erro desconhecido'
     });
   }
 });
@@ -548,29 +472,15 @@ router.get('/fotos/:vistoriaId', optionalAuth, async (req: any, res: any) => {
   }
 });
 
-/**
- * GET /api/inspecao/:vistoriaId
- * Retorna as respostas de uma inspeção específica
- */
 router.get('/:vistoriaId', optionalAuth, async (req, res) => {
   try {
     const { vistoriaId } = req.params;
-
-    const { data, error } = await supabase
-      .from('inspecao_respostas')
-      .select('*')
-      .eq('vistoria_id', vistoriaId)
-      .single();
-
-    if (error) {
-      console.error('Erro ao buscar inspeção:', error);
-      return res.status(404).json({ error: 'Inspeção não encontrada' });
-    }
+    const data = await inspecaoService.buscarRespostas(vistoriaId);
 
     res.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao buscar inspeção:', error);
-    res.status(500).json({ error: 'Erro ao buscar inspeção' });
+    res.status(404).json({ error: error.message || 'Inspeção não encontrada' });
   }
 });
 
