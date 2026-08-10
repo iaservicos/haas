@@ -130,38 +130,33 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     const fotoHash = crypto.createHash('md5').update(file.buffer).digest('hex');
     console.log('[inspecao.ts] Hash da foto:', fotoHash);
 
-    // ✅ Verificar se foto idêntica já existe (com tratamento de erro)
+    // ✅ Verificar se foto idêntica já existe
     console.log('[inspecao.ts] 🔍 Verificando duplicata com hash:', fotoHash);
 
-    let fotosExistentes = [];
     try {
-      const { data, error: erroVerificacao } = await supabase
+      const { data: fotosExistentes, error: erroVerificacao } = await supabase
         .from('fotos_vistoria')
         .select('id, foto_nome, created_at')
         .eq('foto_hash', fotoHash)
         .limit(1);
 
       console.log('[inspecao.ts] - Erro verificação:', erroVerificacao);
-      console.log('[inspecao.ts] - Fotos encontradas:', data?.length || 0);
+      console.log('[inspecao.ts] - Fotos encontradas:', fotosExistentes?.length || 0);
 
-      if (!erroVerificacao && data && data.length > 0) {
-        fotosExistentes = data;
+      if (!erroVerificacao && fotosExistentes && fotosExistentes.length > 0) {
+        const fotoExistente = fotosExistentes[0];
+        console.log('[inspecao.ts] ⚠️ Foto duplicada detectada! Hash encontrado em:', fotoExistente.id);
+        return res.status(409).json({
+          error: 'Foto duplicada',
+          message: 'Esta foto já foi enviada anteriormente',
+          detalhes: {
+            foto_anterior: fotoExistente.foto_nome,
+            enviada_em: fotoExistente.created_at
+          }
+        });
       }
     } catch (dupError) {
       console.log('[inspecao.ts] ⚠️ Erro na verificação de duplicata:', dupError);
-    }
-
-    if (fotosExistentes.length > 0) {
-      const fotoExistente = fotosExistentes[0];
-      console.log('[inspecao.ts] ⚠️ Foto duplicada detectada! Hash encontrado em:', fotoExistente.id);
-      return res.status(409).json({
-        error: 'Foto duplicada',
-        message: 'Esta foto já foi enviada anteriormente',
-        detalhes: {
-          foto_anterior: fotoExistente.foto_nome,
-          enviada_em: fotoExistente.created_at
-        }
-      });
     }
 
     // ✅ Salvar foto no Supabase Storage
@@ -195,17 +190,32 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     console.log('[inspecao.ts] - vistoria_id:', vistoria_id);
     console.log('[inspecao.ts] - foto_nome:', foto_nome || file.originalname);
 
-    const { data, error } = await supabase
+    // Tentar com foto_hash primeiro, se falhar tentar sem
+    let insertData: any = {
+      vistoria_id: vistoria_id || null,
+      foto_url: publicUrl,
+      foto_nome: foto_nome || file.originalname,
+      foto_tipo: foto_tipo || file.mimetype,
+      tamanho_bytes: file.size,
+      foto_hash: fotoHash,
+    };
+
+    let { data, error } = await supabase
       .from('fotos_vistoria')
-      .insert({
-        vistoria_id: vistoria_id || null,
-        foto_url: publicUrl,
-        foto_nome: foto_nome || file.originalname,
-        foto_tipo: foto_tipo || file.mimetype,
-        tamanho_bytes: file.size,
-        foto_hash: fotoHash,
-      })
+      .insert(insertData)
       .select();
+
+    // Se falhar por coluna não existir, tentar sem foto_hash
+    if (error && error.message?.includes('foto_hash')) {
+      console.warn('[inspecao.ts] ⚠️ Coluna foto_hash não existe, tentando sem...');
+      delete insertData.foto_hash;
+      const result = await supabase
+        .from('fotos_vistoria')
+        .insert(insertData)
+        .select();
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('[inspecao.ts] ❌ ERRO CRÍTICO ao salvar foto no banco:');
