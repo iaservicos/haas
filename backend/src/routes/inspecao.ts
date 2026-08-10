@@ -207,14 +207,14 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     console.log('[inspecao.ts] Hash da foto:', fotoHash);
 
     // ✅ Verificar se foto idêntica já existe
-    const { data: fotoExistente, error: erroVerificacao } = await supabase
+    const { data: fotosExistentes, error: erroVerificacao } = await supabase
       .from('fotos_vistoria')
       .select('id, foto_nome, created_at')
       .eq('foto_hash', fotoHash)
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (!erroVerificacao && fotoExistente) {
+    if (!erroVerificacao && fotosExistentes && fotosExistentes.length > 0) {
+      const fotoExistente = fotosExistentes[0];
       console.log('[inspecao.ts] ⚠️ Foto duplicada detectada! Hash encontrado em:', fotoExistente.id);
       return res.status(409).json({
         error: 'Foto duplicada',
