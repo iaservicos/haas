@@ -9,7 +9,7 @@ interface Equipamento {
   numero_serie: string;
   modelo: string;
   sku: string | null;
-  tipo_equipamento: string;
+  tipo_material: string;
   data_criacao: string;
   contratos?: {
     id: number;
@@ -53,7 +53,7 @@ export function GerenciarEquipamentos() {
     numero_serie: '',
     modelo: '',
     sku: '',
-    tipo_equipamento: 'notebook',
+    tipo_material: 'notebook',
   });
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export function GerenciarEquipamentos() {
           numero_serie,
           modelo,
           sku,
-          tipo_equipamento,
+          tipo_material,
           data_criacao,
           contratos:contrato_id(
             id,
@@ -176,7 +176,7 @@ export function GerenciarEquipamentos() {
         numero_serie: equipamento.numero_serie,
         modelo: equipamento.modelo,
         sku: equipamento.sku || '',
-        tipo_equipamento: equipamento.tipo_equipamento || 'notebook',
+        tipo_material: equipamento.tipo_material || 'notebook',
       });
     } else {
       setIsEditing(false);
@@ -186,7 +186,7 @@ export function GerenciarEquipamentos() {
         numero_serie: '',
         modelo: '',
         sku: '',
-        tipo_equipamento: 'notebook',
+        tipo_material: 'notebook',
       });
     }
     setShowModal(true);
@@ -199,12 +199,12 @@ export function GerenciarEquipamentos() {
       numero_serie: '',
       modelo: '',
       sku: '',
-      tipo_equipamento: 'notebook',
+      tipo_material: 'notebook',
     });
   };
 
   const handleSave = async () => {
-    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo || !formData.sku || !formData.tipo_equipamento) {
+    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo || !formData.sku || !formData.tipo_material) {
       alert('Preencha todos os campos obrigatórios: Contrato, Série, Modelo, SKU e Tipo de Equipamento');
       return;
     }
@@ -219,7 +219,7 @@ export function GerenciarEquipamentos() {
             numero_serie: formData.numero_serie,
             modelo: formData.modelo,
             sku: formData.sku,
-            tipo_equipamento: formData.tipo_equipamento,
+            tipo_material: formData.tipo_material,
           })
           .eq('id', editingId);
 
@@ -234,7 +234,7 @@ export function GerenciarEquipamentos() {
             numero_serie: formData.numero_serie,
             modelo: formData.modelo,
             sku: formData.sku,
-            tipo_equipamento: formData.tipo_equipamento,
+            tipo_material: formData.tipo_material,
           }]);
 
         if (error) throw error;
@@ -357,7 +357,7 @@ export function GerenciarEquipamentos() {
               row['Tipo'] ||
               row['tipo'] ||
               row['Tipo de Equipamento'] ||
-              row['tipo_equipamento'] ||
+              row['tipo_material'] ||
               'notebook'
             ).trim().toLowerCase();
 
@@ -385,7 +385,7 @@ export function GerenciarEquipamentos() {
                     numero_serie: numeroSerie,
                     modelo: modelo,
                     sku: sku,
-                    tipo_equipamento: tipoEquipamento,
+                    tipo_material: tipoEquipamento,
                   }]);
 
                 if (error) {
@@ -637,7 +637,7 @@ export function GerenciarEquipamentos() {
                             {equip.modelo}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
-                            {equip.tipo_equipamento || '-'}
+                            {equip.tipo_material || '-'}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             {equip.sku || '-'}
@@ -757,9 +757,9 @@ export function GerenciarEquipamentos() {
                   Tipo de Equipamento
                 </label>
                 <select
-                  value={formData.tipo_equipamento}
+                  value={formData.tipo_material}
                   onChange={(e) =>
-                    setFormData({ ...formData, tipo_equipamento: e.target.value })
+                    setFormData({ ...formData, tipo_material: e.target.value })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
