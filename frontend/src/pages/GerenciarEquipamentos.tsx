@@ -9,6 +9,7 @@ interface Equipamento {
   numero_serie: string;
   modelo: string;
   sku: string | null;
+  tipo_equipamento: string;
   data_criacao: string;
   contratos?: {
     id: number;
@@ -52,6 +53,7 @@ export function GerenciarEquipamentos() {
     numero_serie: '',
     modelo: '',
     sku: '',
+    tipo_equipamento: 'notebook',
   });
 
   useEffect(() => {
@@ -122,6 +124,7 @@ export function GerenciarEquipamentos() {
           numero_serie,
           modelo,
           sku,
+          tipo_equipamento,
           data_criacao,
           contratos:contrato_id(
             id,
@@ -173,6 +176,7 @@ export function GerenciarEquipamentos() {
         numero_serie: equipamento.numero_serie,
         modelo: equipamento.modelo,
         sku: equipamento.sku || '',
+        tipo_equipamento: equipamento.tipo_equipamento || 'notebook',
       });
     } else {
       setIsEditing(false);
@@ -182,6 +186,7 @@ export function GerenciarEquipamentos() {
         numero_serie: '',
         modelo: '',
         sku: '',
+        tipo_equipamento: 'notebook',
       });
     }
     setShowModal(true);
@@ -194,12 +199,13 @@ export function GerenciarEquipamentos() {
       numero_serie: '',
       modelo: '',
       sku: '',
+      tipo_equipamento: 'notebook',
     });
   };
 
   const handleSave = async () => {
-    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo || !formData.sku) {
-      alert('Preencha todos os campos obrigatórios: Contrato, Série, Modelo e SKU');
+    if (!formData.contrato_id || !formData.numero_serie || !formData.modelo || !formData.sku || !formData.tipo_equipamento) {
+      alert('Preencha todos os campos obrigatórios: Contrato, Série, Modelo, SKU e Tipo de Equipamento');
       return;
     }
 
@@ -213,6 +219,7 @@ export function GerenciarEquipamentos() {
             numero_serie: formData.numero_serie,
             modelo: formData.modelo,
             sku: formData.sku,
+            tipo_equipamento: formData.tipo_equipamento,
           })
           .eq('id', editingId);
 
@@ -227,6 +234,7 @@ export function GerenciarEquipamentos() {
             numero_serie: formData.numero_serie,
             modelo: formData.modelo,
             sku: formData.sku,
+            tipo_equipamento: formData.tipo_equipamento,
           }]);
 
         if (error) throw error;
@@ -337,14 +345,21 @@ export function GerenciarEquipamentos() {
             const row: any = rows[i];
 
             const numeroSerie = String(
-              row['Nº Série'] || 
-              row['No Serie'] || 
-              row['numero_serie'] || 
+              row['Nº Série'] ||
+              row['No Serie'] ||
+              row['numero_serie'] ||
               row['N° Série'] ||
               ''
             ).trim();
             const modelo = String(row['Modelo'] || row['modelo'] || '').trim();
             const sku = String(row['SKU'] || row['sku'] || '').trim();
+            const tipoEquipamento = String(
+              row['Tipo'] ||
+              row['tipo'] ||
+              row['Tipo de Equipamento'] ||
+              row['tipo_equipamento'] ||
+              'notebook'
+            ).trim().toLowerCase();
 
             if (!numeroSerie || !modelo || !sku) {
               skipped++;
@@ -370,6 +385,7 @@ export function GerenciarEquipamentos() {
                     numero_serie: numeroSerie,
                     modelo: modelo,
                     sku: sku,
+                    tipo_equipamento: tipoEquipamento,
                   }]);
 
                 if (error) {
@@ -600,6 +616,7 @@ export function GerenciarEquipamentos() {
                         <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Cliente</th>
                         <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">No Serie</th>
                         <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Modelo</th>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Tipo</th>
                         <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
                         <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Acoes</th>
                       </tr>
@@ -618,6 +635,9 @@ export function GerenciarEquipamentos() {
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             {equip.modelo}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            {equip.tipo_equipamento || '-'}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             {equip.sku || '-'}
@@ -730,6 +750,26 @@ export function GerenciarEquipamentos() {
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Equipamento
+                </label>
+                <select
+                  value={formData.tipo_equipamento}
+                  onChange={(e) =>
+                    setFormData({ ...formData, tipo_equipamento: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="notebook">Notebook</option>
+                  <option value="desktop">Desktop</option>
+                  <option value="impressora">Impressora</option>
+                  <option value="monitor">Monitor</option>
+                  <option value="servidor">Servidor</option>
+                  <option value="outro">Outro</option>
+                </select>
               </div>
 
               <div>
