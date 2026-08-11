@@ -275,7 +275,10 @@ export function Dashboard() {
       const response = await apiClient.delete(`/vistorias/${vistoriaId}`);
       if (response.data.success) {
         console.log('[Dashboard] Vistoria deletada com sucesso');
+        // Recarregar ambas as listas
         loadVistorias();
+        loadVistoriasPortal();
+        alert('Vistoria deletada com sucesso!');
       }
     } catch (error) {
       console.error('[Dashboard] Erro ao deletar vistoria:', error);
