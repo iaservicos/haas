@@ -269,7 +269,19 @@ export function Dashboard() {
     setShowRespostasModal(true);
   };
 
-  
+  const deletarVistoria = async (vistoriaId: string) => {
+    try {
+      const response = await apiClient.delete(`/vistorias/${vistoriaId}`);
+      if (response.data.success) {
+        console.log('[Dashboard] Vistoria deletada com sucesso');
+        carregarVistorias();
+      }
+    } catch (error) {
+      console.error('[Dashboard] Erro ao deletar vistoria:', error);
+      alert('Erro ao deletar vistoria. Tente novamente.');
+    }
+  };
+
   // Funcao para determinar status final (prioriza IA)
   const getStatusFinal = (vistoria: any) => {
     const analise = vistoria.analise_ia;
@@ -1114,12 +1126,24 @@ export function Dashboard() {
                                   </button>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">
-                                  <button
-                                    onClick={() => abrirModalRespostas(vistoria)}
-                                    className="text-blue-600 hover:text-blue-800 font-semibold"
-                                  >
-                                    Ver Detalhes
-                                  </button>
+                                  <div className="flex gap-3">
+                                    <button
+                                      onClick={() => abrirModalRespostas(vistoria)}
+                                      className="text-blue-600 hover:text-blue-800 font-semibold"
+                                    >
+                                      Ver Detalhes
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Tem certeza que deseja deletar esta vistoria? Esta ação não pode ser desfeita.')) {
+                                          deletarVistoria(vistoria.id);
+                                        }
+                                      }}
+                                      className="text-red-600 hover:text-red-800 font-semibold"
+                                    >
+                                      Deletar
+                                    </button>
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900">{vistoria.observacoes || '—'}</td>
                               </tr>
