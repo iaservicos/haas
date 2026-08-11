@@ -1463,7 +1463,7 @@ export function Dashboard() {
 
         {/* FOOTER */}
         <div className="bg-gray-900 text-gray-400 text-xs py-4 px-8 border-t border-gray-800">
-          <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Ryan Gabriel, Weslley Neri</span></p>
+          <p>Desenvolvido por <span className="font-semibold text-white">IA Serviços</span>  •  <span className="font-semibold text-white">Supervisora: Mikaela Nogueira</span>  •  <span className="font-semibold text-white">Analistas: Angélica Rejan, Weslley Neri</span></p>
         </div>
       </div>
 
