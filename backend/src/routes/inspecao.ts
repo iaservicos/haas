@@ -130,7 +130,28 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     const fotoHash = crypto.createHash('md5').update(file.buffer).digest('hex');
     console.log('[inspecao.ts] Hash da foto:', fotoHash);
 
-    // TODO: Implementar detecção de duplicata por hash quando coluna estiver pronta
+    // ✅ Verificar se foto idêntica já existe
+    console.log('[inspecao.ts] 🔍 Verificando duplicata com hash:', fotoHash);
+    try {
+      const { data: fotosComHash } = await supabase
+        .from('fotos_vistoria')
+        .select('id, foto_nome, created_at')
+        .eq('foto_hash', fotoHash);
+
+      if (fotosComHash && fotosComHash.length > 0) {
+        console.log('[inspecao.ts] ⚠️ Foto duplicada encontrada!');
+        return res.status(409).json({
+          error: 'Foto duplicada',
+          message: 'Esta foto já foi enviada anteriormente',
+          detalhes: {
+            foto_anterior: fotosComHash[0].foto_nome,
+            enviada_em: fotosComHash[0].created_at
+          }
+        });
+      }
+    } catch (err) {
+      console.log('[inspecao.ts] ℹ️ Coluna foto_hash pode não existir ainda, continuando...');
+    }
 
     // ✅ Salvar foto no Supabase Storage
     const fileName = `${vistoria_id || 'sem-vistoria'}/${Date.now()}-${foto_nome || file.originalname}`;
@@ -163,16 +184,23 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
     console.log('[inspecao.ts] - vistoria_id:', vistoria_id);
     console.log('[inspecao.ts] - foto_nome:', foto_nome || file.originalname);
 
-    // ✅ Salvar foto no banco (sem foto_hash por enquanto)
+    // ✅ Salvar foto no banco
+    const insertPayload: any = {
+      vistoria_id: vistoria_id || null,
+      foto_url: publicUrl,
+      foto_nome: foto_nome || file.originalname,
+      foto_tipo: foto_tipo || file.mimetype,
+      tamanho_bytes: file.size,
+    };
+
+    // Tentar adicionar foto_hash se a coluna existir
+    if (fotoHash) {
+      insertPayload.foto_hash = fotoHash;
+    }
+
     const { data, error } = await supabase
       .from('fotos_vistoria')
-      .insert({
-        vistoria_id: vistoria_id || null,
-        foto_url: publicUrl,
-        foto_nome: foto_nome || file.originalname,
-        foto_tipo: foto_tipo || file.mimetype,
-        tamanho_bytes: file.size,
-      })
+      .insert(insertPayload)
       .select();
 
     if (error) {
