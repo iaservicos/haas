@@ -53,7 +53,7 @@ export function GerenciarEquipamentos() {
     numero_serie: '',
     modelo: '',
     sku: '',
-    tipo_material: 'notebook',
+    tipo_material: '',
   });
 
   useEffect(() => {
@@ -186,7 +186,7 @@ export function GerenciarEquipamentos() {
         numero_serie: '',
         modelo: '',
         sku: '',
-        tipo_material: 'notebook',
+        tipo_material: '',
       });
     }
     setShowModal(true);
@@ -199,7 +199,7 @@ export function GerenciarEquipamentos() {
       numero_serie: '',
       modelo: '',
       sku: '',
-      tipo_material: 'notebook',
+      tipo_material: '',
     });
   };
 
@@ -358,8 +358,8 @@ export function GerenciarEquipamentos() {
               row['tipo'] ||
               row['Tipo de Equipamento'] ||
               row['tipo_material'] ||
-              'notebook'
-            ).trim().toLowerCase();
+              ''
+            ).trim();
 
             if (!numeroSerie || !modelo || !sku) {
               skipped++;
@@ -763,12 +763,18 @@ export function GerenciarEquipamentos() {
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="notebook">Notebook</option>
-                  <option value="desktop">Desktop</option>
-                  <option value="impressora">Impressora</option>
-                  <option value="monitor">Monitor</option>
-                  <option value="servidor">Servidor</option>
-                  <option value="outro">Outro</option>
+                  <option value="">Selecione um tipo</option>
+                  <option value="Desktop">Desktop</option>
+                  <option value="Monitor">Monitor</option>
+                  <option value="Notebook">Notebook</option>
+                  <option value="MiniPro">MiniPro</option>
+                  <option value="All in One">All in One</option>
+                  <option value="Duo">Duo</option>
+                  <option value="Tablet">Tablet</option>
+                  <option value="Chromebook">Chromebook</option>
+                  <option value="Máquina de pagamento">Máquina de pagamento</option>
+                  <option value="Diversos">Diversos</option>
+                  <option value="Celular">Celular</option>
                 </select>
               </div>
 
