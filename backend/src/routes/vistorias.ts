@@ -169,27 +169,34 @@ router.get('/portal/listar', async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/vistorias/:id
- * Deleta uma vistoria (e dados relacionados)
+ * Deleta uma vistoria do portal (inspecao_respostas e dados relacionados)
  */
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    console.log(`[vistorias] Deletando vistoria: ${id}`);
+    console.log(`[vistorias] Deletando vistoria do portal: ${id}`);
 
-    // Deletar respostas da inspeção
-    const deleteRespostasResult = await supabase
+    // Buscar a inspeção para obter vistoria_id
+    const { data: inspecao } = await supabase
       .from('inspecao_respostas')
-      .delete()
-      .eq('vistoria_id', id);
+      .select('vistoria_id')
+      .eq('id', id)
+      .single();
 
-    console.log(`[vistorias] Deletadas respostas de inspeção para vistoria_id: ${id}`);
+    if (!inspecao) {
+      return res.status(404).json({
+        error: 'Vistoria não encontrada'
+      });
+    }
 
-    // Deletar análises de fotos
+    const vistoriaId = inspecao.vistoria_id;
+
+    // Deletar análises de fotos relacionadas
     const { data: fotos } = await supabase
       .from('fotos_vistoria')
       .select('id')
-      .eq('vistoria_id', id);
+      .eq('vistoria_id', vistoriaId);
 
     if (fotos && fotos.length > 0) {
       const fotoIds = fotos.map((f: any) => f.id);
@@ -203,23 +210,23 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await supabase
       .from('fotos_vistoria')
       .delete()
-      .eq('vistoria_id', id);
+      .eq('vistoria_id', vistoriaId);
 
-    // Deletar vistoria
-    const { error } = await supabase
-      .from('vistorias')
+    // Deletar respostas da inspeção (inspecao_respostas)
+    const { error: deleteError } = await supabase
+      .from('inspecao_respostas')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      console.error('[vistorias] Erro ao deletar vistoria:', error);
+    if (deleteError) {
+      console.error('[vistorias] Erro ao deletar inspecao_respostas:', deleteError);
       return res.status(500).json({
         error: 'Erro ao deletar vistoria',
-        details: error.message
+        details: deleteError.message
       });
     }
 
-    console.log(`[vistorias] ✅ Vistoria ${id} deletada com sucesso`);
+    console.log(`[vistorias] ✅ Vistoria do portal ${id} deletada com sucesso`);
 
     res.json({
       success: true,
