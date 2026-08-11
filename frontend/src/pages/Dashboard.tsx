@@ -275,7 +275,7 @@ export function Dashboard() {
       const response = await apiClient.delete(`/vistorias/${vistoriaId}`);
       if (response.data.success) {
         console.log('[Dashboard] Vistoria deletada com sucesso');
-        carregarVistorias();
+        loadVistorias();
       }
     } catch (error) {
       console.error('[Dashboard] Erro ao deletar vistoria:', error);
