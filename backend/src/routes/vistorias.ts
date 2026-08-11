@@ -178,10 +178,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
     console.log(`[vistorias] Deletando vistoria: ${id}`);
 
     // Deletar respostas da inspeção
-    await supabase
+    const deleteRespostasResult = await supabase
       .from('inspecao_respostas')
       .delete()
       .eq('vistoria_id', id);
+
+    console.log(`[vistorias] Deletadas respostas de inspeção para vistoria_id: ${id}`);
 
     // Deletar análises de fotos
     const { data: fotos } = await supabase
