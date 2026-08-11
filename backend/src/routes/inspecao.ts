@@ -142,11 +142,7 @@ router.post('/upload-foto', optionalAuth, (upload.single('file') as any), async 
         console.log('[inspecao.ts] ⚠️ Foto duplicada encontrada!');
         return res.status(409).json({
           error: 'Foto duplicada',
-          message: 'Esta foto já foi enviada anteriormente',
-          detalhes: {
-            foto_anterior: fotosComHash[0].foto_nome,
-            enviada_em: fotosComHash[0].created_at
-          }
+          message: 'Foto duplicada - por favor enviar uma nova foto do equipamento'
         });
       }
     } catch (err) {

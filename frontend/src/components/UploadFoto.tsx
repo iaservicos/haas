@@ -127,9 +127,7 @@ export const UploadFoto: React.FC<UploadFotoProps> = ({
 
       // Verificar se é erro de foto duplicada (409)
       if (err.response?.status === 409) {
-        const mensagem = err.response?.data?.message || 'Foto duplicada';
-        const fotoAnterior = err.response?.data?.detalhes?.foto_anterior || 'desconhecida';
-        setErro(`${mensagem}. A foto "${fotoAnterior}" já foi enviada anteriormente.`);
+        setErro(err.response?.data?.message || 'Foto duplicada - por favor enviar uma nova foto do equipamento');
       } else {
         setErro(err instanceof Error ? err.message : 'Erro desconhecido');
       }

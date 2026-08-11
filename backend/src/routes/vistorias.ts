@@ -167,4 +167,69 @@ router.get('/portal/listar', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /api/vistorias/:id
+ * Deleta uma vistoria (e dados relacionados)
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`[vistorias] Deletando vistoria: ${id}`);
+
+    // Deletar respostas da inspeção
+    await supabase
+      .from('inspecao_respostas')
+      .delete()
+      .eq('vistoria_id', id);
+
+    // Deletar análises de fotos
+    const { data: fotos } = await supabase
+      .from('fotos_vistoria')
+      .select('id')
+      .eq('vistoria_id', id);
+
+    if (fotos && fotos.length > 0) {
+      const fotoIds = fotos.map((f: any) => f.id);
+      await supabase
+        .from('analises_fotos')
+        .delete()
+        .in('foto_id', fotoIds);
+    }
+
+    // Deletar fotos
+    await supabase
+      .from('fotos_vistoria')
+      .delete()
+      .eq('vistoria_id', id);
+
+    // Deletar vistoria
+    const { error } = await supabase
+      .from('vistorias')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[vistorias] Erro ao deletar vistoria:', error);
+      return res.status(500).json({
+        error: 'Erro ao deletar vistoria',
+        details: error.message
+      });
+    }
+
+    console.log(`[vistorias] ✅ Vistoria ${id} deletada com sucesso`);
+
+    res.json({
+      success: true,
+      message: 'Vistoria deletada com sucesso'
+    });
+  } catch (error) {
+    console.error('[vistorias] Erro ao deletar vistoria:', error);
+    res.status(500).json({
+      error: 'Erro ao deletar vistoria',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
 export default router;
