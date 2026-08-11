@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { vistoriaService } from '../services/vistoria.service';
 import { supabase } from '../services/supabase';
+import { apiClient } from '../services/api';
 import { Vistoria } from '../types';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 
