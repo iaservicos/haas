@@ -170,63 +170,84 @@ router.get('/portal/listar', async (req: Request, res: Response) => {
 /**
  * DELETE /api/vistorias/:id
  * Deleta uma vistoria do portal (inspecao_respostas e dados relacionados)
+ * Cascata: analises_fotos -> fotos_vistoria -> inspecao_respostas
  */
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    console.log(`[vistorias] Deletando vistoria do portal: ${id}`);
+    console.log(`[vistorias] Iniciando exclusão de vistoria portal ID: ${id}`);
 
-    // Buscar a inspeção para obter vistoria_id
-    const { data: inspecao } = await supabase
+    // Passo 1: Buscar a inspeção para obter vistoria_id
+    const { data: inspecao, error: inspecaoError } = await supabase
       .from('inspecao_respostas')
       .select('vistoria_id')
       .eq('id', id)
       .single();
 
-    if (!inspecao) {
+    if (inspecaoError || !inspecao) {
+      console.error('[vistorias] Vistoria não encontrada:', id);
       return res.status(404).json({
         error: 'Vistoria não encontrada'
       });
     }
 
     const vistoriaId = inspecao.vistoria_id;
+    console.log(`[vistorias] Vistoria encontrada, vistoria_id: ${vistoriaId}`);
 
-    // Deletar análises de fotos relacionadas
-    const { data: fotos } = await supabase
+    // Passo 2: Buscar todas as fotos desta vistoria
+    const { data: fotos, error: fotosError } = await supabase
       .from('fotos_vistoria')
       .select('id')
       .eq('vistoria_id', vistoriaId);
 
+    console.log(`[vistorias] Fotos encontradas: ${fotos?.length || 0}`);
+
+    // Passo 3: Deletar análises de fotos
     if (fotos && fotos.length > 0) {
       const fotoIds = fotos.map((f: any) => f.id);
-      await supabase
+      console.log(`[vistorias] Deletando análises de fotos...`);
+      const { error: deleteAnalisesError } = await supabase
         .from('analises_fotos')
         .delete()
         .in('foto_id', fotoIds);
+
+      if (deleteAnalisesError) {
+        console.error('[vistorias] Erro ao deletar análises:', deleteAnalisesError);
+      } else {
+        console.log(`[vistorias] ✓ Análises deletadas`);
+      }
     }
 
-    // Deletar fotos
-    await supabase
+    // Passo 4: Deletar fotos
+    console.log(`[vistorias] Deletando fotos...`);
+    const { error: deleteFotosError } = await supabase
       .from('fotos_vistoria')
       .delete()
       .eq('vistoria_id', vistoriaId);
 
-    // Deletar respostas da inspeção (inspecao_respostas)
-    const { error: deleteError } = await supabase
+    if (deleteFotosError) {
+      console.error('[vistorias] Erro ao deletar fotos:', deleteFotosError);
+    } else {
+      console.log(`[vistorias] ✓ Fotos deletadas`);
+    }
+
+    // Passo 5: Deletar respostas da inspeção
+    console.log(`[vistorias] Deletando respostas de inspeção...`);
+    const { error: deleteRespostasError } = await supabase
       .from('inspecao_respostas')
       .delete()
       .eq('id', id);
 
-    if (deleteError) {
-      console.error('[vistorias] Erro ao deletar inspecao_respostas:', deleteError);
+    if (deleteRespostasError) {
+      console.error('[vistorias] Erro ao deletar inspecao_respostas:', deleteRespostasError);
       return res.status(500).json({
         error: 'Erro ao deletar vistoria',
-        details: deleteError.message
+        details: deleteRespostasError.message
       });
     }
 
-    console.log(`[vistorias] ✅ Vistoria do portal ${id} deletada com sucesso`);
+    console.log(`[vistorias] ✅ Vistoria do portal ${id} (vistoria_id: ${vistoriaId}) deletada com sucesso`);
 
     res.json({
       success: true,
