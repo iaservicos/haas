@@ -361,7 +361,7 @@ export function GerenciarEquipamentos() {
               ''
             ).trim();
 
-            if (!numeroSerie || !modelo || !sku) {
+            if (!numeroSerie || !modelo || !sku || !tipoEquipamento) {
               skipped++;
               continue;
             }

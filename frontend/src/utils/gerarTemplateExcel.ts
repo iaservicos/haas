@@ -57,16 +57,19 @@ function gerarArquivoExcel() {
       {
         'Nº Série': '5A4044G3H',
         'Modelo': 'POS MASTER C6400 MINIPRO F8256N1XC IOS',
+        'Tipo': 'MiniPro',
         'SKU': '1307211'
       },
       {
         'Nº Série': '4AF91NQ5F',
         'Modelo': 'POS MASTER N6440 H3-03922 SESI_DF FP',
+        'Tipo': 'Máquina de pagamento',
         'SKU': '3045107'
       },
       {
         'Nº Série': '4AF91NQ4A',
         'Modelo': 'POS MASTER N6440 H3-03922 SESI_DF FP',
+        'Tipo': 'Máquina de pagamento',
         'SKU': '3045107'
       }
     ];
@@ -76,6 +79,7 @@ function gerarArquivoExcel() {
       equipamentosData.push({
         'Nº Série': '',
         'Modelo': '',
+        'Tipo': '',
         'SKU': ''
       });
     }
@@ -85,7 +89,8 @@ function gerarArquivoExcel() {
     // Configurar largura das colunas
     equipamentosSheet['!cols'] = [
       { wch: 20 },  // Nº Série
-      { wch: 20 },  // Modelo
+      { wch: 35 },  // Modelo
+      { wch: 20 },  // Tipo
       { wch: 15 }   // SKU
     ];
 
@@ -111,14 +116,19 @@ function gerarArquivoExcel() {
       ['COLUNAS OBRIGATÓRIAS:'],
       ['• Nº Série: Número de série do equipamento (obrigatório)'],
       ['• Modelo: Modelo do equipamento (obrigatório)'],
+      ['• Tipo: Tipo do equipamento (obrigatório)'],
       ['• SKU: Código SKU do equipamento (obrigatório)'],
+      [''],
+      ['TIPOS VÁLIDOS:'],
+      ['Desktop, Monitor, Notebook, MiniPro, All in One, Duo, Tablet, Chromebook, Máquina de pagamento, Diversos, Celular'],
       [''],
       ['REGRAS:'],
       ['1. Não deixe campos obrigatórios em branco'],
-      ['2. Não modifique o nome das colunas'],
-      ['3. Não adicione novas colunas'],
-      ['4. Use apenas a aba "Equipamentos"'],
-      ['5. Equipamentos duplicados (mesma série) serão ignorados'],
+      ['2. Use apenas os tipos válidos listados acima'],
+      ['3. Não modifique o nome das colunas'],
+      ['4. Não adicione novas colunas'],
+      ['5. Use apenas a aba "Equipamentos"'],
+      ['6. Equipamentos duplicados (mesma série) serão ignorados'],
       [''],
       ['SUPORTE:'],
       ['Em caso de dúvidas, entre em contato com a Equipe da IA Serviços']
