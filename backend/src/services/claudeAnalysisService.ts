@@ -96,6 +96,7 @@ function isValidAnalysisResponse(response: any): boolean {
 function parseJsonResponse(claudeResponse: string): AnalysisResult {
   let jsonContent = claudeResponse.trim();
 
+  // Remove markdown code blocks
   if (jsonContent.includes('```')) {
     jsonContent = jsonContent
       .replace(/```json\n?/g, '')
@@ -103,15 +104,31 @@ function parseJsonResponse(claudeResponse: string): AnalysisResult {
       .trim();
   }
 
+  // Extrair apenas o objeto JSON se houver texto extra
+  const jsonMatch = jsonContent.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+  if (jsonMatch) {
+    jsonContent = jsonMatch[0];
+  }
+
+  // Limpar whitespace
   jsonContent = jsonContent
     .replace(/\n/g, ' ')
     .replace(/\r/g, '')
     .replace(/\t/g, ' ')
     .replace(/  +/g, ' ');
 
-  jsonContent = jsonContent.replace(/": '/g, '": "').replace(/', "/g, '", "').replace(/',/g, '",');
-
-  return JSON.parse(jsonContent);
+  // Tentar parse direto primeiro
+  try {
+    return JSON.parse(jsonContent);
+  } catch (e) {
+    // Se falhar, tentar corrigir aspas
+    jsonContent = jsonContent
+      .replace(/': '/g, '": "')
+      .replace(/': /g, '": ')
+      .replace(/', "/g, '", "')
+      .replace(/,'/g, ',"');
+    return JSON.parse(jsonContent);
+  }
 }
 
 // Main Service
