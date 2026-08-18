@@ -1,0 +1,61 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  DOCKER_IMAGE_LATEST: $CI_REGISTRY_IMAGE:latest
+
+# Build Docker image
+build:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $DOCKER_IMAGE_NAME -t $DOCKER_IMAGE_LATEST .
+    - docker push $DOCKER_IMAGE_NAME
+    - docker push $DOCKER_IMAGE_LATEST
+  only:
+    - main
+    - qa
+
+# Deploy to QA
+deploy_qa:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl kubectl
+    - mkdir -p $HOME/.kube
+    - echo "$K8S_KUBECONFIG" | base64 -d > $HOME/.kube/config
+  script:
+    - kubectl set image deployment/$K8S_NAMESPACE -n $K8S_NAMESPACE $K8S_NAMESPACE=$DOCKER_IMAGE_NAME
+    - kubectl rollout status deployment/$K8S_NAMESPACE -n $K8S_NAMESPACE --timeout=5m
+  environment:
+    name: qa
+    kubernetes:
+      namespace: $K8S_NAMESPACE
+  only:
+    - qa
+  when: manual
+
+# Deploy to Production
+deploy_prd:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl kubectl
+    - mkdir -p $HOME/.kube
+    - echo "$K8S_KUBECONFIG_PRD" | base64 -d > $HOME/.kube/config
+  script:
+    - kubectl set image deployment/$K8S_NAMESPACE -n $K8S_NAMESPACE $K8S_NAMESPACE=$DOCKER_IMAGE_NAME
+    - kubectl rollout status deployment/$K8S_NAMESPACE -n $K8S_NAMESPACE --timeout=5m
+  environment:
+    name: production
+    kubernetes:
+      namespace: $K8S_NAMESPACE
+  only:
+    - main
+  when: manual

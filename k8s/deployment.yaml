@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  namespace: ${APP_NAME}
+  labels:
+    app: ${APP_NAME}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+    spec:
+      serviceAccountName: ${APP_NAME}
+      containers:
+      - name: ${APP_NAME}
+        image: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA}
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 5000
+          protocol: TCP
+        env:
+        - name: BIND_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ${APP_NAME}-config
+              key: BIND_PORT
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ${APP_NAME}-config
+              key: NODE_ENV
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: SUPABASE_URL
+        - name: SUPABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: SUPABASE_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: JWT_SECRET
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: ANTHROPIC_API_KEY
+        - name: GPTMAKER_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: GPTMAKER_API_TOKEN
+              optional: true
+        - name: GPTMAKER_AGENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: GPTMAKER_AGENT_ID
+              optional: true
+        - name: GPTMAKER_WORKSPACE_ID
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: GPTMAKER_WORKSPACE_ID
+              optional: true
+        - name: POWER_AUTOMATE_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: ${APP_NAME}-secrets
+              key: POWER_AUTOMATE_WEBHOOK_URL
+              optional: true
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      imagePullSecrets:
+      - name: regcred
